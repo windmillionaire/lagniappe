@@ -267,6 +267,10 @@ td [data-role="quick-edit-error"] {
 			border-top: none;
 		}
 
+		& > tbody > tr[data-role="loading"][data-visible="true"] {
+			display: block;
+		}
+
 		& > tbody > tr[data-key] {
 			display: flex;
 			flex-direction: column;

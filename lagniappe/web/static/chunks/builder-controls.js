@@ -1,2 +1,756 @@
-import{s as L,S as f}from"./ui-resources.js?v=b9ad6d22";import{w as k,g as N}from"./foundation.js?v=b9ad6d22";import{p as u}from"./ui-controls.js?v=b9ad6d22";import{F as A,S as C}from"./forms.js?v=b9ad6d22";import{f as x,C as P}from"./builder.js?v=b9ad6d22";class w{constructor(e){this.builder=e,this.element=e.selectedElement,this.target=document.createElement("div"),this.target.className="flex flex-col gap-4",this.submitButton=this._createSubmitButton(),this.header=this._createHeader(),this.progress=this._createProgress(),this.form=null,this.destroyables=[],this.options=new Map,this.complete=!1,this.focusTarget=null,this.index=-1,this._successTimer=null}get html(){return[this.progress]}init(){this.destroy(),this.draftSetting&&(this.setting=structuredClone(this.draftSetting),delete this.draftSetting),this.complete=!1,this.form=new A(this),this.form.init()}showSuccess(){clearTimeout(this._successTimer??void 0);const e=document.createElement("span"),t=e.appendChild(document.createElement("span"));e.dataset.kind="success",L(t,"check","ml-2 text-kind-default"),this.header.querySelector("[data-role='title']")?.appendChild(e),this._successTimer=setTimeout(()=>{k(()=>e.remove(),{label:"builder:condition-success"})},1e3)}_createProgress(){const e=document.createElement("div");return e.dataset.role="updates",e.dataset.visible="false",e.className="flex flex-col gap-4",e}showProgress(){for(const e of this.options.values())this.progress.contains(e)||this.progress.appendChild(e);this.progress.dataset.visible="true",this.complete&&this.form?.showSubmitButton()}hideProgress(){k(()=>{this.progress.dataset.visible="false"})}focus(){const e=this.focusTarget||this.target,t="input:not([type='hidden']):not([disabled])",i="textarea:not([disabled])",n="select:not([disabled])",s=`${t}, ${i}, ${n}`;(e?.matches?.(s)?e:e?.querySelector?.(t)??e?.querySelector?.(i)??e?.querySelector?.(n))?.focus()}_createHeader(){const e=document.createElement("div");e.className=f.form.header.container;const t=e.appendChild(document.createElement("div"));t.className=f.form.header.title,t.dataset.role="title";const i=e.appendChild(document.createElement("div"));return i.className=f.form.header.controls,i.appendChild(u.toggle({icon:"help",data:{kind:"help",role:"help"}})),i.appendChild(u.toggle({icon:"close",data:{kind:"close",role:"close"}})),e}setTitle(e){const t=this.header.querySelector("[data-role='title']");t&&(t.textContent=e)}_createSubmitButton(){const e=document.createElement("button");return e.className=`${f.button.submit}`,e.dataset.visible="false",e.dataset.role="save",e}validate(){return!1}refreshSavedState(){}clearOptions(){for(const e of this.options.values())e.remove();this.options.clear()}destroy(){clearTimeout(this._successTimer??void 0),this._successTimer=null,this.form?.destroy?.(),this.form=null,this.destroyables.forEach(e=>{e?.destroy?.()}),this.clearOptions(),this.destroyables=[],this.focusTarget=null}}class O extends w{addTargetSelect(){const e=u.select({options:this.builder.getEligibleConditionTargets(),placeholder:"select a target element...",id:"target-element"});this.header.after(e);const t=new C(e);this.setting.id&&t.values.add(this.setting.id),t.init(),this.destroyables.push(t),this.focusTarget=e,e.addEventListener("updated",i=>{this.clearOptions();const n=Object.values(i.detail.options);this.setting.id=n[0].id,this.setting.name=n[0].name,this.showProgress()})}addCheckboxTarget(){if(this.options.has("checkbox"))return;delete this.setting.value,this.setting.type="checkbox",this.setting.checked=!0;const e=document.createElement("p");e.dataset.kind="success",e.textContent="is checked",e.className="font-semibold text-medium text-kind-default",this.options.set("checkbox",e)}addChooseValue(){if(this.options.has("value"))return;const e=this.setting.id&&this.builder.elements.get(this.setting.id);if(!e)return;this.setting.type=e.schema.type;const t=e.schema.options||[];if(t.length>0){const i=u.select({options:t.map(s=>({label:s.label,value:s.value,details:{icon:this.setting.type==="radio"?"radio":"select",kind:"form",name:s.label}})),placeholder:"select an option...",id:"eligible-options"}),n=new C(i);typeof this.setting.value=="string"&&this.setting.value&&n.values.add(this.setting.value),n.init(),this.destroyables.push(n),this.options.set("value",i),this.focusTarget=i,i.addEventListener("updated",s=>{const o=Object.values(s.detail.options);this.setting.value=o[0].id,this.setting.label=o[0].name,this.showProgress()})}else this.form?.showError("The target element must have at least one option.")}validate(){return this.setting.id?this.setting.checked||this.setting.value?!0:(this.form?.showError("Please select an option."),!1):(this.form?.showError("Please select a target element."),!1)}}const I={checkbox:{text:"Values will be converted to 'True' or 'False'.",radio:"Component will be converted to a Radio with 'True' and 'False' values."},out:{text:"Values will be converted to a plain-text url",bookmark:"Values will not change"},location:{text:"Values will be converted to plain-text addresses"},textarea:{text:"Values will be converted to text; newlines will be lost"},radio:{text:"Values will be converted to the plain-text label of the option selected",select:"Component will be converted into a Select component with the same options"},select:{text:"Values will be converted to the plain-text label of the option selected",radio:"Component will be converted into a Radio component with the same options"},table:{textarea:"Values will be converted to a table with Markdown formatting"},todo:{textarea:"Values will be converted to a todo list with Markdown formatting"}};class M extends w{init(){this.destroy(),this.setTitle("Replace or Delete");const e=this.header.querySelector("[data-role='help']");e?.setAttribute("lp-control","help"),e?.setAttribute("lp-help","form_element_changes"),e?.setAttribute("aria-label","Help with converting or deleting form elements"),this.target.replaceChildren(this.header);const t=this.target.appendChild(document.createElement("p"));t.className="text-sm text-base-medium",t.textContent="If an element is deleted, any values entered using that element in current submissions will be cleared, with the exception of tasks that have already been completed. Already completed tasks will retain the form that accompanied their original submitted values.";const i=this.builder.savedField(this.element.schema.id)||this.element.schema,n=x(i),s=x(this.element.schema),o=(this.builder.conversionCatalog?.types||[]).filter(a=>this.builder.conversionCatalog?.rules[n]?.[a.value]&&a.value!==(s==="multiple"?"select":s)&&a.value!=="multiple"&&!(this.builder.elt.dataset.formType==="page"&&a.value==="todo")),r=document.createElement("div");if(r.className=o.length?"grid grid-cols-2 gap-3":"grid grid-cols-1 gap-3",o.length){const a=this.target.appendChild(document.createElement("p"));a.className="text-sm text-base-medium",a.textContent="If you replace the element instead, those values will be converted in order to match the new component type. Values that cannot be converted will be cleared.",this.addReplacement(o,i,r)}else{const a=this.target.appendChild(document.createElement("p"));a.dataset.role="conversion-unavailable",a.dataset.kind="error",a.className="text-sm text-kind-default",a.textContent="This component type cannot be converted"}this.target.append(r);const m=r.appendChild(document.createElement("button"));m.type="button",m.dataset.kind="delete",m.className=f.button.submit,m.textContent="Delete",m.addEventListener("click",()=>{k(()=>{this.builder._destroyed||this.builder.selectedElement!==this.element||(this.builder.conditions.close(),this.builder.removeElement(),this.builder.settings.deselectItem(),this.builder.formSettings.visible=!0)},{label:"builder:delete-element"})})}addReplacement(e,t,i){const n=x(t),s=u.select({label:"Replace With",kind:"form",data:{kind:"form"},name:"conversion-type",placeholder:"Choose a new component...",selectIcon:"dropdown",options:[]});this.target.append(s);const o=s.querySelector("select"),r=this.builder.conversionCatalog;if(!o||!r)return;const m=this.builder.elt.dataset.aiConversion==="true";for(const[b,l]of[["Deterministic conversions",!1],["AI conversions",!0]]){const c=document.createElement("optgroup");c.label=b;for(const d of e){if(r.rules[n]?.[d.value]==="ai"!==l)continue;const S=P.TABLE_COLUMNS.find(({type:V})=>V===d.value)?.name||d.label,_=l?`${S} (requires AI${m?"":" access"})`:S,T=new Option(_,d.value);T.dataset.details=JSON.stringify({kind:"form",icon:d.value==="todo"?"checklist":d.value,name:_}),T.disabled=l&&!m,c.append(T)}c.childElementCount&&o.append(c)}const a=new C(s);a.init(),this.destroyables.push(a),this.focusTarget=s;const p=this.target.appendChild(document.createElement("p"));p.dataset.role="conversion-description",p.dataset.kind="success",p.className="text-sm text-kind-default",p.setAttribute("aria-live","polite"),p.hidden=!0;const y=this.target.appendChild(document.createElement("label"));y.className="flex flex-col gap-2 text-sm",y.textContent="Conversion instructions (optional)";const h=y.appendChild(document.createElement("textarea"));h.name="conversion-instructions",h.className=f.textarea,h.rows=3,h.maxLength=4e3,h.placeholder="For example: one row per item; preserve completed checkboxes.",h.value=this.builder.conversionInstructions?.[t.id]||"";const E=r.rules[n]?.[x(this.element.schema)]==="ai";y.hidden=!E,h.addEventListener("input",()=>{E&&(this.builder.conversionInstructions??={},this.builder.conversionInstructions[t.id]=h.value,this.builder.updateSchema(!1,`conversion-instructions:${t.id}`))});const g=i.appendChild(document.createElement("button"));g.type="button",g.dataset.kind="form",g.className=f.button.submit,g.textContent="Convert",g.disabled=!0,s.addEventListener("updated",()=>{const b=r.rules[n]?.[o.value]==="ai";y.hidden=!b&&!E,g.disabled=!o.value,p.hidden=!o.value,p.textContent=b?"AI will convert saved values after Save. Review the destination columns and any conversion instructions first. Unresolvable values will be cleared; originals remain available in View changes.":I[n==="multiple"?"select":n]?.[o.value]||"Values will be converted to match the new component type. Values that cannot be converted will be cleared."}),g.addEventListener("click",()=>{const b=r.types.find(({value:d})=>d===o.value);if(!b)return;const l=this.element.schema,c={id:l.id,title:l.title,...b.schema,...l.required!==void 0?{required:l.required}:{},...l.placeholder!==void 0?{placeholder:l.placeholder}:{},...l.visibility!==void 0?{visibility:l.visibility}:{}};if(["radio","select"].includes(c.type)){const d=l.options??t.options;c.options=d?structuredClone(d):n==="checkbox"?[{value:"true",label:"True"},{value:"false",label:"False"}]:[]}c.type==="table"&&(c.columns=l.columns||[]),this.element.schema=c,this.builder.conversionInstructions??={},r.rules[n]?.[o.value]==="ai"?this.builder.conversionInstructions[t.id]=h.value:delete this.builder.conversionInstructions[t.id],this.builder.updateSchema(),this.builder.restoreDraft(),this.builder.header.message("Conversion staged. Save will update submissions; values that cannot be converted will be cleared.",{persistent:!0})})}}var B=Object.freeze({__proto__:null,default:M});class q extends O{constructor(e){super(e),this.key="status",this.messages={submit:"Add Status Message"}}init(){this.index!==-1?(this.setTitle("Edit Status Message"),this.messages.submit="Update Status Message",this.setting={...this.element.schema.status?.[this.index]}):(this.setTitle("Create Status Message"),this.setting={}),super.init(),this.builder.getEligibleConditionTargets().length===0?this.form?.showError("Status messages cannot be set using available components. Please add a radio button, checkbox, or select menu to the form before setting a status message."):super.addTargetSelect(),this.showProgress()}showProgress(){const e=this.setting.id&&this.builder.elements.get(this.setting.id);e&&(this.setting.text&&(this.complete=!0),e.schema.type==="checkbox"?(this.addCheckboxTarget(),this.addStatusText()):(this.addChooseValue(),this.setting.value&&this.addStatusText()),super.showProgress())}addStatusText(){if(this.options.has("text"))return;const e=u.input({label:"Status Message",placeholder:"enter status message...",name:"status-message",type:"text",value:this.setting.text||null});this.options.set("text",e),this.focusTarget=e,e.addEventListener("input",t=>{this.setting.text=t.target.value,this.showProgress()})}validate(){return super.validate()?this.setting.text?!0:(this.form?.showError("Please enter a status message."),!1):!1}}var F=Object.freeze({__proto__:null,default:q});class j extends O{constructor(e){super(e),this.key="visibility",this.messages={submit:"Add Visibility Condition"}}init(){this.index!==-1?(this.setTitle("Edit Visibility Condition"),this.messages.submit="Update Visibility Condition",this.setting={...this.element.schema.visibility?.[this.index]}):(this.setTitle("Create Visibility Condition"),this.setting={}),super.init(),this.builder.getEligibleConditionTargets().length===0?this.form?.showError("Visibility cannot be set using available components. Please add a radio button, checkbox, or select menu to the form before setting the visibility of this element."):super.addTargetSelect(),this.showProgress()}showProgress(){const e=this.setting.id&&this.builder.elements.get(this.setting.id);e&&(e.schema.type==="checkbox"?(this.addCheckboxTarget(),this.complete=!0):(this.addChooseValue(),this.setting.value&&(this.complete=!0)),super.showProgress())}}var U=Object.freeze({__proto__:null,default:j});class R extends w{constructor(e){super(e),this.key="columns",this.messages={submit:"Add Column"},this._updated=this._updated.bind(this)}init(){this.index!==-1?(this.setTitle("Edit Column"),this.messages.submit="Update Column",this.setting={...this.element.schema.columns?.[this.index]}):(this.setTitle("Create Column"),this.setting={}),super.init(),this.addColumnType(),this.showProgress()}showProgress(){this.setting.title&&(this.complete=!0,this.addColumnName()),super.showProgress()}addColumnName(){if(this.options.has("name"))return;const e=u.input({label:"Column Name",placeholder:"enter column name...",name:"column-name",type:"text",value:this.setting.title||null});this.options.set("name",e),this.focusTarget=e,e.addEventListener("input",t=>{this.setting.title=t.target.value,this.showProgress()})}_updateSetting(e){delete this.setting.location,delete this.setting.input,delete this.setting.type,e==="out"||e==="in"?(this.setting.location=e,this.setting.type="link"):e&&e!=="checkbox"?(this.setting.input=e,this.setting.type="input"):e==="checkbox"&&(this.setting.type="checkbox")}addColumnType(){const e=this.builder.savedField(this.element.schema.id)?.columns?.find(s=>s.id===this.setting.id);if(e){const s=document.createElement("p");s.className="text-sm text-base-medium",s.textContent="Save will convert this column. Values that cannot be converted will be cleared.",this.header.after(s),this.destroyables.push({destroy:()=>s.remove()})}const t=u.select({label:"Column Type",kind:"form",placeholder:"select column type...",name:this.element.schema.id,options:P.TABLE_COLUMNS.filter(s=>!e||this.builder.conversionCatalog?.rules[x(e)]?.[s.type]&&this.builder.conversionCatalog.rules[x(e)]?.[s.type]!=="ai").map(s=>({label:s.name,value:s.type,details:{kind:"form",icon:s.type,name:s.name}}))});this.header.after(t);const i=new C(t),n=this.setting.location||this.setting.input||this.setting.type;n&&i.values.add(n),i.init(),this.columnType=i,this.destroyables.push(i),this.focusTarget=t,this.target.removeEventListener("updated",this._updated),this.target.addEventListener("updated",this._updated)}refreshSavedState(){}_updated(e){const i=Object.values(e.detail.options)[0]?.id;i&&(this._updateSetting(i),this.addColumnName(),this.showProgress())}destroy(){this.target.removeEventListener("updated",this._updated),super.destroy(),this.columnType=null}validate(){if(!this.setting.title)return this.form?.showError("Please enter a column name"),!1;if(!this.setting.type)return this.form?.showError("Please select a column type"),!1;if(!this.setting.id)do this.setting.id=N("column");while(this.element.schema.columns?.some(e=>e.id===this.setting.id));return!0}}var $=Object.freeze({__proto__:null,default:R});class z extends w{constructor(e){super(e),this.key="options",this.messages={submit:"Add Option"}}init(){this.index!==-1?(this.setTitle("Edit Option"),this.messages.submit="Update Option",this.setting={...this.element.schema.options?.[this.index]}):(this.setTitle("Create Option"),this.messages.submit="Add Option",this.setting={}),super.init(),this.showProgress()}showProgress(){this.addOptionName(),this.setting.label&&(this.complete=!0),super.showProgress()}addOptionName(){if(this.options.has("name"))return;const e=u.input({label:"Option Name",placeholder:"enter option name...",name:"option-name",type:"text",value:this.setting.label||null});this.options.set("name",e),this.focusTarget=e,e.addEventListener("input",t=>{this.setting.label=t.target.value,this.showProgress()})}validate(){if(!this.setting.label)return this.form?.showError("Please enter an option name."),!1;if(!this.setting.value)do this.setting.value=N("option");while(this.element.schema.options?.some(e=>e.value===this.setting.value));return!0}}var D=Object.freeze({__proto__:null,default:z});export{w as C,$ as c,B as m,D as o,F as s,U as v};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { s as setIcon, S as STYLES } from './ui-resources.js?v=b6ea3fe0';
+import { w as withTransition, g as generateElementId } from './foundation.js?v=b6ea3fe0';
+import { p as primitives } from './ui-controls.js?v=b6ea3fe0';
+import { F as FormController, S as SelectBox } from './forms.js?v=b6ea3fe0';
+import { f as fieldKind, C as CONFIG } from './builder.js?v=b6ea3fe0';
+
+class Condition {
+  constructor(builder) {
+    this.builder = builder;
+    this.element = builder.selectedElement;
+    this.target = document.createElement("div");
+    this.target.className = "flex flex-col gap-4";
+    this.submitButton = this._createSubmitButton();
+    this.header = this._createHeader();
+    this.progress = this._createProgress();
+    this.form = null;
+    this.destroyables = [];
+    this.options = /* @__PURE__ */ new Map();
+    this.complete = false;
+    this.focusTarget = null;
+    this.index = -1;
+    this._successTimer = null;
+  }
+  get html() {
+    return [this.progress];
+  }
+  init() {
+    this.destroy();
+    if (this.draftSetting) {
+      this.setting = structuredClone(this.draftSetting);
+      delete this.draftSetting;
+    }
+    this.complete = false;
+    this.form = new FormController(this);
+    this.form.init();
+    return;
+  }
+  showSuccess() {
+    clearTimeout(this._successTimer ?? void 0);
+    const status = document.createElement("span");
+    const icon = status.appendChild(document.createElement("span"));
+    status.dataset.kind = "success";
+    setIcon(icon, "check", "ml-2 text-kind-default");
+    this.header.querySelector("[data-role='title']")?.appendChild(status);
+    this._successTimer = setTimeout(() => {
+      void withTransition(() => status.remove(), {
+        label: "builder:condition-success"
+      });
+    }, 1e3);
+  }
+  _createProgress() {
+    const progress = document.createElement("div");
+    progress.dataset.role = "updates";
+    progress.dataset.visible = "false";
+    progress.className = "flex flex-col gap-4";
+    return progress;
+  }
+  showProgress() {
+    for (const option of this.options.values()) {
+      if (!this.progress.contains(option)) {
+        this.progress.appendChild(option);
+      }
+    }
+    this.progress.dataset.visible = "true";
+    if (this.complete) {
+      this.form?.showSubmitButton();
+    }
+  }
+  hideProgress() {
+    withTransition(() => {
+      this.progress.dataset.visible = "false";
+    });
+  }
+  focus() {
+    const target = this.focusTarget || this.target;
+    const inputSelector = "input:not([type='hidden']):not([disabled])";
+    const textareaSelector = "textarea:not([disabled])";
+    const selectSelector = "select:not([disabled])";
+    const selector = `${inputSelector}, ${textareaSelector}, ${selectSelector}`;
+    const focusable = target?.matches?.(selector) ? target : target?.querySelector?.(inputSelector) ?? target?.querySelector?.(textareaSelector) ?? target?.querySelector?.(selectSelector);
+    focusable?.focus();
+  }
+  _createHeader() {
+    const header = document.createElement("div");
+    header.className = STYLES.form.header.container;
+    const title = header.appendChild(document.createElement("div"));
+    title.className = STYLES.form.header.title;
+    title.dataset.role = "title";
+    const controls = header.appendChild(document.createElement("div"));
+    controls.className = STYLES.form.header.controls;
+    controls.appendChild(
+      primitives.toggle({ icon: "help", data: { kind: "help", role: "help" } })
+    );
+    controls.appendChild(
+      primitives.toggle({
+        icon: "close",
+        data: { kind: "close", role: "close" }
+      })
+    );
+    return header;
+  }
+  setTitle(title) {
+    const node = this.header.querySelector("[data-role='title']");
+    if (node) node.textContent = title;
+  }
+  _createSubmitButton() {
+    const submitButton = document.createElement("button");
+    submitButton.className = `${STYLES.button.submit}`;
+    submitButton.dataset.visible = "false";
+    submitButton.dataset.role = "save";
+    return submitButton;
+  }
+  validate() {
+    return false;
+  }
+  refreshSavedState() {
+  }
+  clearOptions() {
+    for (const option of this.options.values()) option.remove();
+    this.options.clear();
+  }
+  destroy() {
+    clearTimeout(this._successTimer ?? void 0);
+    this._successTimer = null;
+    this.form?.destroy?.();
+    this.form = null;
+    this.destroyables.forEach((destroyable) => {
+      destroyable?.destroy?.();
+    });
+    this.clearOptions();
+    this.destroyables = [];
+    this.focusTarget = null;
+  }
+}
+class ConditionTarget extends Condition {
+  addTargetSelect() {
+    const selectElt = primitives.select({
+      options: this.builder.getEligibleConditionTargets(),
+      placeholder: "select a target element...",
+      id: "target-element"
+    });
+    this.header.after(selectElt);
+    const selectBox = new SelectBox(selectElt);
+    if (this.setting.id) {
+      selectBox.values.add(this.setting.id);
+    }
+    selectBox.init();
+    this.destroyables.push(selectBox);
+    this.focusTarget = selectElt;
+    selectElt.addEventListener("updated", (e) => {
+      this.clearOptions();
+      const options = Object.values(
+        e.detail.options
+      );
+      this.setting.id = options[0].id;
+      this.setting.name = options[0].name;
+      this.showProgress();
+    });
+  }
+  addCheckboxTarget() {
+    if (this.options.has("checkbox")) return;
+    delete this.setting.value;
+    this.setting.type = "checkbox";
+    this.setting.checked = true;
+    const checkboxMessage = document.createElement("p");
+    checkboxMessage.dataset.kind = "success";
+    checkboxMessage.textContent = "is checked";
+    checkboxMessage.className = "font-semibold text-medium text-kind-default";
+    this.options.set("checkbox", checkboxMessage);
+  }
+  addChooseValue() {
+    if (this.options.has("value")) return;
+    const element = this.setting.id && this.builder.elements.get(this.setting.id);
+    if (!element) return;
+    this.setting.type = element.schema.type;
+    const options = element.schema.options || [];
+    if (options.length > 0) {
+      const selectElt = primitives.select({
+        options: options.map((option) => ({
+          label: option.label,
+          value: option.value,
+          details: {
+            icon: this.setting.type === "radio" ? "radio" : "select",
+            kind: "form",
+            name: option.label
+          }
+        })),
+        placeholder: "select an option...",
+        id: "eligible-options"
+      });
+      const selectBox = new SelectBox(selectElt);
+      if (typeof this.setting.value === "string" && this.setting.value) {
+        selectBox.values.add(this.setting.value);
+      }
+      selectBox.init();
+      this.destroyables.push(selectBox);
+      this.options.set("value", selectElt);
+      this.focusTarget = selectElt;
+      selectElt.addEventListener("updated", (e) => {
+        const options2 = Object.values(
+          e.detail.options
+        );
+        this.setting.value = options2[0].id;
+        this.setting.label = options2[0].name;
+        this.showProgress();
+      });
+    } else {
+      this.form?.showError("The target element must have at least one option.");
+    }
+  }
+  validate() {
+    if (!this.setting.id) {
+      this.form?.showError("Please select a target element.");
+      return false;
+    } else if (this.setting.checked) {
+      return true;
+    } else if (this.setting.value) {
+      return true;
+    } else {
+      this.form?.showError("Please select an option.");
+      return false;
+    }
+  }
+}
+
+const MESSAGES = {
+  checkbox: {
+    text: "Values will be converted to 'True' or 'False'.",
+    radio: "Component will be converted to a Radio with 'True' and 'False' values."
+  },
+  out: {
+    text: "Values will be converted to a plain-text url",
+    bookmark: "Values will not change"
+  },
+  location: { text: "Values will be converted to plain-text addresses" },
+  textarea: { text: "Values will be converted to text; newlines will be lost" },
+  radio: {
+    text: "Values will be converted to the plain-text label of the option selected",
+    select: "Component will be converted into a Select component with the same options"
+  },
+  select: {
+    text: "Values will be converted to the plain-text label of the option selected",
+    radio: "Component will be converted into a Radio component with the same options"
+  },
+  table: {
+    textarea: "Values will be converted to a table with Markdown formatting"
+  },
+  todo: {
+    textarea: "Values will be converted to a todo list with Markdown formatting"
+  }
+};
+class Modify extends Condition {
+  init() {
+    this.destroy();
+    this.setTitle("Replace or Delete");
+    const help = this.header.querySelector("[data-role='help']");
+    help?.setAttribute("lp-control", "help");
+    help?.setAttribute("lp-help", "form_element_changes");
+    help?.setAttribute(
+      "aria-label",
+      "Help with converting or deleting form elements"
+    );
+    this.target.replaceChildren(this.header);
+    const deletion = this.target.appendChild(document.createElement("p"));
+    deletion.className = "text-sm text-base-medium";
+    deletion.textContent = "If an element is deleted, any values entered using that element in current submissions will be cleared, with the exception of tasks that have already been completed. Already completed tasks will retain the form that accompanied their original submitted values.";
+    const source = this.builder.savedField(this.element.schema.id) || this.element.schema;
+    const sourceKind = fieldKind(source);
+    const kind = fieldKind(this.element.schema);
+    const choices = (this.builder.conversionCatalog?.types || []).filter(
+      (item) => {
+        const rule = this.builder.conversionCatalog?.rules[sourceKind]?.[item.value];
+        return rule && item.value !== (kind === "multiple" ? "select" : kind) && item.value !== "multiple" && !(this.builder.elt.dataset.formType === "page" && item.value === "todo");
+      }
+    );
+    const actions = document.createElement("div");
+    actions.className = choices.length ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 gap-3";
+    if (choices.length) {
+      const explanation = this.target.appendChild(document.createElement("p"));
+      explanation.className = "text-sm text-base-medium";
+      explanation.textContent = "If you replace the element instead, those values will be converted in order to match the new component type. Values that cannot be converted will be cleared.";
+      this.addReplacement(choices, source, actions);
+    } else {
+      const unavailable = this.target.appendChild(document.createElement("p"));
+      unavailable.dataset.role = "conversion-unavailable";
+      unavailable.dataset.kind = "error";
+      unavailable.className = "text-sm text-kind-default";
+      unavailable.textContent = "This component type cannot be converted";
+    }
+    this.target.append(actions);
+    const remove = actions.appendChild(document.createElement("button"));
+    remove.type = "button";
+    remove.dataset.kind = "delete";
+    remove.className = STYLES.button.submit;
+    remove.textContent = "Delete";
+    remove.addEventListener("click", () => {
+      void withTransition(
+        () => {
+          if (this.builder._destroyed || this.builder.selectedElement !== this.element)
+            return;
+          this.builder.conditions.close();
+          this.builder.removeElement();
+          this.builder.settings.deselectItem();
+          this.builder.formSettings.visible = true;
+        },
+        { label: "builder:delete-element" }
+      );
+    });
+  }
+  addReplacement(choices, source, actions) {
+    const sourceKind = fieldKind(source);
+    const selectElt = primitives.select({
+      label: "Replace With",
+      kind: "form",
+      data: { kind: "form" },
+      name: "conversion-type",
+      placeholder: "Choose a new component...",
+      selectIcon: "dropdown",
+      options: []
+    });
+    this.target.append(selectElt);
+    const select = selectElt.querySelector("select");
+    const catalog = this.builder.conversionCatalog;
+    if (!select || !catalog) return;
+    const canUseAI = this.builder.elt.dataset.aiConversion === "true";
+    for (const [title, ai] of [
+      ["Deterministic conversions", false],
+      ["AI conversions", true]
+    ]) {
+      const group = document.createElement("optgroup");
+      group.label = title;
+      for (const item of choices) {
+        const rule = catalog.rules[sourceKind]?.[item.value];
+        if (rule === "ai" !== ai) continue;
+        const label = CONFIG.TABLE_COLUMNS.find(({ type }) => type === item.value)?.name || item.label;
+        const name = ai ? `${label} (requires AI${canUseAI ? "" : " access"})` : label;
+        const option = new Option(name, item.value);
+        option.dataset.details = JSON.stringify({
+          kind: "form",
+          icon: item.value === "todo" ? "checklist" : item.value,
+          name
+        });
+        option.disabled = ai && !canUseAI;
+        group.append(option);
+      }
+      if (group.childElementCount) select.append(group);
+    }
+    const selectBox = new SelectBox(selectElt);
+    selectBox.init();
+    this.destroyables.push(selectBox);
+    this.focusTarget = selectElt;
+    const description = this.target.appendChild(document.createElement("p"));
+    description.dataset.role = "conversion-description";
+    description.dataset.kind = "success";
+    description.className = "text-sm text-kind-default";
+    description.setAttribute("aria-live", "polite");
+    description.hidden = true;
+    const instructionLabel = this.target.appendChild(
+      document.createElement("label")
+    );
+    instructionLabel.className = "flex flex-col gap-2 text-sm";
+    instructionLabel.textContent = "Conversion instructions (optional)";
+    const instructions = instructionLabel.appendChild(
+      document.createElement("textarea")
+    );
+    instructions.name = "conversion-instructions";
+    instructions.className = STYLES.textarea;
+    instructions.rows = 3;
+    instructions.maxLength = 4e3;
+    instructions.placeholder = "For example: one row per item; preserve completed checkboxes.";
+    instructions.value = this.builder.conversionInstructions?.[source.id] || "";
+    const alreadyAI = catalog.rules[sourceKind]?.[fieldKind(this.element.schema)] === "ai";
+    instructionLabel.hidden = !alreadyAI;
+    instructions.addEventListener("input", () => {
+      if (!alreadyAI) return;
+      this.builder.conversionInstructions ??= {};
+      this.builder.conversionInstructions[source.id] = instructions.value;
+      this.builder.updateSchema(false, `conversion-instructions:${source.id}`);
+    });
+    const convert = actions.appendChild(document.createElement("button"));
+    convert.type = "button";
+    convert.dataset.kind = "form";
+    convert.className = STYLES.button.submit;
+    convert.textContent = "Convert";
+    convert.disabled = true;
+    selectElt.addEventListener("updated", () => {
+      const ai = catalog.rules[sourceKind]?.[select.value] === "ai";
+      instructionLabel.hidden = !ai && !alreadyAI;
+      convert.disabled = !select.value;
+      description.hidden = !select.value;
+      description.textContent = ai ? "AI will convert saved values after Save. Review the destination columns and any conversion instructions first. Unresolvable values will be cleared; originals remain available in View changes." : MESSAGES[sourceKind === "multiple" ? "select" : sourceKind]?.[select.value] || "Values will be converted to match the new component type. Values that cannot be converted will be cleared.";
+    });
+    convert.addEventListener("click", () => {
+      const type = catalog.types.find(({ value }) => value === select.value);
+      if (!type) return;
+      const previous = this.element.schema;
+      const next = {
+        id: previous.id,
+        title: previous.title,
+        ...type.schema,
+        ...previous.required !== void 0 ? { required: previous.required } : {},
+        ...previous.placeholder !== void 0 ? { placeholder: previous.placeholder } : {},
+        ...previous.visibility !== void 0 ? { visibility: previous.visibility } : {}
+      };
+      if (["radio", "select"].includes(next.type)) {
+        const options = previous.options ?? source.options;
+        next.options = options ? structuredClone(options) : sourceKind === "checkbox" ? [
+          { value: "true", label: "True" },
+          { value: "false", label: "False" }
+        ] : [];
+      }
+      if (next.type === "table") next.columns = previous.columns || [];
+      this.element.schema = next;
+      this.builder.conversionInstructions ??= {};
+      if (catalog.rules[sourceKind]?.[select.value] === "ai")
+        this.builder.conversionInstructions[source.id] = instructions.value;
+      else delete this.builder.conversionInstructions[source.id];
+      this.builder.updateSchema();
+      this.builder.restoreDraft();
+      this.builder.header.message(
+        "Conversion staged. Save will update submissions; values that cannot be converted will be cleared.",
+        { persistent: true }
+      );
+    });
+  }
+}
+
+var modify = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	default: Modify
+});
+
+class Status extends ConditionTarget {
+  constructor(builder) {
+    super(builder);
+    this.key = "status";
+    this.messages = {
+      submit: "Add Status Message"
+    };
+  }
+  init() {
+    if (this.index !== -1) {
+      this.setTitle("Edit Status Message");
+      this.messages.submit = "Update Status Message";
+      this.setting = { ...this.element.schema.status?.[this.index] };
+    } else {
+      this.setTitle("Create Status Message");
+      this.setting = {};
+    }
+    super.init();
+    const targets = this.builder.getEligibleConditionTargets();
+    if (targets.length === 0) {
+      this.form?.showError(
+        "Status messages cannot be set using available components. Please add a radio button, checkbox, or select menu to the form before setting a status message."
+      );
+    } else {
+      super.addTargetSelect();
+    }
+    this.showProgress();
+  }
+  showProgress() {
+    const target = this.setting.id && this.builder.elements.get(this.setting.id);
+    if (!target) return;
+    if (this.setting.text) {
+      this.complete = true;
+    }
+    if (target.schema.type === "checkbox") {
+      this.addCheckboxTarget();
+      this.addStatusText();
+    } else {
+      this.addChooseValue();
+      if (this.setting.value) this.addStatusText();
+    }
+    super.showProgress();
+  }
+  addStatusText() {
+    if (this.options.has("text")) return;
+    const statusText = primitives.input({
+      label: "Status Message",
+      placeholder: "enter status message...",
+      name: "status-message",
+      type: "text",
+      value: this.setting.text || null
+    });
+    this.options.set("text", statusText);
+    this.focusTarget = statusText;
+    statusText.addEventListener("input", (e) => {
+      this.setting.text = e.target.value;
+      this.showProgress();
+    });
+  }
+  validate() {
+    if (!super.validate()) return false;
+    if (!this.setting.text) {
+      this.form?.showError("Please enter a status message.");
+      return false;
+    }
+    return true;
+  }
+}
+
+var status = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	default: Status
+});
+
+class Visibility extends ConditionTarget {
+  constructor(builder) {
+    super(builder);
+    this.key = "visibility";
+    this.messages = {
+      submit: "Add Visibility Condition"
+    };
+  }
+  init() {
+    if (this.index !== -1) {
+      this.setTitle("Edit Visibility Condition");
+      this.messages.submit = "Update Visibility Condition";
+      this.setting = { ...this.element.schema.visibility?.[this.index] };
+    } else {
+      this.setTitle("Create Visibility Condition");
+      this.setting = {};
+    }
+    super.init();
+    const targets = this.builder.getEligibleConditionTargets();
+    if (targets.length === 0) {
+      this.form?.showError(
+        "Visibility cannot be set using available components. Please add a radio button, checkbox, or select menu to the form before setting the visibility of this element."
+      );
+    } else {
+      super.addTargetSelect();
+    }
+    this.showProgress();
+  }
+  showProgress() {
+    const target = this.setting.id && this.builder.elements.get(this.setting.id);
+    if (!target) return;
+    if (target.schema.type === "checkbox") {
+      this.addCheckboxTarget();
+      this.complete = true;
+    } else {
+      this.addChooseValue();
+      if (this.setting.value) this.complete = true;
+    }
+    super.showProgress();
+  }
+}
+
+var visibility = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	default: Visibility
+});
+
+class Columns extends Condition {
+  constructor(builder) {
+    super(builder);
+    this.key = "columns";
+    this.messages = {
+      submit: "Add Column"
+    };
+    this._updated = this._updated.bind(this);
+  }
+  init() {
+    if (this.index !== -1) {
+      this.setTitle("Edit Column");
+      this.messages.submit = "Update Column";
+      this.setting = { ...this.element.schema.columns?.[this.index] };
+    } else {
+      this.setTitle("Create Column");
+      this.setting = {};
+    }
+    super.init();
+    this.addColumnType();
+    this.showProgress();
+  }
+  showProgress() {
+    if (this.setting.title) {
+      this.complete = true;
+      this.addColumnName();
+    }
+    super.showProgress();
+  }
+  addColumnName() {
+    if (this.options.has("name")) return;
+    const columnName = primitives.input({
+      label: "Column Name",
+      placeholder: "enter column name...",
+      name: "column-name",
+      type: "text",
+      value: this.setting.title || null
+    });
+    this.options.set("name", columnName);
+    this.focusTarget = columnName;
+    columnName.addEventListener("input", (e) => {
+      this.setting.title = e.target.value;
+      this.showProgress();
+    });
+  }
+  _updateSetting(value) {
+    delete this.setting.location;
+    delete this.setting.input;
+    delete this.setting.type;
+    if (value === "out" || value === "in") {
+      this.setting.location = value;
+      this.setting.type = "link";
+    } else if (value && value !== "checkbox") {
+      this.setting.input = value;
+      this.setting.type = "input";
+    } else if (value === "checkbox") {
+      this.setting.type = "checkbox";
+    }
+  }
+  addColumnType() {
+    const saved = this.builder.savedField(this.element.schema.id)?.columns?.find((column) => column.id === this.setting.id);
+    if (saved) {
+      const notice = document.createElement("p");
+      notice.className = "text-sm text-base-medium";
+      notice.textContent = "Save will convert this column. Values that cannot be converted will be cleared.";
+      this.header.after(notice);
+      this.destroyables.push({ destroy: () => notice.remove() });
+    }
+    const selectElt = primitives.select({
+      label: "Column Type",
+      kind: "form",
+      placeholder: "select column type...",
+      name: this.element.schema.id,
+      options: CONFIG.TABLE_COLUMNS.filter(
+        (input) => !saved || this.builder.conversionCatalog?.rules[fieldKind(saved)]?.[input.type] && this.builder.conversionCatalog.rules[fieldKind(saved)]?.[input.type] !== "ai"
+      ).map((input) => ({
+        label: input.name,
+        value: input.type,
+        details: { kind: "form", icon: input.type, name: input.name }
+      }))
+    });
+    this.header.after(selectElt);
+    const selectBox = new SelectBox(selectElt);
+    const initial = this.setting.location || this.setting.input || this.setting.type;
+    if (initial) {
+      selectBox.values.add(initial);
+    }
+    selectBox.init();
+    this.columnType = selectBox;
+    this.destroyables.push(selectBox);
+    this.focusTarget = selectElt;
+    this.target.removeEventListener("updated", this._updated);
+    this.target.addEventListener("updated", this._updated);
+  }
+  refreshSavedState() {
+  }
+  _updated(e) {
+    const options = Object.values(
+      e.detail.options
+    );
+    const value = options[0]?.id;
+    if (!value) return;
+    this._updateSetting(value);
+    this.addColumnName();
+    this.showProgress();
+  }
+  destroy() {
+    this.target.removeEventListener("updated", this._updated);
+    super.destroy();
+    this.columnType = null;
+  }
+  validate() {
+    if (!this.setting.title) {
+      this.form?.showError("Please enter a column name");
+      return false;
+    }
+    if (!this.setting.type) {
+      this.form?.showError("Please select a column type");
+      return false;
+    }
+    if (!this.setting.id) {
+      do {
+        this.setting.id = generateElementId("column");
+      } while (this.element.schema.columns?.some(
+        (column) => column.id === this.setting.id
+      ));
+    }
+    return true;
+  }
+}
+
+var columns = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	default: Columns
+});
+
+class Options extends Condition {
+  constructor(builder) {
+    super(builder);
+    this.key = "options";
+    this.messages = {
+      submit: "Add Option"
+    };
+  }
+  init() {
+    if (this.index !== -1) {
+      this.setTitle("Edit Option");
+      this.messages.submit = "Update Option";
+      this.setting = { ...this.element.schema.options?.[this.index] };
+    } else {
+      this.setTitle("Create Option");
+      this.messages.submit = "Add Option";
+      this.setting = {};
+    }
+    super.init();
+    this.showProgress();
+  }
+  showProgress() {
+    this.addOptionName();
+    if (this.setting.label) {
+      this.complete = true;
+    }
+    super.showProgress();
+  }
+  addOptionName() {
+    if (this.options.has("name")) return;
+    const optionName = primitives.input({
+      label: "Option Name",
+      placeholder: "enter option name...",
+      name: "option-name",
+      type: "text",
+      value: this.setting.label || null
+    });
+    this.options.set("name", optionName);
+    this.focusTarget = optionName;
+    optionName.addEventListener("input", (e) => {
+      this.setting.label = e.target.value;
+      this.showProgress();
+    });
+  }
+  validate() {
+    if (!this.setting.label) {
+      this.form?.showError("Please enter an option name.");
+      return false;
+    }
+    if (!this.setting.value) {
+      do {
+        this.setting.value = generateElementId("option");
+      } while (this.element.schema.options?.some(
+        (option) => option.value === this.setting.value
+      ));
+    }
+    return true;
+  }
+}
+
+var options = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	default: Options
+});
+
+export { Condition as C, columns as c, modify as m, options as o, status as s, visibility as v };

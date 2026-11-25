@@ -1,2 +1,1367 @@
-import{b as C}from"./ui-controls.js?v=b9ad6d22";import{r as f,w as I,a as R}from"./foundation.js?v=b9ad6d22";import{S as Y,a as K}from"./forms.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";import{Modal as G}from"./modal.js?v=b9ad6d22";import{u as H,B as J,U as V}from"./uploads.js?v=b9ad6d22";import{s as D,S as x}from"./ui-resources.js?v=b9ad6d22";class v{constructor(e){Object.assign(this,e),this.destroyables=[]}updateSummary(e){const t=this.target.closest("[data-role='site-settings-section']")?.querySelector("[data-role='section-summary']");t&&(t.textContent=e||"")}syncSelectBox(e,t){const i=e.closest("[lp-select]")?._lp_combobox;i&&(i.values.clear(),t&&i.values.add(t),i.updateSelect(!0))}destroy(){this.destroyables.forEach(e=>{e.destroy?.()}),this.destroyables=[]}}class Q extends v{constructor(e){super(e),this._aiSettings=null,this._aiModelOptions=null,this._aiSelectsInitialized=!1,this._saveAiSettings=this._saveAiSettings.bind(this)}init(){this.aiForm=this.target.querySelector("[data-role='ai-settings']"),this.aiForm&&(this.aiButton=C.active({existingButton:this.aiForm.querySelector("button[type='submit']"),text:"Save AI Model Settings",processingText:"Saving AI Model Settings",completedText:"AI Model Settings Saved",processingIcon:"spinner",completedIcon:"check"}),this.aiForm.addEventListener("submit",this._saveAiSettings))}updated(e){this._aiSettings=e.ai_settings,this._aiModelOptions=e.ai_model_options}postreconcile(){this._aiSettings&&this._renderAiSettings(this._aiSettings,this._aiModelOptions)}_renderAiSettings(e,t){if(!this.aiForm||!e)return;this._initAiSelectBoxes(),this._populateAiModelSelect("AI_MODEL",t?.text||[]),this._populateAiModelSelect("AI_UTILITY_MODEL",t?.text||[]),this._populateAiModelSelect("AI_IMAGE_MODEL",t?.image||[]),this._setAiField("AI_MODEL",e.AI_MODEL),this._setAiField("AI_UTILITY_MODEL",e.AI_UTILITY_MODEL),this._setAiField("AI_IMAGE_MODEL",e.AI_IMAGE_MODEL),this._setAiField("AI_LOCATION",e.AI_LOCATION||"global");const i=this.aiForm.querySelector("[name='AI_AUTO_EXECUTE']");i&&(i.checked=e.AI_AUTO_EXECUTE===!0);const s=this.aiForm.querySelector("[data-role='ai-pricing-link']");s&&t?.pricing_url&&(s.href=t.pricing_url);const n=e.AI_AUTO_EXECUTE===!0?" \xB7 auto-execute on":"";this.updateSummary(`${e.AI_MODEL} \xB7 utility ${e.AI_UTILITY_MODEL} \xB7 image ${e.AI_IMAGE_MODEL}${n}`)}_populateAiModelSelect(e,t){const i=this.aiForm?.querySelector(`[name='${e}']`);if(i){i.replaceChildren();for(const s of t){const n=document.createElement("option");n.value=s.id,n.textContent=s.label||s.id,n.dataset.details=JSON.stringify({description:s.description,kind:s.kind,source:s.source}),i.appendChild(n)}this._refreshSelectBox(i)}}_initAiSelectBoxes(){if(this.aiForm){if(this._aiSelectsInitialized){this.aiForm.querySelectorAll("[data-role='ai-select'] select").forEach(e=>{this._refreshSelectBox(e)});return}this._aiSelectsInitialized=!0,this.aiForm.querySelectorAll("[data-role='ai-select']").forEach(e=>{const t=new Y(e);t.init(),this.destroyables.push(t)})}}_refreshSelectBox(e){const t=e.closest("[lp-select]")?._lp_combobox;if(!t)return;const i=Array.from(e.querySelectorAll("option"));t.items=i.map(s=>({id:s.value,name:s.textContent??"",kind:s.dataset.kind||"default",...JSON.parse(s.dataset.details||"{}")})),t.updatePanel(t.results.create(t.items)),this.syncSelectBox(e,e.value)}_setAiField(e,t){const i=this.aiForm?.querySelector(`[name='${e}']`);i&&(i.value=t||"",i instanceof HTMLSelectElement&&this.syncSelectBox(i,t))}_showAiError(e){const t=this.aiForm?.querySelector("[data-role='ai-error']");t&&(t.textContent=e||"",t.dataset.visible=e?"true":"false")}_aiSettingsFormData(){const e=this.aiForm,t=new FormData(e??void 0);if(!e)return t;e.querySelectorAll("[data-role='ai-select'] select").forEach(s=>{const a=s.closest("[lp-select]")?._lp_combobox?.values?.values().next().value;t.set(s.name,a??s.value??"")});const i=e.querySelector("[name='AI_AUTO_EXECUTE']");return i&&t.set("AI_AUTO_EXECUTE",i.checked?"true":"false"),t}async _saveAiSettings(e){e.preventDefault(),e.stopPropagation();const t=this.aiButton;if(!t)return;this._showAiError(""),t.activate();const i=await f.post(this.endpoints.setAiSettings,this._aiSettingsFormData());if(!i?.ok){this._showAiError(i?.error||"Unable to save AI model settings."),t.deactivate("Save AI Model Settings");return}this._aiSettings=i.ai_settings,this._aiModelOptions=i.ai_model_options,await I(()=>{this._renderAiSettings(i.ai_settings,i.ai_model_options),t.deactivate()},{label:"site-settings:save-ai-models"})}}var Z=Object.freeze({__proto__:null,SiteAiModels:Q});class ee extends v{constructor(e){super(e),this._administrators=[],this._candidates=[],this._canManage=!1,this._demotionModal=null,this._submit=this._submit.bind(this),this._click=this._click.bind(this)}init(){this.form=this.target.querySelector("[data-role='administrator-form']"),this.list=this.target.querySelector("[data-role='administrator-list']"),this.error=this.target.querySelector("[data-role='administrator-error']");const e=this.form?.querySelector("input[name='user_key']");e&&(this.selector=new K(e),this.selector.init(),this.form?.addEventListener("submit",this._submit),this.list?.addEventListener("click",this._click))}updated(e){this._administrators=e.administrators||[],this._candidates=e.administrator_candidates||[],this._canManage=e.can_manage_administrators===!0}postreconcile(){this._render()}_render(){if(!this.list||!this.form)return;this.list.replaceChildren(...this._administrators.map(t=>this._administratorRow(t))),this.selector?.clear({notify:!1}),this.selector?.updatePanel(""),this.form.dataset.visible=this._canManage?"true":"false";const e=this.form.querySelector("button");e&&(e.disabled=!this._candidates.length),this.updateSummary(`${this._administrators.length} ${this._administrators.length===1?"administrator":"administrators"}`)}_administratorRow(e){const t=document.createElement("li");t.dataset.role="administrator",t.dataset.owner=e.is_owner?"true":"false",t.className="flex flex-col gap-2 rounded-md border border-base-light/70 bg-white/80 p-3 sm:flex-row sm:items-center sm:justify-between";const i=document.createElement("div"),s=document.createElement("strong");s.className="block text-sm text-base-dark",s.textContent=`${e.name}${e.is_owner?" \u2014 Primary Owner":""}`;const n=document.createElement("span");n.className="block text-xs text-base-medium",n.textContent=e.email;const a=document.createElement("span");if(a.className="block text-xs text-base-medium",a.dataset.role="administrator-last-login",a.textContent=e.awaiting_first_sign_in?"Awaiting first sign-in":e.last_login?`Last signed in ${new Date(e.last_login).toLocaleString()}`:"Never signed in",i.append(s,n,a),t.append(i),this._canManage&&!e.is_owner&&e.key){const o=document.createElement("button");o.type="button",o.dataset.role="demote-administrator",o.dataset.key=e.key,o.dataset.name=e.name,o.dataset.kind="delete",o.className="action-button shrink-0 rounded-md px-3 py-1.5 text-sm font-semibold",o.textContent="Remove Administrator",t.append(o)}return t}async _submit(e){e.preventDefault();const t=this.form?.querySelector("select[name='user_key']");if(!t?.value)return;this._showError();const i=await f.post(this.endpoints.promote,{user_key:t.value});if(!i?.ok)return this._showError(i?.error);this.updated(i),this._render()}async _click(e){const t=e.target;if(!(t instanceof Element))return;const i=t.closest("[data-role='demote-administrator']");if(!i?.dataset.key||!this.list?.contains(i))return;const s=this.endpoints.demote(i.dataset.key);this._showError(),this._demotionModal?.destroy();const n=new G(this.view,i);if(this._demotionModal=n,await n.load(s),this._demotionModal!==n||!n.modal)return;const a=n.modal.querySelector("[data-role='delete']");if(!a)return;let o=!1;a.addEventListener("click",async()=>{if(o)return;o=!0,a.disabled=!0;const r=a.querySelector("#spinner");r&&(r.dataset.visible="true");const l=await f.delete(s);if(!l?.ok){o=!1,a.disabled=!1,r&&(r.dataset.visible="false"),this._showError(l?.error);return}await n.remove(),this._demotionModal===n&&(this._demotionModal=null),this.updated(l),this._render()})}_showError(e=""){this.error&&(this.error.textContent=e,this.error.dataset.visible=e?"true":"false")}destroy(){this._demotionModal?.destroy(),this._demotionModal=null,this.form?.removeEventListener("submit",this._submit),this.list?.removeEventListener("click",this._click),this.selector?.destroy(),super.destroy()}}var te=Object.freeze({__proto__:null,SiteAdministrators:ee});const z={automatic:["F1","F2","F4","F4_1G"],basic:["B1","B2","B4","B4_1G","B8"]},ie={automatic:"F2",basic:"B2"},se=new Set(["F2","B2"]),F=3;class ne extends v{constructor(e){super(e),this._deployment=null,this._saveDeployment=this._saveDeployment.bind(this)}init(){this.deploymentForm=this.target.querySelector("[data-role='deployment-settings']"),this.deploymentForm&&(this.deploymentButton=C.active({existingButton:this.deploymentForm.querySelector("button[type='submit']"),text:"Save Deployment Settings",processingText:"Saving Deployment Settings",completedText:"Deployment Settings Saved",processingIcon:"spinner",completedIcon:"check"}),this.deploymentForm.addEventListener("submit",this._saveDeployment),this.deploymentForm.querySelectorAll("[data-role='deployment-select']").forEach(e=>{const t=new Y(e);t.init(),this.destroyables.push(t)}),this.deploymentForm.querySelector("[name='DEPLOY_SCALING_TYPE']")?.addEventListener("change",()=>{this._syncInstanceClassOptions(),this._syncInstanceControls(),this._syncWorkerLimit()}),this.deploymentForm.querySelector("[name='DEPLOY_INSTANCE_CLASS']")?.addEventListener("change",()=>this._syncWorkerLimit()),this._syncWorkerLimit())}updated(e){this._deployment=e.deployment}postreconcile(){this._deployment&&this._renderDeployment(this._deployment)}_renderDeployment(e){if(!this.deploymentForm||!e)return;const t=this._normalizeDeployment(e);this._setDeploymentField("DEPLOY_SCALING_TYPE",t.scalingType),this._setDeploymentField("DEPLOY_WORKER_COUNT",t.workerCount),this._setDeploymentField("DEPLOY_INSTANCE_CLASS",t.instanceClass),this._setDeploymentField("DEPLOY_MAX_INSTANCES",t.maxInstances),this._setDeploymentField("DEPLOY_MIN_IDLE_INSTANCES",t.minIdleInstances),this._setDeploymentField("DEPLOY_IDLE_TIMEOUT",String(t.idleTimeout)),this._syncInstanceClassOptions({preserveCurrent:!0}),this._syncInstanceControls(),this._syncWorkerLimit(),this._updateDeploymentSummary(t)}_updateDeploymentSummary(e){const t=e.scalingType==="automatic"?"Automatic":"Basic",i=Number(e.workerCount)===1?"worker":"workers",s=Number(e.maxInstances)===1?"max instance":"max instances",n=e.scalingType==="automatic"?`${e.minIdleInstances} min idle \xB7 ${e.maxInstances} ${s}`:`${e.maxInstances} ${s}`;this.updateSummary(`${t} \xB7 ${e.workerCount} ${i} \xB7 ${e.instanceClass} \xB7 ${n}`)}_normalizeDeployment(e){const t=(i,s)=>i==null||i===""?s:i;return{scalingType:t(e.DEPLOY_SCALING_TYPE,"basic"),workerCount:t(e.DEPLOY_WORKER_COUNT,3),instanceClass:t(e.DEPLOY_INSTANCE_CLASS,"B2"),maxInstances:t(e.DEPLOY_MAX_INSTANCES,1),minIdleInstances:t(e.DEPLOY_MIN_IDLE_INSTANCES,1),idleTimeout:t(e.DEPLOY_IDLE_TIMEOUT,"15m")}}_setDeploymentField(e,t){this.deploymentForm?.querySelectorAll(`[name='${e}']`).forEach(i=>{i.value=String(t),i instanceof window.HTMLSelectElement&&this.syncSelectBox(i,t?String(t):void 0)})}_syncInstanceClassOptions({preserveCurrent:e=!1}={}){if(!this.deploymentForm)return;const t=this.deploymentForm.querySelector("[name='DEPLOY_SCALING_TYPE']"),i=this.deploymentForm.querySelector("[name='DEPLOY_INSTANCE_CLASS']");if(!i)return;const s=t?.value||"basic",n=z[s]||z.basic,a=Array.from(i.querySelectorAll("option"));a.forEach(r=>{const l=n.includes(r.value);r.disabled=!l,r.hidden=!l});const o=i.closest("[lp-select]")?._lp_combobox;o&&(o.items=a.filter(r=>n.includes(r.value)).map(r=>{const l=JSON.parse(r.dataset.details||"{}");return{id:r.value,name:r.textContent,kind:i.dataset.kind||"default",...l}}),o.updatePanel(o.results.create(o.items))),!e||!n.includes(i.value)?this._setDeploymentField("DEPLOY_INSTANCE_CLASS",ie[s]):this.syncSelectBox(i,i.value)}_syncInstanceControls(){if(!this.deploymentForm)return;const t=this.deploymentForm.querySelector("[name='DEPLOY_SCALING_TYPE']")?.value==="automatic",i=this.deploymentForm.querySelector("[data-role='basic-instance-count']"),s=this.deploymentForm.querySelector("[data-role='automatic-instance-counts']");!i||!s||(i.dataset.visible=t?"false":"true",s.dataset.visible=t?"true":"false",i.querySelectorAll("input").forEach(n=>{n.disabled=t}),s.querySelectorAll("input").forEach(n=>{n.disabled=!t}))}_syncWorkerLimit(){if(!this.deploymentForm)return;const e=this.deploymentForm.querySelector("[name='DEPLOY_INSTANCE_CLASS']")?.value,t=this.deploymentForm.querySelector("[name='DEPLOY_WORKER_COUNT']");if(!t)return;const i=e!==void 0&&se.has(e);t.max=i?String(F):"20",i&&Number(t.value)>F&&(t.value=String(F));const s=this.deploymentForm.querySelector("[data-role='deployment-worker-guidance']");s&&(s.textContent=i?`${e} supports at most three workers; each worker adds application memory use.`:"Workers multiply application memory use; monitor memory after increasing them.")}_showDeploymentError(e){const t=this.deploymentForm?.querySelector("[data-role='deployment-error']");t&&(t.textContent=e||"",t.dataset.visible=e?"true":"false")}async _saveDeployment(e){if(e.preventDefault(),e.stopPropagation(),!this.deploymentForm||!this.deploymentButton)return;this._showDeploymentError(""),this.deploymentButton.activate();const t=await f.post(this.endpoints.setDeploymentSettings,new FormData(this.deploymentForm));if(!t?.ok){this._showDeploymentError(t?.error||"Unable to save deployment."),this.deploymentButton.deactivate("Save Deployment Settings");return}this._deployment=t.deployment,this._renderDeployment(t.deployment),this.deploymentButton.deactivate()}}var ae=Object.freeze({__proto__:null,SiteDeployment:ne});const oe=p=>p||"None";class re extends v{updated(e){this._access=e.installation_access}postreconcile(){this._access&&this._render(this._access)}_render(e){this.updateSummary(e.summary),this.target.dataset.state=e.state;const t={project:e.project_id,owner:e.owner_email,installer:e.installer_email,deployer:e.deployer_email,bootstrap:e.bootstrap_admin_email,runtime:e.runtime_service_account,"email-service":e.authentication_email?.service,"email-sender":e.authentication_email?.sender_email,"email-login":e.authentication_email?.login};for(const[h,_]of Object.entries(t)){const A=this.target.querySelector(`[data-field='${h}']`);A&&(A.textContent=oe(_))}const i=this.target.querySelector("[data-role='handoff-status']"),s=i?.querySelector("[data-role='status-title']"),n=i?.querySelector("[data-role='status-description']");s&&n&&e.state==="application-complete"?(s.textContent="Application handoff configured",n.textContent="The saved deployer is the permanent Owner and automatic installer bootstrap is closed. Confirm Cloud IAM separately before considering cloud cleanup complete."):s&&n&&e.state==="pending"?(s.textContent="Delegated handoff pending",n.textContent="Keep the installer\u2019s Google Cloud access until setup handoff completes. Removing it early can prevent deployment and managed-resource transfer."):s&&n&&(s.textContent="Owner-managed installation",n.textContent="The permanent Owner also installed this site; there is no separate delegated installer to hand off.");const a=this.target.querySelector("[data-role='project-iam-link']");a&&(a.href=e.project_iam_url);const o=e.authentication_email,r=this.target.querySelector("[data-role='authentication-email-details']");r&&(r.dataset.visible=o?.configured?"true":"false");const l=this.target.querySelector("[data-role='installer-email-warning']");l&&(l.dataset.visible=o?.uses_installer?"true":"false");const u=this.target.querySelector("[data-role='handoff-instructions']");u&&(u.dataset.visible=e.state==="pending"?"true":"false")}}var le=Object.freeze({__proto__:null,SiteInstallationAccess:re});const ce="splash-";class de extends v{constructor(e){super(e),this._siteImage=null,this._uploadInitialization=null,this._uploadImage=this._uploadImage.bind(this)}updated(e){this._siteImage=e.site_image}postreconcile(){this._siteImage&&this._renderSiteImage(this._siteImage)}opened(){if(this._uploadInitialization)return this._uploadInitialization;const e=this._initUpload().catch(t=>{throw this._uploadInitialization===e&&(this._uploadInitialization=null),t});return this._uploadInitialization=e,e}async _initUpload(){const e=this.target.querySelector("[data-role='upload-site-image']");if(!e)return;const t=H.dropzone({text:"Drop image here, click to upload, or tap to choose camera/files"}),i=new J({target:e,dropzone:t,submitButton:e.querySelector("button[type='submit']"),inputName:"site-image",uploadType:"image",menuOptions:["paste","remove"],messages:{submit:"Update Site Image",submitting:"Processing Image",submitted:"Image Processed"},html:[t.element]});this.upload=i,i.uploadMenu=new V(i),await i.init(),this.destroyables.push(i),e.addEventListener("submit",this._uploadImage)}async _uploadImage(e){e.preventDefault(),e.stopPropagation();const t=this.upload;if(!t||!await t.prepareSubmit({route:this.endpoints.setSiteImage}))return;const s=await f.post(this.endpoints.setSiteImage,t.formData);if(!s?.ok){s?.error&&t.showError(s.error),t.form?.resetSubmitButton();return}t.form?.success();const n=s.site_image;n&&(this._siteImage=n,I(()=>{this._renderSiteImage(n)}))}_renderSiteImage(e){const t=this.target.querySelector("[data-role='site-image']");if(!t||!e)return;const i=Object.entries(e).filter(([a])=>!a.startsWith(ce)),s=document.createDocumentFragment(),n=e["apple-touch-icon.png"]||e["logo-192x192.png"];if(n){const a=document.createElement("img");a.src=`${n}?v=${Date.now()}`,a.alt="Site image",a.className="size-20 rounded-lg object-contain",s.appendChild(a)}if(i.length>0){const a=document.createElement("div");a.className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2";for(const[o,r]of i){const l=document.createElement("a");l.href=r,l.target="_blank",l.rel="noopener noreferrer",l.className="flex flex-row items-center gap-2 rounded-md border border-base-light/50 bg-white px-3 py-2 text-sm hover:bg-base-bg transition-colors";const u=document.createElement("span");D(u,"image","icon-xs text-base-medium");const h=document.createElement("span");h.className="text-base-dark font-medium truncate grow text-xs",h.textContent=o;const _=document.createElement("span");D(_,"next","icon-xs text-base-medium"),l.append(u,h,_),a.appendChild(l)}s.appendChild(a)}this.updateSummary(`${i.length} generated files`),t.replaceChildren(s)}}var ue=Object.freeze({__proto__:null,SiteImage:de});class me extends v{constructor(e){super(e),this._migrationStatus=null,this._cacheStatus=null}init(){this._initActions(),this._initConfiguration()}updated(e){this._migrationStatus=e.migration_status||null}postreconcile(){this._renderMigrationStatus(this._migrationStatus),this._renderCacheStatus(this._cacheStatus)}_initActions(){const e=this.target.querySelector("[data-role='rebuild-cache']"),t=this.target.querySelector("[data-role='site-update']");if(!e||!t)return;const i=C.active({existingButton:e,icon:"database",text:"Refresh Cache",processingText:"Refreshing Cache",completedText:"Cache Refreshed",processingIcon:"spinner",completedIcon:"check"});i.element.addEventListener("click",async()=>{i.activate(),this._cacheStatus=null,this._renderCacheStatus(null);const n=await f.post(this.endpoints.rebuildCache);if(n?.migration_status&&(this._migrationStatus=n.migration_status),!n?.ok){await I(()=>{i.deactivate("Refresh Cache"),this._renderMigrationStatus(this._migrationStatus)},{label:"site-settings:cache-error"});return}this._cacheStatus=n.cache_status||null,this._renderCacheStatus(this._cacheStatus),i.deactivate(this._cacheStatus?.failed?"Cache Refreshed \u2014 Review Errors":void 0),R()});const s=C.active({existingButton:t,icon:"installation",text:"Apply Updates",processingText:"Applying Site Updates",completedText:"Updates Applied",processingIcon:"spinner",completedIcon:"check"});s.element.addEventListener("click",async()=>{s.activate();const n=await f.post(this.endpoints.siteUpdate);if(n?.migration_status&&(this._migrationStatus=n.migration_status),!n?.ok){await I(()=>{s.deactivate("Apply Updates"),this._renderMigrationStatus(this._migrationStatus)},{label:"site-settings:update-error"});return}await I(()=>{s.deactivate(),this._renderMigrationStatus(this._migrationStatus)},{label:"site-settings:update-complete"}),R()})}_renderCacheStatus(e){const t=this.target.querySelector("[data-role='cache-status']");if(!t||(t.dataset.visible=e?"true":"false",!e))return;const i=t.querySelector("[data-role='cache-status-title']"),s=t.querySelector("[data-role='cache-status-summary']"),n=t.querySelector("[data-role='cache-status-errors']");if(!i||!s||!n)return;i.textContent=e.failed?"Cache refreshed with errors":"Cache refreshed";const a=e.errors||[];s.textContent=`${e.processed} records processed; ${e.failed} skipped.`+(e.failed?" Skipped records could not be safely cached. Review them, then refresh again.":"")+(e.failed>a.length?` Showing ${a.length} errors.`:""),n.replaceChildren();for(const o of a){const r=document.createElement("li");if(r.textContent=`${o.message} `,o.url){const l=document.createElement("a");l.href=o.url,l.textContent=o.link_label||"Open record",l.className=x.link.emphasized,r.appendChild(l)}else r.textContent+=o.key||"";n.appendChild(r)}}_initConfiguration(){const e=this.target.querySelector("[data-role='configuration']");if(!e)return;const t=C.active({existingButton:e,icon:"configuration",text:"Configuration",processingText:"Loading Configuration",completedText:"Configuration",completedIcon:"configuration"});e.addEventListener("click",async()=>{t.activate();const i=new G(this.view,e);try{await i.load(this.endpoints.siteConfiguration)}finally{t.deactivate()}})}_renderMigrationStatus(e){const t=this.target.querySelector("[data-role='migration-status']");if(!t)return;const i=t.querySelector("[data-role='migration-status-title']"),s=t.querySelector("[data-role='migration-status-summary']"),n=t.querySelector("[data-role='migration-status-results']"),a=t.querySelector("[data-role='migration-status-errors']");if(!i||!s||!n||!a)return;const o=this.target.querySelector("[data-role='site-update']"),r=this.target.querySelector("[data-role='rebuild-cache']");n.replaceChildren(),a.replaceChildren(),t.dataset.visible="true";const l=e?.status||"current",u=e?.counts||{},h=(u.pending||0)+(u.failed||0)+(u.interrupted||0)+(u.blocked||0);o&&(o.disabled=!["pending","failed"].includes(l),o.title=h?`Apply ${h} pending site ${h===1?"update":"updates"}`:"All site updates are complete"),r&&(r.disabled=!e?.cache_refresh_allowed,r.title=e?.cache_refresh_allowed?"Refresh cached and search data":"Apply all site updates before refreshing the cache");const _=e?.current_version?`Version ${e.current_version}. `:"",A=(e?.migrations||[]).filter(g=>g.source!=="fresh-install"),O=A.filter(g=>g.state==="complete").length;switch(l){case"pending":i.textContent="Site updates are ready",s.textContent=`${_}${h} pending site ${h===1?"update":"updates"}.`;break;case"running":i.textContent="Site updates are running",s.textContent=`${_}Another update request is currently working through the migration catalog.`;break;case"failed":i.textContent="Site updates need attention",s.textContent=`${_}Fix or retry the first incomplete update; later updates remain blocked.`;break;case"audit-error":i.textContent="Site update history needs repair",s.textContent=`${_}Stored migration identity or history does not match this build.`;break;default:i.textContent="Site updates are current",s.textContent=O?`${_}${O} site ${O===1?"update":"updates"} completed.`:`${_}No site updates are required.`}const T=(g,m,S="")=>{const y=document.createElement("li");if(y.textContent=`${S?`${S}: `:""}${m.message}${m.url?" ":""}`,m.url){const b=document.createElement("a");b.href=m.url,b.textContent=m.link_label||"Open record",b.className=x.link.emphasized,y.appendChild(b)}g.appendChild(y)},j={complete:"Completed",pending:"Pending",running:"Running",failed:"Failed",interrupted:"Interrupted \u2014 retry available",blocked:"Blocked by an earlier update","audit-error":"Audit error"},q=new Map;for(const g of A){const m=g.introduced_in||"Unknown",S=q.get(m);S?S.push(g):q.set(m,[g])}for(const[g,m]of q){const S=document.createElement("li"),y=document.createElement("details");y.open=m.some(c=>c.state!=="complete");const b=document.createElement("summary"),X=m.filter(c=>c.state==="complete").length;b.textContent=`Version ${g} \u2014 ${X}/${m.length} completed`,b.className=x.siteSettings.migration.releaseSummary,y.appendChild(b);const N=document.createElement("ul");N.className=x.siteSettings.migration.migrationList;for(const c of m){const w=document.createElement("li"),k=c.attempts||[],$=k.length,B=c.state==="complete"?[...k].reverse().find(d=>d.status==="complete"):k.at(-1);if(w.textContent=`${c.id} \u2014 ${c.label}: ${j[c.state]||c.state}`,c.completed_at){const d=document.createElement("div"),E=c.completed_version?`version ${c.completed_version}`:"an earlier version",L=c.completed_build_id?`, build ${c.completed_build_id}`:"";d.textContent=`Completed on ${E}${L} \xB7 ${$} recorded ${$===1?"attempt":"attempts"}`,d.className=x.siteSettings.migration.completion,w.appendChild(d)}if(c.audit_error&&T(a,{message:c.audit_error},`${c.id} audit`),k.length){const d=document.createElement("ul");d.className=x.siteSettings.migration.attemptList;for(const E of k){const L=document.createElement("li"),M=E.totals||{};L.textContent=`${E.status}: ${M.changed||0} changed, ${M.repaired||0} repaired, ${M.failed||0} failed`,d.appendChild(L)}w.appendChild(d)}const U=c.id==="MSG-001"?[]:B?.repairs||[];if(U.length){const d=document.createElement("ul");d.className=x.siteSettings.migration.attemptList;for(const E of U)T(d,E,E.url?"":E.key);w.appendChild(d)}for(const d of B?.errors||[])T(a,d,d.url?c.id:`${c.id} ${d.key}`);N.appendChild(w)}y.appendChild(N),S.appendChild(y),n.appendChild(S)}a.dataset.visible=a.childElementCount?"true":"false"}}var pe=Object.freeze({__proto__:null,SiteMaintenance:me});class he extends v{updated(e){this._links=e.service_providers}postreconcile(){this._links&&this._renderServiceProviders(this._links)}_renderServiceProviders(e){const t=this.target.querySelector("[data-role='service-providers']");if(!t||!e?.length)return;const i=document.createElement("div");i.className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";for(const s of e){const n=document.createElement("a");n.href=s.url,n.target="_blank",n.rel="noopener noreferrer",n.className="group/link flex flex-col gap-1 rounded-lg border border-base-light/50 bg-white px-4 py-3 shadow-sm hover:bg-base-bg transition-colors";const a=document.createElement("div");a.className="flex flex-row items-center gap-1";const o=document.createElement("span");D(o,s.icon,"text-base-dark text-lg group-hover/link:text-kind-default transition-colors text-sm");const r=document.createElement("span");r.className="text-sm font-semibold text-base-dark group-hover/link:text-kind-default transition-colors",r.textContent=s.title;const l=document.createElement("span");D(l,"next","icon-xs text-base-medium ml-auto"),a.append(o,r,l);const u=document.createElement("span");u.className="text-xs text-base-medium leading-snug",u.textContent=s.description,n.append(a,u),i.appendChild(n)}this.updateSummary(`${e.length} external links`),t.replaceChildren(i)}}var _e=Object.freeze({__proto__:null,SiteServiceProviders:he});const W="/l/site-settings/public-pages";class ge extends v{constructor(e){super({...e,endpoints:{}}),this._settings=null,this._save=this._save.bind(this)}async init(){if(this.form=this.target.querySelector("[data-role='public-page-settings']"),!this.form)return;this.button=C.active({existingButton:this.form.querySelector("button[type='submit']"),text:"Save Public Page Settings",processingText:"Saving Public Page Settings",completedText:"Public Page Settings Saved",processingIcon:"spinner",completedIcon:"check"}),this.form.addEventListener("submit",this._save);const e=await f.get(W);e?.ok&&e.public_pages?(this._settings=e.public_pages,this._render(e.public_pages)):this._showError(e?.error||"Unable to load public page settings.")}updated(e){e.public_pages&&(this._settings=e.public_pages)}postreconcile(){this._settings&&this._render(this._settings)}_render(e){const t=e.PUBLIC_PAGE_INDEXING===!0,i=this.form?.querySelector("[name='PUBLIC_PAGE_INDEXING']");i&&(i.checked=t),this.updateSummary(t?"Search discovery is on":"Search discovery is off")}_showError(e){const t=this.form?.querySelector("[data-role='public-pages-error']");t&&(t.textContent=e||"",t.dataset.visible=e?"true":"false")}async _save(e){e.preventDefault(),e.stopPropagation();const{form:t,button:i}=this;if(!t||!i)return;this._showError(""),i.activate();const s=new FormData;s.set("PUBLIC_PAGE_INDEXING",t.querySelector("[name='PUBLIC_PAGE_INDEXING']")?.checked?"true":"false");const n=await f.post(W,s);if(!n?.ok||!n.public_pages){this._showError(n?.error||"Unable to save public page settings."),i.deactivate("Save Public Page Settings");return}this._settings=n.public_pages,this._render(n.public_pages),i.deactivate()}destroy(){this.form?.removeEventListener("submit",this._save),super.destroy()}}const P="lagniappe:site-settings-section",fe="maintenance",Se={maintenance:"SiteMaintenance",administrators:"SiteAdministrators","installation-access":"SiteInstallationAccess",deployment:"SiteDeployment","ai-models":"SiteAiModels","service-providers":"SiteServiceProviders","site-image":"SiteImage"};class ye{constructor(e){Object.assign(this,e),this.sections=new Map,this.settingWidgets=new Map,this._sectionRequest=0,this._click=this._click.bind(this)}async init(){this._collectSections(),await this._loadSettingWidgets(),this.target.addEventListener("click",this._click);const e=localStorage.getItem(P),t=e&&this.sections.has(e)?e:fe;await this.settingWidgets.get(t)?.opened?.(),this._setOpenSection(t,{persist:!1}),this.target.setAttribute("initialized","")}_collectSections(){this.target.querySelectorAll("[data-role='site-settings-section']").forEach(e=>{const t=e.dataset.section;t&&this.sections.set(t,e)})}async _loadSettingWidgets(){await Promise.all(Object.entries(Se).map(async([t,i])=>{const s=await this.component.loadWidget(i);s&&this.settingWidgets.set(t,s)}));const e=this.sections.get("public-pages")?.querySelector("[data-widget='SitePublicPages']");if(e){const t=new ge({target:e,kind:"page"});await t.init(),this.settingWidgets.set("public-pages",t)}}updated(e){this.settingWidgets.forEach(t=>{t.updated?.(e),t.modified=!0}),this.modified=!0}postreconcile(){}_click(e){const t=e.target;if(!(t instanceof Element))return;const i=t.closest("[data-role='site-settings-section']");if(!i||!this.target.contains(i))return;if(t.closest("[data-role='expand']")){e.preventDefault(),e.stopPropagation(),this._toggleSection(i.dataset.section);return}const n=t.closest("header");!n||!i.contains(n)||t.closest("button, a, input, select, textarea")||this._toggleSection(i.dataset.section)}async _toggleSection(e){const i=!this._isSectionOpen(e)?e:null,s=++this._sectionRequest;if(await(i?this.settingWidgets.get(i)?.opened?.():void 0),s===this._sectionRequest)return I(()=>this._setOpenSection(i),{label:"site-settings:toggle-section"})}_setOpenSection(e,{persist:t=!0}={}){this.sections.forEach((i,s)=>{const n=s===e;i.dataset.open=n?"true":"false";const a=i.querySelector("[data-role='section-body']");a&&(a.dataset.visible=n?"true":"false");const o=i.querySelector("[data-role='expand']");o&&(o.dataset.open=n?"true":"false",o.setAttribute("aria-expanded",n?"true":"false"),o.setAttribute("aria-label",n?"Collapse":"Expand"),o.title=n?"Collapse":"Expand")}),t&&(e?localStorage.setItem(P,e):localStorage.removeItem(P))}_isSectionOpen(e){return e!==void 0&&this.sections.get(e)?.dataset.open==="true"}destroy(){this.target.removeEventListener("click",this._click),this.settingWidgets.get("public-pages")?.destroy?.()}}var be=Object.freeze({__proto__:null,SiteSettings:ye});export{Z as a,te as b,ue as c,ae as d,le as i,pe as m,_e as p,be as s};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { b as buttons } from './ui-controls.js?v=b6ea3fe0';
+import { r as request, w as withTransition, a as clearRecentSearchResults } from './foundation.js?v=b6ea3fe0';
+import { S as SelectBox, a as FacetsBox } from './forms.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+import { Modal } from './modal.js?v=b6ea3fe0';
+import { u as uploadElement, B as BaseUpload, U as UploadMenu } from './uploads.js?v=b6ea3fe0';
+import { s as setIcon, S as STYLES } from './ui-resources.js?v=b6ea3fe0';
+
+class SiteSetting {
+  constructor(attributes) {
+    Object.assign(this, attributes);
+    this.destroyables = [];
+  }
+  updateSummary(text) {
+    const summary = this.target.closest("[data-role='site-settings-section']")?.querySelector("[data-role='section-summary']");
+    if (summary) summary.textContent = text || "";
+  }
+  syncSelectBox(select, value) {
+    const combobox = select.closest("[lp-select]")?._lp_combobox;
+    if (!combobox) return;
+    combobox.values.clear();
+    if (value) combobox.values.add(value);
+    combobox.updateSelect(true);
+  }
+  destroy() {
+    this.destroyables.forEach((destroyable) => {
+      destroyable.destroy?.();
+    });
+    this.destroyables = [];
+  }
+}
+
+class SiteAiModels extends SiteSetting {
+  constructor(attributes) {
+    super(attributes);
+    this._aiSettings = null;
+    this._aiModelOptions = null;
+    this._aiSelectsInitialized = false;
+    this._saveAiSettings = this._saveAiSettings.bind(this);
+  }
+  init() {
+    this.aiForm = this.target.querySelector(
+      "[data-role='ai-settings']"
+    );
+    if (!this.aiForm) return;
+    this.aiButton = buttons.active({
+      existingButton: this.aiForm.querySelector("button[type='submit']"),
+      text: "Save AI Model Settings",
+      processingText: "Saving AI Model Settings",
+      completedText: "AI Model Settings Saved",
+      processingIcon: "spinner",
+      completedIcon: "check"
+    });
+    this.aiForm.addEventListener("submit", this._saveAiSettings);
+  }
+  updated(response) {
+    this._aiSettings = response.ai_settings;
+    this._aiModelOptions = response.ai_model_options;
+  }
+  postreconcile() {
+    if (this._aiSettings) {
+      this._renderAiSettings(this._aiSettings, this._aiModelOptions);
+    }
+  }
+  _renderAiSettings(settings, modelOptions) {
+    if (!this.aiForm || !settings) return;
+    this._initAiSelectBoxes();
+    this._populateAiModelSelect("AI_MODEL", modelOptions?.text || []);
+    this._populateAiModelSelect("AI_UTILITY_MODEL", modelOptions?.text || []);
+    this._populateAiModelSelect("AI_IMAGE_MODEL", modelOptions?.image || []);
+    this._setAiField("AI_MODEL", settings.AI_MODEL);
+    this._setAiField("AI_UTILITY_MODEL", settings.AI_UTILITY_MODEL);
+    this._setAiField("AI_IMAGE_MODEL", settings.AI_IMAGE_MODEL);
+    this._setAiField("AI_LOCATION", settings.AI_LOCATION || "global");
+    const autoExecute = this.aiForm.querySelector(
+      "[name='AI_AUTO_EXECUTE']"
+    );
+    if (autoExecute) {
+      autoExecute.checked = settings.AI_AUTO_EXECUTE === true;
+    }
+    const pricing = this.aiForm.querySelector(
+      "[data-role='ai-pricing-link']"
+    );
+    if (pricing && modelOptions?.pricing_url) {
+      pricing.href = modelOptions.pricing_url;
+    }
+    const autoSuffix = settings.AI_AUTO_EXECUTE === true ? " \xB7 auto-execute on" : "";
+    this.updateSummary(
+      `${settings.AI_MODEL} \xB7 utility ${settings.AI_UTILITY_MODEL} \xB7 image ${settings.AI_IMAGE_MODEL}${autoSuffix}`
+    );
+  }
+  _populateAiModelSelect(name, options) {
+    const select = this.aiForm?.querySelector(
+      `[name='${name}']`
+    );
+    if (!select) return;
+    select.replaceChildren();
+    for (const option of options) {
+      const element = document.createElement("option");
+      element.value = option.id;
+      element.textContent = option.label || option.id;
+      element.dataset.details = JSON.stringify({
+        description: option.description,
+        kind: option.kind,
+        source: option.source
+      });
+      select.appendChild(element);
+    }
+    this._refreshSelectBox(select);
+  }
+  _initAiSelectBoxes() {
+    if (!this.aiForm) return;
+    if (this._aiSelectsInitialized) {
+      this.aiForm.querySelectorAll("[data-role='ai-select'] select").forEach((select) => {
+        this._refreshSelectBox(select);
+      });
+      return;
+    }
+    this._aiSelectsInitialized = true;
+    this.aiForm.querySelectorAll("[data-role='ai-select']").forEach((element) => {
+      const select = new SelectBox(element);
+      select.init();
+      this.destroyables.push(select);
+    });
+  }
+  _refreshSelectBox(select) {
+    const combobox = select.closest("[lp-select]")?._lp_combobox;
+    if (!combobox) return;
+    const options = Array.from(select.querySelectorAll("option"));
+    combobox.items = options.map((option) => ({
+      id: option.value,
+      name: option.textContent ?? "",
+      kind: option.dataset.kind || "default",
+      ...JSON.parse(option.dataset.details || "{}")
+    }));
+    combobox.updatePanel(combobox.results.create(combobox.items));
+    this.syncSelectBox(select, select.value);
+  }
+  _setAiField(name, value) {
+    const field = this.aiForm?.querySelector(`[name='${name}']`);
+    if (!field) return;
+    field.value = value || "";
+    if (field instanceof HTMLSelectElement) this.syncSelectBox(field, value);
+  }
+  _showAiError(message) {
+    const error = this.aiForm?.querySelector(
+      "[data-role='ai-error']"
+    );
+    if (!error) return;
+    error.textContent = message || "";
+    error.dataset.visible = message ? "true" : "false";
+  }
+  _aiSettingsFormData() {
+    const form = this.aiForm;
+    const data = new FormData(form ?? void 0);
+    if (!form) return data;
+    form.querySelectorAll("[data-role='ai-select'] select").forEach((select) => {
+      const combobox = select.closest("[lp-select]")?._lp_combobox;
+      const selected = combobox?.values?.values().next().value;
+      data.set(select.name, selected ?? select.value ?? "");
+    });
+    const autoExecute = form.querySelector(
+      "[name='AI_AUTO_EXECUTE']"
+    );
+    if (autoExecute) {
+      data.set("AI_AUTO_EXECUTE", autoExecute.checked ? "true" : "false");
+    }
+    return data;
+  }
+  async _saveAiSettings(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const button = this.aiButton;
+    if (!button) return;
+    this._showAiError("");
+    button.activate();
+    const response = await request.post(
+      this.endpoints.setAiSettings,
+      this._aiSettingsFormData()
+    );
+    if (!response?.ok) {
+      this._showAiError(response?.error || "Unable to save AI model settings.");
+      button.deactivate("Save AI Model Settings");
+      return;
+    }
+    this._aiSettings = response.ai_settings;
+    this._aiModelOptions = response.ai_model_options;
+    await withTransition(
+      () => {
+        this._renderAiSettings(response.ai_settings, response.ai_model_options);
+        button.deactivate();
+      },
+      { label: "site-settings:save-ai-models" }
+    );
+  }
+}
+
+var aiModels = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	SiteAiModels: SiteAiModels
+});
+
+class SiteAdministrators extends SiteSetting {
+  constructor(attributes) {
+    super(attributes);
+    this._administrators = [];
+    this._candidates = [];
+    this._canManage = false;
+    this._demotionModal = null;
+    this._submit = this._submit.bind(this);
+    this._click = this._click.bind(this);
+  }
+  init() {
+    this.form = this.target.querySelector(
+      "[data-role='administrator-form']"
+    );
+    this.list = this.target.querySelector(
+      "[data-role='administrator-list']"
+    );
+    this.error = this.target.querySelector(
+      "[data-role='administrator-error']"
+    );
+    const input = this.form?.querySelector(
+      "input[name='user_key']"
+    );
+    if (!input) return;
+    this.selector = new FacetsBox(input);
+    this.selector.init();
+    this.form?.addEventListener("submit", this._submit);
+    this.list?.addEventListener("click", this._click);
+  }
+  updated(response) {
+    this._administrators = response.administrators || [];
+    this._candidates = response.administrator_candidates || [];
+    this._canManage = response.can_manage_administrators === true;
+  }
+  postreconcile() {
+    this._render();
+  }
+  _render() {
+    if (!this.list || !this.form) return;
+    this.list.replaceChildren(
+      ...this._administrators.map(
+        (administrator) => this._administratorRow(administrator)
+      )
+    );
+    this.selector?.clear({ notify: false });
+    this.selector?.updatePanel("");
+    this.form.dataset.visible = this._canManage ? "true" : "false";
+    const submit = this.form.querySelector("button");
+    if (submit) submit.disabled = !this._candidates.length;
+    this.updateSummary(
+      `${this._administrators.length} ${this._administrators.length === 1 ? "administrator" : "administrators"}`
+    );
+  }
+  _administratorRow(administrator) {
+    const item = document.createElement("li");
+    item.dataset.role = "administrator";
+    item.dataset.owner = administrator.is_owner ? "true" : "false";
+    item.className = "flex flex-col gap-2 rounded-md border border-base-light/70 bg-white/80 p-3 sm:flex-row sm:items-center sm:justify-between";
+    const details = document.createElement("div");
+    const name = document.createElement("strong");
+    name.className = "block text-sm text-base-dark";
+    name.textContent = `${administrator.name}${administrator.is_owner ? " \u2014 Primary Owner" : ""}`;
+    const email = document.createElement("span");
+    email.className = "block text-xs text-base-medium";
+    email.textContent = administrator.email;
+    const status = document.createElement("span");
+    status.className = "block text-xs text-base-medium";
+    status.dataset.role = "administrator-last-login";
+    status.textContent = administrator.awaiting_first_sign_in ? "Awaiting first sign-in" : administrator.last_login ? `Last signed in ${new Date(administrator.last_login).toLocaleString()}` : "Never signed in";
+    details.append(name, email, status);
+    item.append(details);
+    if (this._canManage && !administrator.is_owner && administrator.key) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.role = "demote-administrator";
+      button.dataset.key = administrator.key;
+      button.dataset.name = administrator.name;
+      button.dataset.kind = "delete";
+      button.className = "action-button shrink-0 rounded-md px-3 py-1.5 text-sm font-semibold";
+      button.textContent = "Remove Administrator";
+      item.append(button);
+    }
+    return item;
+  }
+  async _submit(event) {
+    event.preventDefault();
+    const select = this.form?.querySelector(
+      "select[name='user_key']"
+    );
+    if (!select?.value) return;
+    this._showError();
+    const response = await request.post(
+      this.endpoints.promote,
+      { user_key: select.value }
+    );
+    if (!response?.ok) return this._showError(response?.error);
+    this.updated(response);
+    this._render();
+  }
+  async _click(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const button = target.closest(
+      "[data-role='demote-administrator']"
+    );
+    if (!button?.dataset.key || !this.list?.contains(button)) return;
+    const route = this.endpoints.demote(button.dataset.key);
+    this._showError();
+    this._demotionModal?.destroy();
+    const modal = new Modal(this.view, button);
+    this._demotionModal = modal;
+    await modal.load(route);
+    if (this._demotionModal !== modal || !modal.modal) return;
+    const confirm = modal.modal.querySelector(
+      "[data-role='delete']"
+    );
+    if (!confirm) return;
+    let submitting = false;
+    confirm.addEventListener("click", async () => {
+      if (submitting) return;
+      submitting = true;
+      confirm.disabled = true;
+      const spinner = confirm.querySelector("#spinner");
+      if (spinner) spinner.dataset.visible = "true";
+      const response = await request.delete(route);
+      if (!response?.ok) {
+        submitting = false;
+        confirm.disabled = false;
+        if (spinner) spinner.dataset.visible = "false";
+        this._showError(response?.error);
+        return;
+      }
+      await modal.remove();
+      if (this._demotionModal === modal) this._demotionModal = null;
+      this.updated(response);
+      this._render();
+    });
+  }
+  _showError(message = "") {
+    if (!this.error) return;
+    this.error.textContent = message;
+    this.error.dataset.visible = message ? "true" : "false";
+  }
+  destroy() {
+    this._demotionModal?.destroy();
+    this._demotionModal = null;
+    this.form?.removeEventListener("submit", this._submit);
+    this.list?.removeEventListener("click", this._click);
+    this.selector?.destroy();
+    super.destroy();
+  }
+}
+
+var administrators = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	SiteAdministrators: SiteAdministrators
+});
+
+const INSTANCE_CLASSES = {
+  automatic: ["F1", "F2", "F4", "F4_1G"],
+  basic: ["B1", "B2", "B4", "B4_1G", "B8"]
+};
+const DEFAULT_INSTANCE_CLASS = {
+  automatic: "F2",
+  basic: "B2"
+};
+const MEMORY_SAFE_WORKER_CLASSES = /* @__PURE__ */ new Set(["F2", "B2"]);
+const MEMORY_SAFE_WORKER_LIMIT = 3;
+class SiteDeployment extends SiteSetting {
+  constructor(attributes) {
+    super(attributes);
+    this._deployment = null;
+    this._saveDeployment = this._saveDeployment.bind(this);
+  }
+  init() {
+    this.deploymentForm = this.target.querySelector(
+      "[data-role='deployment-settings']"
+    );
+    if (!this.deploymentForm) return;
+    this.deploymentButton = buttons.active({
+      existingButton: this.deploymentForm.querySelector(
+        "button[type='submit']"
+      ),
+      text: "Save Deployment Settings",
+      processingText: "Saving Deployment Settings",
+      completedText: "Deployment Settings Saved",
+      processingIcon: "spinner",
+      completedIcon: "check"
+    });
+    this.deploymentForm.addEventListener("submit", this._saveDeployment);
+    this.deploymentForm.querySelectorAll("[data-role='deployment-select']").forEach((element) => {
+      const select = new SelectBox(element);
+      select.init();
+      this.destroyables.push(select);
+    });
+    this.deploymentForm.querySelector("[name='DEPLOY_SCALING_TYPE']")?.addEventListener("change", () => {
+      this._syncInstanceClassOptions();
+      this._syncInstanceControls();
+      this._syncWorkerLimit();
+    });
+    this.deploymentForm.querySelector("[name='DEPLOY_INSTANCE_CLASS']")?.addEventListener("change", () => this._syncWorkerLimit());
+    this._syncWorkerLimit();
+  }
+  updated(response) {
+    this._deployment = response.deployment;
+  }
+  postreconcile() {
+    if (this._deployment) this._renderDeployment(this._deployment);
+  }
+  _renderDeployment(deployment) {
+    if (!this.deploymentForm || !deployment) return;
+    const data = this._normalizeDeployment(deployment);
+    this._setDeploymentField("DEPLOY_SCALING_TYPE", data.scalingType);
+    this._setDeploymentField("DEPLOY_WORKER_COUNT", data.workerCount);
+    this._setDeploymentField("DEPLOY_INSTANCE_CLASS", data.instanceClass);
+    this._setDeploymentField("DEPLOY_MAX_INSTANCES", data.maxInstances);
+    this._setDeploymentField(
+      "DEPLOY_MIN_IDLE_INSTANCES",
+      data.minIdleInstances
+    );
+    this._setDeploymentField("DEPLOY_IDLE_TIMEOUT", String(data.idleTimeout));
+    this._syncInstanceClassOptions({ preserveCurrent: true });
+    this._syncInstanceControls();
+    this._syncWorkerLimit();
+    this._updateDeploymentSummary(data);
+  }
+  _updateDeploymentSummary(deployment) {
+    const scaling = deployment.scalingType === "automatic" ? "Automatic" : "Basic";
+    const workers = Number(deployment.workerCount) === 1 ? "worker" : "workers";
+    const maxInstances = Number(deployment.maxInstances) === 1 ? "max instance" : "max instances";
+    const instanceText = deployment.scalingType === "automatic" ? `${deployment.minIdleInstances} min idle \xB7 ${deployment.maxInstances} ${maxInstances}` : `${deployment.maxInstances} ${maxInstances}`;
+    this.updateSummary(
+      `${scaling} \xB7 ${deployment.workerCount} ${workers} \xB7 ${deployment.instanceClass} \xB7 ${instanceText}`
+    );
+  }
+  _normalizeDeployment(deployment) {
+    const first = (value, fallback) => value === void 0 || value === null || value === "" ? fallback : value;
+    return {
+      scalingType: first(deployment.DEPLOY_SCALING_TYPE, "basic"),
+      workerCount: first(deployment.DEPLOY_WORKER_COUNT, 3),
+      instanceClass: first(deployment.DEPLOY_INSTANCE_CLASS, "B2"),
+      maxInstances: first(deployment.DEPLOY_MAX_INSTANCES, 1),
+      minIdleInstances: first(deployment.DEPLOY_MIN_IDLE_INSTANCES, 1),
+      idleTimeout: first(deployment.DEPLOY_IDLE_TIMEOUT, "15m")
+    };
+  }
+  _setDeploymentField(name, value) {
+    this.deploymentForm?.querySelectorAll(
+      `[name='${name}']`
+    ).forEach((field) => {
+      field.value = String(value);
+      if (field instanceof window.HTMLSelectElement) {
+        this.syncSelectBox(field, value ? String(value) : void 0);
+      }
+    });
+  }
+  _syncInstanceClassOptions({ preserveCurrent = false } = {}) {
+    if (!this.deploymentForm) return;
+    const scaling = this.deploymentForm.querySelector(
+      "[name='DEPLOY_SCALING_TYPE']"
+    );
+    const instanceClass = this.deploymentForm.querySelector(
+      "[name='DEPLOY_INSTANCE_CLASS']"
+    );
+    if (!instanceClass) return;
+    const scalingType = scaling?.value || "basic";
+    const allowed = INSTANCE_CLASSES[scalingType] || INSTANCE_CLASSES.basic;
+    const options = Array.from(instanceClass.querySelectorAll("option"));
+    options.forEach((option) => {
+      const visible = allowed.includes(option.value);
+      option.disabled = !visible;
+      option.hidden = !visible;
+    });
+    const combobox = instanceClass.closest("[lp-select]")?._lp_combobox;
+    if (combobox) {
+      combobox.items = options.filter((option) => allowed.includes(option.value)).map((option) => {
+        const details = JSON.parse(
+          option.dataset.details || "{}"
+        );
+        return {
+          id: option.value,
+          name: option.textContent,
+          kind: instanceClass.dataset.kind || "default",
+          ...details
+        };
+      });
+      combobox.updatePanel(combobox.results.create(combobox.items));
+    }
+    if (!preserveCurrent || !allowed.includes(instanceClass.value)) {
+      this._setDeploymentField(
+        "DEPLOY_INSTANCE_CLASS",
+        DEFAULT_INSTANCE_CLASS[scalingType]
+      );
+    } else {
+      this.syncSelectBox(instanceClass, instanceClass.value);
+    }
+  }
+  _syncInstanceControls() {
+    if (!this.deploymentForm) return;
+    const scaling = this.deploymentForm.querySelector(
+      "[name='DEPLOY_SCALING_TYPE']"
+    );
+    const automatic = scaling?.value === "automatic";
+    const basicGroup = this.deploymentForm.querySelector(
+      "[data-role='basic-instance-count']"
+    );
+    const automaticGroup = this.deploymentForm.querySelector(
+      "[data-role='automatic-instance-counts']"
+    );
+    if (!basicGroup || !automaticGroup) return;
+    basicGroup.dataset.visible = automatic ? "false" : "true";
+    automaticGroup.dataset.visible = automatic ? "true" : "false";
+    basicGroup.querySelectorAll("input").forEach((input) => {
+      input.disabled = automatic;
+    });
+    automaticGroup.querySelectorAll("input").forEach((input) => {
+      input.disabled = !automatic;
+    });
+  }
+  _syncWorkerLimit() {
+    if (!this.deploymentForm) return;
+    const instanceClass = this.deploymentForm.querySelector(
+      "[name='DEPLOY_INSTANCE_CLASS']"
+    )?.value;
+    const workerInput = this.deploymentForm.querySelector(
+      "[name='DEPLOY_WORKER_COUNT']"
+    );
+    if (!workerInput) return;
+    const memoryLimited = instanceClass !== void 0 && MEMORY_SAFE_WORKER_CLASSES.has(instanceClass);
+    workerInput.max = memoryLimited ? String(MEMORY_SAFE_WORKER_LIMIT) : "20";
+    if (memoryLimited && Number(workerInput.value) > MEMORY_SAFE_WORKER_LIMIT) {
+      workerInput.value = String(MEMORY_SAFE_WORKER_LIMIT);
+    }
+    const guidance = this.deploymentForm.querySelector(
+      "[data-role='deployment-worker-guidance']"
+    );
+    if (guidance) {
+      guidance.textContent = memoryLimited ? `${instanceClass} supports at most three workers; each worker adds application memory use.` : "Workers multiply application memory use; monitor memory after increasing them.";
+    }
+  }
+  _showDeploymentError(message) {
+    const error = this.deploymentForm?.querySelector(
+      "[data-role='deployment-error']"
+    );
+    if (!error) return;
+    error.textContent = message || "";
+    error.dataset.visible = message ? "true" : "false";
+  }
+  async _saveDeployment(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.deploymentForm || !this.deploymentButton) return;
+    this._showDeploymentError("");
+    this.deploymentButton.activate();
+    const response = await request.post(
+      this.endpoints.setDeploymentSettings,
+      new FormData(this.deploymentForm)
+    );
+    if (!response?.ok) {
+      this._showDeploymentError(
+        response?.error || "Unable to save deployment."
+      );
+      this.deploymentButton.deactivate("Save Deployment Settings");
+      return;
+    }
+    this._deployment = response.deployment;
+    this._renderDeployment(response.deployment);
+    this.deploymentButton.deactivate();
+  }
+}
+
+var deployment = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	SiteDeployment: SiteDeployment
+});
+
+const display = (value) => value || "None";
+class SiteInstallationAccess extends SiteSetting {
+  updated(response) {
+    this._access = response.installation_access;
+  }
+  postreconcile() {
+    if (this._access) this._render(this._access);
+  }
+  _render(access) {
+    this.updateSummary(access.summary);
+    this.target.dataset.state = access.state;
+    const fields = {
+      project: access.project_id,
+      owner: access.owner_email,
+      installer: access.installer_email,
+      deployer: access.deployer_email,
+      bootstrap: access.bootstrap_admin_email,
+      runtime: access.runtime_service_account,
+      "email-service": access.authentication_email?.service,
+      "email-sender": access.authentication_email?.sender_email,
+      "email-login": access.authentication_email?.login
+    };
+    for (const [name, value] of Object.entries(fields)) {
+      const field = this.target.querySelector(`[data-field='${name}']`);
+      if (field) field.textContent = display(value);
+    }
+    const status = this.target.querySelector("[data-role='handoff-status']");
+    const statusTitle = status?.querySelector("[data-role='status-title']");
+    const statusDescription = status?.querySelector(
+      "[data-role='status-description']"
+    );
+    if (statusTitle && statusDescription && access.state === "application-complete") {
+      statusTitle.textContent = "Application handoff configured";
+      statusDescription.textContent = "The saved deployer is the permanent Owner and automatic installer bootstrap is closed. Confirm Cloud IAM separately before considering cloud cleanup complete.";
+    } else if (statusTitle && statusDescription && access.state === "pending") {
+      statusTitle.textContent = "Delegated handoff pending";
+      statusDescription.textContent = "Keep the installer\u2019s Google Cloud access until setup handoff completes. Removing it early can prevent deployment and managed-resource transfer.";
+    } else if (statusTitle && statusDescription) {
+      statusTitle.textContent = "Owner-managed installation";
+      statusDescription.textContent = "The permanent Owner also installed this site; there is no separate delegated installer to hand off.";
+    }
+    const iamLink = this.target.querySelector(
+      "[data-role='project-iam-link']"
+    );
+    if (iamLink) iamLink.href = access.project_iam_url;
+    const email = access.authentication_email;
+    const emailDetails = this.target.querySelector(
+      "[data-role='authentication-email-details']"
+    );
+    if (emailDetails)
+      emailDetails.dataset.visible = email?.configured ? "true" : "false";
+    const emailWarning = this.target.querySelector(
+      "[data-role='installer-email-warning']"
+    );
+    if (emailWarning) {
+      emailWarning.dataset.visible = email?.uses_installer ? "true" : "false";
+    }
+    const handoffInstructions = this.target.querySelector(
+      "[data-role='handoff-instructions']"
+    );
+    if (handoffInstructions) {
+      handoffInstructions.dataset.visible = access.state === "pending" ? "true" : "false";
+    }
+  }
+}
+
+var installationAccess = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	SiteInstallationAccess: SiteInstallationAccess
+});
+
+const SPLASH_PREFIX = "splash-";
+class SiteImage extends SiteSetting {
+  constructor(attributes) {
+    super(attributes);
+    this._siteImage = null;
+    this._uploadInitialization = null;
+    this._uploadImage = this._uploadImage.bind(this);
+  }
+  updated(response) {
+    this._siteImage = response.site_image;
+  }
+  postreconcile() {
+    if (this._siteImage) this._renderSiteImage(this._siteImage);
+  }
+  opened() {
+    if (this._uploadInitialization) return this._uploadInitialization;
+    const pending = this._initUpload().catch((error) => {
+      if (this._uploadInitialization === pending) {
+        this._uploadInitialization = null;
+      }
+      throw error;
+    });
+    this._uploadInitialization = pending;
+    return pending;
+  }
+  async _initUpload() {
+    const uploadForm = this.target.querySelector(
+      "[data-role='upload-site-image']"
+    );
+    if (!uploadForm) return;
+    const dropzone = uploadElement.dropzone({
+      text: "Drop image here, click to upload, or tap to choose camera/files"
+    });
+    const upload = new BaseUpload({
+      target: uploadForm,
+      dropzone,
+      submitButton: uploadForm.querySelector("button[type='submit']"),
+      inputName: "site-image",
+      uploadType: "image",
+      menuOptions: ["paste", "remove"],
+      messages: {
+        submit: "Update Site Image",
+        submitting: "Processing Image",
+        submitted: "Image Processed"
+      },
+      html: [dropzone.element]
+    });
+    this.upload = upload;
+    upload.uploadMenu = new UploadMenu(upload);
+    await upload.init();
+    this.destroyables.push(upload);
+    uploadForm.addEventListener("submit", this._uploadImage);
+  }
+  async _uploadImage(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const upload = this.upload;
+    if (!upload) return;
+    const prepared = await upload.prepareSubmit({
+      route: this.endpoints.setSiteImage
+    });
+    if (!prepared) return;
+    const response = await request.post(
+      this.endpoints.setSiteImage,
+      upload.formData
+    );
+    if (!response?.ok) {
+      if (response?.error) upload.showError(response.error);
+      upload.form?.resetSubmitButton();
+      return;
+    }
+    upload.form?.success();
+    const image = response.site_image;
+    if (image) {
+      this._siteImage = image;
+      withTransition(() => {
+        this._renderSiteImage(image);
+      });
+    }
+  }
+  _renderSiteImage(imageData) {
+    const container = this.target.querySelector("[data-role='site-image']");
+    if (!container || !imageData) return;
+    const entries = Object.entries(imageData).filter(
+      ([name]) => !name.startsWith(SPLASH_PREFIX)
+    );
+    const fragment = document.createDocumentFragment();
+    const previewUrl = imageData["apple-touch-icon.png"] || imageData["logo-192x192.png"];
+    if (previewUrl) {
+      const preview = document.createElement("img");
+      preview.src = `${previewUrl}?v=${Date.now()}`;
+      preview.alt = "Site image";
+      preview.className = "size-20 rounded-lg object-contain";
+      fragment.appendChild(preview);
+    }
+    if (entries.length > 0) {
+      const grid = document.createElement("div");
+      grid.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2";
+      for (const [filename, url] of entries) {
+        const link = document.createElement("a");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.className = "flex flex-row items-center gap-2 rounded-md border border-base-light/50 bg-white px-3 py-2 text-sm hover:bg-base-bg transition-colors";
+        const icon = document.createElement("span");
+        setIcon(icon, "image", "icon-xs text-base-medium");
+        const name = document.createElement("span");
+        name.className = "text-base-dark font-medium truncate grow text-xs";
+        name.textContent = filename;
+        const arrow = document.createElement("span");
+        setIcon(arrow, "next", "icon-xs text-base-medium");
+        link.append(icon, name, arrow);
+        grid.appendChild(link);
+      }
+      fragment.appendChild(grid);
+    }
+    this.updateSummary(`${entries.length} generated files`);
+    container.replaceChildren(fragment);
+  }
+}
+
+var image = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	SiteImage: SiteImage
+});
+
+class SiteMaintenance extends SiteSetting {
+  constructor(attributes) {
+    super(attributes);
+    this._migrationStatus = null;
+    this._cacheStatus = null;
+  }
+  init() {
+    this._initActions();
+    this._initConfiguration();
+  }
+  updated(response) {
+    this._migrationStatus = response.migration_status || null;
+  }
+  postreconcile() {
+    this._renderMigrationStatus(this._migrationStatus);
+    this._renderCacheStatus(this._cacheStatus);
+  }
+  _initActions() {
+    const cacheButton = this.target.querySelector(
+      "[data-role='rebuild-cache']"
+    );
+    const updateButton = this.target.querySelector(
+      "[data-role='site-update']"
+    );
+    if (!cacheButton || !updateButton) return;
+    const rebuildCache = buttons.active({
+      existingButton: cacheButton,
+      icon: "database",
+      text: "Refresh Cache",
+      processingText: "Refreshing Cache",
+      completedText: "Cache Refreshed",
+      processingIcon: "spinner",
+      completedIcon: "check"
+    });
+    rebuildCache.element.addEventListener("click", async () => {
+      rebuildCache.activate();
+      this._cacheStatus = null;
+      this._renderCacheStatus(null);
+      const response = await request.post(
+        this.endpoints.rebuildCache
+      );
+      if (response?.migration_status) {
+        this._migrationStatus = response.migration_status;
+      }
+      if (!response?.ok) {
+        await withTransition(
+          () => {
+            rebuildCache.deactivate("Refresh Cache");
+            this._renderMigrationStatus(this._migrationStatus);
+          },
+          { label: "site-settings:cache-error" }
+        );
+        return;
+      }
+      this._cacheStatus = response.cache_status || null;
+      this._renderCacheStatus(this._cacheStatus);
+      rebuildCache.deactivate(
+        this._cacheStatus?.failed ? "Cache Refreshed \u2014 Review Errors" : void 0
+      );
+      clearRecentSearchResults();
+    });
+    const applyUpdates = buttons.active({
+      existingButton: updateButton,
+      icon: "installation",
+      text: "Apply Updates",
+      processingText: "Applying Site Updates",
+      completedText: "Updates Applied",
+      processingIcon: "spinner",
+      completedIcon: "check"
+    });
+    applyUpdates.element.addEventListener("click", async () => {
+      applyUpdates.activate();
+      const response = await request.post(
+        this.endpoints.siteUpdate
+      );
+      if (response?.migration_status) {
+        this._migrationStatus = response.migration_status;
+      }
+      if (!response?.ok) {
+        await withTransition(
+          () => {
+            applyUpdates.deactivate("Apply Updates");
+            this._renderMigrationStatus(this._migrationStatus);
+          },
+          { label: "site-settings:update-error" }
+        );
+        return;
+      }
+      await withTransition(
+        () => {
+          applyUpdates.deactivate();
+          this._renderMigrationStatus(this._migrationStatus);
+        },
+        { label: "site-settings:update-complete" }
+      );
+      clearRecentSearchResults();
+    });
+  }
+  _renderCacheStatus(status) {
+    const panel = this.target.querySelector(
+      "[data-role='cache-status']"
+    );
+    if (!panel) return;
+    panel.dataset.visible = status ? "true" : "false";
+    if (!status) return;
+    const title = panel.querySelector("[data-role='cache-status-title']");
+    const summary = panel.querySelector("[data-role='cache-status-summary']");
+    const list = panel.querySelector("[data-role='cache-status-errors']");
+    if (!title || !summary || !list) return;
+    title.textContent = status.failed ? "Cache refreshed with errors" : "Cache refreshed";
+    const errors = status.errors || [];
+    summary.textContent = `${status.processed} records processed; ${status.failed} skipped.` + (status.failed ? " Skipped records could not be safely cached. Review them, then refresh again." : "") + (status.failed > errors.length ? ` Showing ${errors.length} errors.` : "");
+    list.replaceChildren();
+    for (const error of errors) {
+      const item = document.createElement("li");
+      item.textContent = `${error.message} `;
+      if (error.url) {
+        const link = document.createElement("a");
+        link.href = error.url;
+        link.textContent = error.link_label || "Open record";
+        link.className = STYLES.link.emphasized;
+        item.appendChild(link);
+      } else {
+        item.textContent += error.key || "";
+      }
+      list.appendChild(item);
+    }
+  }
+  _initConfiguration() {
+    const configurationButton = this.target.querySelector(
+      "[data-role='configuration']"
+    );
+    if (!configurationButton) return;
+    const configuration = buttons.active({
+      existingButton: configurationButton,
+      icon: "configuration",
+      text: "Configuration",
+      processingText: "Loading Configuration",
+      completedText: "Configuration",
+      completedIcon: "configuration"
+    });
+    configurationButton.addEventListener("click", async () => {
+      configuration.activate();
+      const modal = new Modal(this.view, configurationButton);
+      try {
+        await modal.load(this.endpoints.siteConfiguration);
+      } finally {
+        configuration.deactivate();
+      }
+    });
+  }
+  _renderMigrationStatus(status) {
+    const panel = this.target.querySelector(
+      "[data-role='migration-status']"
+    );
+    if (!panel) return;
+    const title = panel.querySelector("[data-role='migration-status-title']");
+    const summary = panel.querySelector(
+      "[data-role='migration-status-summary']"
+    );
+    const results = panel.querySelector(
+      "[data-role='migration-status-results']"
+    );
+    const errors = panel.querySelector(
+      "[data-role='migration-status-errors']"
+    );
+    if (!title || !summary || !results || !errors) return;
+    const updateButton = this.target.querySelector(
+      "[data-role='site-update']"
+    );
+    const cacheButton = this.target.querySelector(
+      "[data-role='rebuild-cache']"
+    );
+    results.replaceChildren();
+    errors.replaceChildren();
+    panel.dataset.visible = "true";
+    const state = status?.status || "current";
+    const counts = status?.counts || {};
+    const pendingCount = (counts.pending || 0) + (counts.failed || 0) + (counts.interrupted || 0) + (counts.blocked || 0);
+    if (updateButton) {
+      updateButton.disabled = !["pending", "failed"].includes(state);
+      updateButton.title = pendingCount ? `Apply ${pendingCount} pending site ${pendingCount === 1 ? "update" : "updates"}` : "All site updates are complete";
+    }
+    if (cacheButton) {
+      cacheButton.disabled = !status?.cache_refresh_allowed;
+      cacheButton.title = status?.cache_refresh_allowed ? "Refresh cached and search data" : "Apply all site updates before refreshing the cache";
+    }
+    const version = status?.current_version ? `Version ${status.current_version}. ` : "";
+    const visibleMigrations = (status?.migrations || []).filter(
+      (migration) => migration.source !== "fresh-install"
+    );
+    const visibleCompleted = visibleMigrations.filter(
+      (migration) => migration.state === "complete"
+    ).length;
+    switch (state) {
+      case "pending":
+        title.textContent = "Site updates are ready";
+        summary.textContent = `${version}${pendingCount} pending site ${pendingCount === 1 ? "update" : "updates"}.`;
+        break;
+      case "running":
+        title.textContent = "Site updates are running";
+        summary.textContent = `${version}Another update request is currently working through the migration catalog.`;
+        break;
+      case "failed":
+        title.textContent = "Site updates need attention";
+        summary.textContent = `${version}Fix or retry the first incomplete update; later updates remain blocked.`;
+        break;
+      case "audit-error":
+        title.textContent = "Site update history needs repair";
+        summary.textContent = `${version}Stored migration identity or history does not match this build.`;
+        break;
+      default:
+        title.textContent = "Site updates are current";
+        summary.textContent = visibleCompleted ? `${version}${visibleCompleted} site ${visibleCompleted === 1 ? "update" : "updates"} completed.` : `${version}No site updates are required.`;
+    }
+    const appendDetail = (list, detail, label = "") => {
+      const item = document.createElement("li");
+      item.textContent = `${label ? `${label}: ` : ""}${detail.message}${detail.url ? " " : ""}`;
+      if (detail.url) {
+        const link = document.createElement("a");
+        link.href = detail.url;
+        link.textContent = detail.link_label || "Open record";
+        link.className = STYLES.link.emphasized;
+        item.appendChild(link);
+      }
+      list.appendChild(item);
+    };
+    const stateLabels = {
+      complete: "Completed",
+      pending: "Pending",
+      running: "Running",
+      failed: "Failed",
+      interrupted: "Interrupted \u2014 retry available",
+      blocked: "Blocked by an earlier update",
+      "audit-error": "Audit error"
+    };
+    const releases = /* @__PURE__ */ new Map();
+    for (const migration of visibleMigrations) {
+      const release = migration.introduced_in || "Unknown";
+      const migrations = releases.get(release);
+      if (migrations) migrations.push(migration);
+      else releases.set(release, [migration]);
+    }
+    for (const [release, migrations] of releases) {
+      const releaseItem = document.createElement("li");
+      const releaseDetails = document.createElement("details");
+      releaseDetails.open = migrations.some(
+        (migration) => migration.state !== "complete"
+      );
+      const releaseSummary = document.createElement("summary");
+      const completed = migrations.filter(
+        (migration) => migration.state === "complete"
+      ).length;
+      releaseSummary.textContent = `Version ${release} \u2014 ${completed}/${migrations.length} completed`;
+      releaseSummary.className = STYLES.siteSettings.migration.releaseSummary;
+      releaseDetails.appendChild(releaseSummary);
+      const migrationList = document.createElement("ul");
+      migrationList.className = STYLES.siteSettings.migration.migrationList;
+      for (const migration of migrations) {
+        const migrationItem = document.createElement("li");
+        const attempts = migration.attempts || [];
+        const attemptCount = attempts.length;
+        const detailAttempt = migration.state === "complete" ? [...attempts].reverse().find((attempt) => attempt.status === "complete") : attempts.at(-1);
+        migrationItem.textContent = `${migration.id} \u2014 ${migration.label}: ${stateLabels[migration.state] || migration.state}`;
+        if (migration.completed_at) {
+          const completion = document.createElement("div");
+          const completedVersion = migration.completed_version ? `version ${migration.completed_version}` : "an earlier version";
+          const completedBuild = migration.completed_build_id ? `, build ${migration.completed_build_id}` : "";
+          completion.textContent = `Completed on ${completedVersion}${completedBuild} \xB7 ${attemptCount} recorded ${attemptCount === 1 ? "attempt" : "attempts"}`;
+          completion.className = STYLES.siteSettings.migration.completion;
+          migrationItem.appendChild(completion);
+        }
+        if (migration.audit_error) {
+          appendDetail(
+            errors,
+            { message: migration.audit_error },
+            `${migration.id} audit`
+          );
+        }
+        if (attempts.length) {
+          const history = document.createElement("ul");
+          history.className = STYLES.siteSettings.migration.attemptList;
+          for (const attempt of attempts) {
+            const attemptItem = document.createElement("li");
+            const totals = attempt.totals || {};
+            attemptItem.textContent = `${attempt.status}: ${totals.changed || 0} changed, ${totals.repaired || 0} repaired, ${totals.failed || 0} failed`;
+            history.appendChild(attemptItem);
+          }
+          migrationItem.appendChild(history);
+        }
+        const repairDetails = migration.id === "MSG-001" ? [] : detailAttempt?.repairs || [];
+        if (repairDetails.length) {
+          const notes = document.createElement("ul");
+          notes.className = STYLES.siteSettings.migration.attemptList;
+          for (const repair of repairDetails) {
+            appendDetail(notes, repair, repair.url ? "" : repair.key);
+          }
+          migrationItem.appendChild(notes);
+        }
+        for (const failure of detailAttempt?.errors || []) {
+          appendDetail(
+            errors,
+            failure,
+            failure.url ? migration.id : `${migration.id} ${failure.key}`
+          );
+        }
+        migrationList.appendChild(migrationItem);
+      }
+      releaseDetails.appendChild(migrationList);
+      releaseItem.appendChild(releaseDetails);
+      results.appendChild(releaseItem);
+    }
+    errors.dataset.visible = errors.childElementCount ? "true" : "false";
+  }
+}
+
+var maintenance = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	SiteMaintenance: SiteMaintenance
+});
+
+class SiteServiceProviders extends SiteSetting {
+  updated(response) {
+    this._links = response.service_providers;
+  }
+  postreconcile() {
+    if (this._links) this._renderServiceProviders(this._links);
+  }
+  _renderServiceProviders(links) {
+    const container = this.target.querySelector(
+      "[data-role='service-providers']"
+    );
+    if (!container || !links?.length) return;
+    const grid = document.createElement("div");
+    grid.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3";
+    for (const link of links) {
+      const card = document.createElement("a");
+      card.href = link.url;
+      card.target = "_blank";
+      card.rel = "noopener noreferrer";
+      card.className = "group/link flex flex-col gap-1 rounded-lg border border-base-light/50 bg-white px-4 py-3 shadow-sm hover:bg-base-bg transition-colors";
+      const titleRow = document.createElement("div");
+      titleRow.className = "flex flex-row items-center gap-1";
+      const icon = document.createElement("span");
+      setIcon(
+        icon,
+        link.icon,
+        "text-base-dark text-lg group-hover/link:text-kind-default transition-colors text-sm"
+      );
+      const title = document.createElement("span");
+      title.className = "text-sm font-semibold text-base-dark group-hover/link:text-kind-default transition-colors";
+      title.textContent = link.title;
+      const arrow = document.createElement("span");
+      setIcon(arrow, "next", "icon-xs text-base-medium ml-auto");
+      titleRow.append(icon, title, arrow);
+      const description = document.createElement("span");
+      description.className = "text-xs text-base-medium leading-snug";
+      description.textContent = link.description;
+      card.append(titleRow, description);
+      grid.appendChild(card);
+    }
+    this.updateSummary(`${links.length} external links`);
+    container.replaceChildren(grid);
+  }
+}
+
+var providers = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	SiteServiceProviders: SiteServiceProviders
+});
+
+const PUBLIC_PAGE_SETTINGS_ENDPOINT = "/l/site-settings/public-pages";
+class SitePublicPages extends SiteSetting {
+  constructor(attributes) {
+    super({ ...attributes, endpoints: {} });
+    this._settings = null;
+    this._save = this._save.bind(this);
+  }
+  async init() {
+    this.form = this.target.querySelector(
+      "[data-role='public-page-settings']"
+    );
+    if (!this.form) return;
+    this.button = buttons.active({
+      existingButton: this.form.querySelector("button[type='submit']"),
+      text: "Save Public Page Settings",
+      processingText: "Saving Public Page Settings",
+      completedText: "Public Page Settings Saved",
+      processingIcon: "spinner",
+      completedIcon: "check"
+    });
+    this.form.addEventListener("submit", this._save);
+    const response = await request.get(
+      PUBLIC_PAGE_SETTINGS_ENDPOINT
+    );
+    if (response?.ok && response.public_pages) {
+      this._settings = response.public_pages;
+      this._render(response.public_pages);
+    } else {
+      this._showError(
+        response?.error || "Unable to load public page settings."
+      );
+    }
+  }
+  updated(response) {
+    if (response.public_pages) this._settings = response.public_pages;
+  }
+  postreconcile() {
+    if (this._settings) this._render(this._settings);
+  }
+  _render(settings) {
+    const enabled = settings.PUBLIC_PAGE_INDEXING === true;
+    const field = this.form?.querySelector(
+      "[name='PUBLIC_PAGE_INDEXING']"
+    );
+    if (field) field.checked = enabled;
+    this.updateSummary(
+      enabled ? "Search discovery is on" : "Search discovery is off"
+    );
+  }
+  _showError(message) {
+    const error = this.form?.querySelector(
+      "[data-role='public-pages-error']"
+    );
+    if (!error) return;
+    error.textContent = message || "";
+    error.dataset.visible = message ? "true" : "false";
+  }
+  async _save(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const { form, button } = this;
+    if (!form || !button) return;
+    this._showError("");
+    button.activate();
+    const data = new FormData();
+    data.set(
+      "PUBLIC_PAGE_INDEXING",
+      form.querySelector("[name='PUBLIC_PAGE_INDEXING']")?.checked ? "true" : "false"
+    );
+    const response = await request.post(
+      PUBLIC_PAGE_SETTINGS_ENDPOINT,
+      data
+    );
+    if (!response?.ok || !response.public_pages) {
+      this._showError(
+        response?.error || "Unable to save public page settings."
+      );
+      button.deactivate("Save Public Page Settings");
+      return;
+    }
+    this._settings = response.public_pages;
+    this._render(response.public_pages);
+    button.deactivate();
+  }
+  destroy() {
+    this.form?.removeEventListener("submit", this._save);
+    super.destroy();
+  }
+}
+
+const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";
+const DEFAULT_SECTION = "maintenance";
+const SETTING_WIDGETS = {
+  maintenance: "SiteMaintenance",
+  administrators: "SiteAdministrators",
+  "installation-access": "SiteInstallationAccess",
+  deployment: "SiteDeployment",
+  "ai-models": "SiteAiModels",
+  "service-providers": "SiteServiceProviders",
+  "site-image": "SiteImage"
+};
+class SiteSettings {
+  constructor(attributes) {
+    Object.assign(this, attributes);
+    this.sections = /* @__PURE__ */ new Map();
+    this.settingWidgets = /* @__PURE__ */ new Map();
+    this._sectionRequest = 0;
+    this._click = this._click.bind(this);
+  }
+  async init() {
+    this._collectSections();
+    await this._loadSettingWidgets();
+    this.target.addEventListener("click", this._click);
+    const savedSection = localStorage.getItem(SECTION_STORAGE_KEY);
+    const initialSection = savedSection && this.sections.has(savedSection) ? savedSection : DEFAULT_SECTION;
+    await this.settingWidgets.get(initialSection)?.opened?.();
+    this._setOpenSection(initialSection, { persist: false });
+    this.target.setAttribute("initialized", "");
+  }
+  _collectSections() {
+    this.target.querySelectorAll("[data-role='site-settings-section']").forEach((section) => {
+      const name = section.dataset.section;
+      if (name) this.sections.set(name, section);
+    });
+  }
+  async _loadSettingWidgets() {
+    await Promise.all(
+      Object.entries(SETTING_WIDGETS).map(async ([section, widgetName]) => {
+        const widget = await this.component.loadWidget(widgetName);
+        if (widget) this.settingWidgets.set(section, widget);
+      })
+    );
+    const target = this.sections.get("public-pages")?.querySelector("[data-widget='SitePublicPages']");
+    if (target) {
+      const widget = new SitePublicPages({ target, kind: "page" });
+      await widget.init();
+      this.settingWidgets.set("public-pages", widget);
+    }
+  }
+  updated(response) {
+    this.settingWidgets.forEach((widget) => {
+      widget.updated?.(response);
+      widget.modified = true;
+    });
+    this.modified = true;
+  }
+  // ViewComponent.load() reconciles a loaded inactive widget before activate()
+  // assigns it as current. Child widgets do the actual response rendering.
+  postreconcile() {
+  }
+  _click(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const section = target.closest(
+      "[data-role='site-settings-section']"
+    );
+    if (!section || !this.target.contains(section)) return;
+    const toggle = target.closest("[data-role='expand']");
+    if (toggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      void this._toggleSection(section.dataset.section);
+      return;
+    }
+    const header = target.closest("header");
+    if (!header || !section.contains(header)) return;
+    if (target.closest("button, a, input, select, textarea")) return;
+    void this._toggleSection(section.dataset.section);
+  }
+  async _toggleSection(name) {
+    const nextOpen = !this._isSectionOpen(name);
+    const nextSection = nextOpen ? name : null;
+    const request = ++this._sectionRequest;
+    await (nextSection ? this.settingWidgets.get(nextSection)?.opened?.() : void 0);
+    if (request !== this._sectionRequest) return;
+    return withTransition(() => this._setOpenSection(nextSection), {
+      label: "site-settings:toggle-section"
+    });
+  }
+  _setOpenSection(name, { persist = true } = {}) {
+    this.sections.forEach((section, sectionName) => {
+      const open = sectionName === name;
+      section.dataset.open = open ? "true" : "false";
+      const body = section.querySelector(
+        "[data-role='section-body']"
+      );
+      if (body) body.dataset.visible = open ? "true" : "false";
+      const toggle = section.querySelector(
+        "[data-role='expand']"
+      );
+      if (toggle) {
+        toggle.dataset.open = open ? "true" : "false";
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        toggle.setAttribute("aria-label", open ? "Collapse" : "Expand");
+        toggle.title = open ? "Collapse" : "Expand";
+      }
+    });
+    if (persist) {
+      if (name) {
+        localStorage.setItem(SECTION_STORAGE_KEY, name);
+      } else {
+        localStorage.removeItem(SECTION_STORAGE_KEY);
+      }
+    }
+  }
+  _isSectionOpen(name) {
+    return name !== void 0 && this.sections.get(name)?.dataset.open === "true";
+  }
+  destroy() {
+    this.target.removeEventListener("click", this._click);
+    this.settingWidgets.get("public-pages")?.destroy?.();
+  }
+}
+
+var siteSettings = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	SiteSettings: SiteSettings
+});
+
+export { aiModels as a, administrators as b, image as c, deployment as d, installationAccess as i, maintenance as m, providers as p, siteSettings as s };

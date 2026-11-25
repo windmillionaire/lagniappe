@@ -1,2 +1,1374 @@
-import{S as r,s as f}from"./ui-resources.js?v=b9ad6d22";import{E as L,f as w,w as p,r as k,c as y,d as N}from"./foundation.js?v=b9ad6d22";import{B as g,L as S,I as P,C as R,g as T}from"./forms.js?v=b9ad6d22";import{p as m}from"./ui-controls.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";const x=new Set(["checkbox"]),D={checkbox:R,input:P,link:S},H=8,O=250,V=500,C=500,U=[["moveUp","up","Move row up"],["moveDown","down","Move row down"],["edit","edit","Edit row"],["delete","delete","Delete row"]];function E(d){return!!(d&&typeof d=="object"&&!Array.isArray(d))}function c(d){return!E(d)||!Array.isArray(d.rows)?null:d.rows.filter(E)}class I extends g{constructor(t,e,i){if(super(t,e,i),this._input=null,this._table=null,this._tbody=null,this._thead=null,this._form=null,this._container=null,this._createButton=null,this._actions=null,this._activeRow=null,this._actionsOpen=!1,this._actionsPinned=!1,this._actionsListenersAdded=!1,this._hideActionsTimer=null,this._pendingTouchAction=null,this._suppressHoverUntil=0,this._suppressTapUntil=0,!this.renderer.readonly){const n=this.renderer.form?.key;n&&(this._validate=L.renderer.validateRow(n,this.schema.id)),this._click=this._click.bind(this),this._rowPointerOver=this._rowPointerOver.bind(this),this._rowPointerDown=this._rowPointerDown.bind(this),this._rowPointerMove=this._rowPointerMove.bind(this),this._rowPointerUp=this._rowPointerUp.bind(this),this._rowPointerCancel=this._rowPointerCancel.bind(this),this._rowClick=this._rowClick.bind(this),this._rowFocusIn=this._rowFocusIn.bind(this),this._scheduleHideActions=this._scheduleHideActions.bind(this),this._cancelHideActions=this._cancelHideActions.bind(this),this._documentPointerDown=this._documentPointerDown.bind(this),this._documentKeyDown=this._documentKeyDown.bind(this)}}get value(){return this.submission}get mode(){return this.renderer.readonly?"read":"edit"}changed(t){return!w(this.value,t)}_setSubmission(t){if(this.submission=t,this._input){const e=c(t);this._input.value=e?JSON.stringify(e):""}}updateSubmission(t){this._hideActions(),this._setSubmission(t),this._redrawRows()}_redrawRows(){const{_tbody:t,_container:e}=this;if(!t||!e)return;const i=c(this.submission)??[];if(i.length===0){t.innerHTML="",e.dataset.visible="false";return}const n=Array.from(t.rows);for(let s=0;s<i.length;s++){const o=JSON.stringify(i[s]);if(s<n.length)if(n[s].dataset.submission!==o)n[s].replaceWith(this.row(s,i[s]));else{n[s].dataset.index=String(s);const a=n[s].querySelector("[data-role='row-actions']");a&&(a.dataset.index=String(s))}else t.appendChild(this.row(s,i[s]))}for(;t.children.length>i.length;)t.lastChild?.remove();e.dataset.visible="true"}_redrawTable({after:t=null,dispatchChange:e=!1}={}){return p(()=>{this._hideActions(),this._redrawRows(),t&&t(),e&&this._edit?.dispatchEvent(new Event("change",{bubbles:!0}))})}_commitRows(t,{after:e=null}={}){const i=t.length>0?{rows:t}:null;return this._suppressHoverUntil=performance.now()+O,this._setSubmission(i),this._redrawTable({after:e,dispatchChange:!0})}_removeForm(){this._form?.remove(),this._form=null,this._container&&(this._container.dataset.visible=this._tbody?.children.length?"true":"false")}_actionRow(t){return t.closest("tr[data-index]")||this._activeRow}_moveRow(t,e){const i=c(this.submission)??[],n=e==="moveUp"?t-1:t+1;n<0||n>=i.length||([i[t],i[n]]=[i[n],i[t]],this._commitRows(i))}async _click(t){t.stopPropagation();const e=t.target;if(!(e instanceof Element))return;const i=e.closest("[data-role]")?.dataset.role;if(i&&["create","cancel","edit","delete","validate","moveUp","moveDown"].includes(i))t.preventDefault(),t.stopPropagation();else if(i){t.stopPropagation();return}if(i==="create"){if(this._form)return;const s=await this.form();await p(()=>{!this._container||!this._edit||(this._container.dataset.visible="false",this._form=s,this._edit.appendChild(this._form))},{label:"embedded-form:create"})}else if(i==="cancel")p(()=>{this._removeForm()});else if(i==="edit"){const s=this._actionRow(e)?.dataset.index;if(s===void 0)return;this._hideActions();const o=await this.form(s);await p(()=>{!this._container||!this._edit||(this._container.dataset.visible="false",this._form=o,this._edit.appendChild(this._form))},{label:"embedded-form:edit"})&&this._scrollFormIntoView()}else if(i==="delete"){const s=Number.parseInt(this._actionRow(e)?.dataset.index??"",10),o=c(this.submission);if(Number.isNaN(s)||!o)return;const a=o.filter((h,u)=>u!==s);this._commitRows(a)}else if(i==="moveUp"||i==="moveDown"){const s=Number.parseInt(this._actionRow(e)?.dataset.index??"",10);if(Number.isNaN(s))return;this._moveRow(s,i)}else if(i==="validate"){const s=e.closest("button"),o=this._form,a=this._validate;if(!s||!o||!a)return;const h=o.dataset.index,u=new FormData(o);s.disabled=!0;try{const _=await k.get(a,u);if(!_?.ok||this._form!==o)return;const b=_.row;if(!E(b))return;const v=c(this.submission)??[];h!==void 0&&h!==""?v[Number.parseInt(h,10)]=b:v.push(b),await this._commitRows(v,{after:()=>this._removeForm()})}catch(_){y(_)}finally{s.disabled=!1}}}table(){this._container=document.createElement("div"),this._container.className="table-container",this._container.dataset.visible="false";const t=this._container.appendChild(document.createElement("table"));t.className=r.form.table.table;const e=t.appendChild(document.createElement("thead"));if(this._thead=e,e.className="bg-base-bg",this.schema.columns?.forEach(n=>{const s=e.appendChild(document.createElement("th"));s.className=x.has(n.type)?r.form.table.cell.compact.th:r.form.table.cell.th;const o=s.appendChild(document.createElement("div"));o.className=r.form.table.cell.title;const a=o.appendChild(document.createElement("span"));a.textContent=n.title??null}),!this.renderer.readonly){const n=this._thead.appendChild(document.createElement("th"));n.className=r.form.table.rowActionHeader,n.setAttribute("aria-hidden","true")}this._tbody=t.appendChild(document.createElement("tbody")),this._tbody.className=r.form.table.body,this.renderer.readonly||(this._tbody.addEventListener("pointerover",this._rowPointerOver),this._tbody.addEventListener("pointerdown",this._rowPointerDown),this._tbody.addEventListener("pointermove",this._rowPointerMove),this._tbody.addEventListener("click",this._rowClick),this._tbody.addEventListener("focusin",this._rowFocusIn),this._tbody.addEventListener("pointerleave",this._scheduleHideActions),this._tbody.addEventListener("focusout",this._scheduleHideActions));const i=c(this.submission)??[];for(const[n,s]of i.entries())this._tbody.appendChild(this.row(n,s));return i.length>0&&(this._container.dataset.visible="true"),this._container}get embedded(){return this._embedded?this._embedded:(this._embedded=this.table(),this._embedded)}get edit(){if(this._edit)return this._edit;this._edit=document.createElement("div"),this._edit.className=r.form.table.container,this._edit.dataset.kind=String(this.renderer.kind);const t=c(this.submission);this._input=this._edit.appendChild(m.input({name:this.schema.id,type:"hidden",value:t?JSON.stringify(t):""}));const e=this._edit.appendChild(m.label({label:this.schema.title,tag:"h3",styles:{label:r.label.row}}));return this.renderer.readonly||(this._createButton=document.createElement("button"),this._createButton.dataset.role="create",this._createButton.className=`group-data-[mode=read]/element:hidden ${r.form.icon}`,this._createButton.dataset.kind="add",f(this._createButton.appendChild(document.createElement("span")),"addRow","icon-sm"),e.appendChild(this._createButton)),this._table=this.table(),this._edit.appendChild(this._table),this.renderer.readonly||(this._edit.addEventListener("click",this._click),this._edit.addEventListener("submit",i=>{i.preventDefault(),i.stopPropagation()})),this._edit}_tableCellElement(t,e){const i=t.type==="checkbox"||t.type==="input"||t.type==="link"?D[t.type]:null;return i?new i(this._rowRenderer(),t,e[t.id]):(y(new Error(`Unsupported table column type: ${t.type}`)),null)}_rowRenderer(){return{id:this.id,readonly:this.readonly,mode:this.mode}}row(t,e){const i=document.createElement("tr");if(i.dataset.index=String(t),i.dataset.submission=JSON.stringify(e),this.renderer.readonly||(i.tabIndex=0),this.schema.columns?.forEach(n=>{const s=document.createElement("td");s.className=x.has(n.type)?r.form.table.cell.compact.default:r.form.table.cell.default,i.appendChild(s);const a=this._tableCellElement(n,e)?.cell;s.innerHTML=typeof a=="string"?a:a?.outerHTML??""}),!this.renderer.readonly){const n=i.appendChild(document.createElement("td"));n.className=r.form.table.rowActionCell,n.appendChild(this._rowActions(t))}return i}_rowActions(t){const e=document.createElement("div");e.dataset.role="row-actions",e.dataset.index=String(t),e.setAttribute("aria-label","Row actions"),e.className=r.form.table.rowActions,e.hidden=!0;for(const[i,n,s]of U){const o=e.appendChild(document.createElement("button"));o.type="button",o.dataset.role=i,o.className=r.form.table.actionButton,o.title=s,o.setAttribute("aria-label",s),i==="delete"&&(o.dataset.kind="delete");const a=o.appendChild(document.createElement("span"));f(a,n,"icon-sm")}return e.addEventListener("pointerenter",this._cancelHideActions),e.addEventListener("pointerleave",this._scheduleHideActions),e.addEventListener("focusin",this._cancelHideActions),e.addEventListener("focusout",this._scheduleHideActions),e}_rowPointerOver(t){if(t.pointerType&&t.pointerType!=="mouse"||performance.now()<this._suppressHoverUntil||this._actionsPinned)return;const e=t.target instanceof Element?t.target.closest("tr[data-index]"):null;e&&this._showActions(e)}_rowPointerDown(t){if(t.pointerType==="mouse")return;const e=t.target;if(!(e instanceof Element)||e.closest("a, button, input, select, textarea, [data-role]"))return;const i=e.closest("tr[data-index]");i&&(this._pendingTouchAction={row:i,pointerId:t.pointerId,x:t.clientX,y:t.clientY,canceled:!1},document.addEventListener("pointermove",this._rowPointerMove,!0),document.addEventListener("pointerup",this._rowPointerUp,!0),document.addEventListener("pointercancel",this._rowPointerCancel,!0))}_rowPointerMove(t){const e=this._pendingTouchAction;if(!e||e.pointerId!==t.pointerId)return;Math.hypot(t.clientX-e.x,t.clientY-e.y)>H&&(e.canceled=!0,this._suppressTapUntil=performance.now()+C,this._hideActions())}_rowPointerUp(t){const e=this._pendingTouchAction;if(!e||e.pointerId!==t.pointerId)return;const i=!e.canceled&&this._actionsOpen&&this._actionsPinned&&e.row===this._activeRow;if(this._clearPendingTouchAction(),!e.canceled){if(this._suppressTapUntil=performance.now()+C,i){this._hideActions();return}this._showActions(e.row,{pinned:!0})}}_rowPointerCancel(t){this._pendingTouchAction&&this._pendingTouchAction.pointerId!==t.pointerId||this._clearPendingTouchAction()}_rowClick(t){if(performance.now()<this._suppressTapUntil||window.matchMedia("(hover: hover) and (pointer: fine)").matches)return;const i=t.target;if(!(i instanceof Element)||i.closest("a, button, input, select, textarea, [data-role]"))return;const n=i.closest("tr[data-index]");if(n){if(this._actionsOpen&&this._actionsPinned&&n===this._activeRow){this._hideActions();return}this._showActions(n,{pinned:!0})}}_clearPendingTouchAction(){this._pendingTouchAction=null,document.removeEventListener("pointermove",this._rowPointerMove,!0),document.removeEventListener("pointerup",this._rowPointerUp,!0),document.removeEventListener("pointercancel",this._rowPointerCancel,!0)}_rowFocusIn(t){if(this._pendingTouchAction)return;const e=t.target instanceof Element?t.target.closest("tr[data-index]"):null;e&&this._showActions(e,{pinned:!0})}_showActions(t,{pinned:e=!1}={}){if(this._form||!t||!this._edit?.contains(t))return;this._cancelHideActions(),this._activeRow=t,this._actionsPinned=e;const i=t.querySelector("[data-role='row-actions']");i&&(this._actions&&this._actions!==i&&(this._actions.hidden=!0),this._actions=i,this._updateActionStates(t),i.hidden=!1,this._actionsOpen||(this._actionsOpen=!0,this._addActionsListeners()))}_updateActionStates(t){const e=Number.parseInt(t.dataset.index??"",10),i=c(this.submission)?.length||this._tbody?.children.length||0;if(Number.isNaN(e))return;const n={moveUp:e<=0,moveDown:e>=i-1};for(const[s,o]of Object.entries(n)){const a=this._actions?.querySelector(`[data-role='${s}']`);a&&(a.disabled=o,a.setAttribute("aria-disabled",o?"true":"false"))}}_addActionsListeners(){this._actionsListenersAdded||(document.addEventListener("pointerdown",this._documentPointerDown,!0),document.addEventListener("keydown",this._documentKeyDown,!0),this._actionsListenersAdded=!0)}_removeActionsListeners(){this._actionsListenersAdded&&(document.removeEventListener("pointerdown",this._documentPointerDown,!0),document.removeEventListener("keydown",this._documentKeyDown,!0),this._actionsListenersAdded=!1)}_documentPointerDown(t){t.target instanceof Node&&(this._actions?.contains(t.target)||this._activeRow?.contains(t.target)||this._hideActions())}_documentKeyDown(t){t.key==="Escape"&&this._hideActions()}_scheduleHideActions(){this._cancelHideActions(),this._hideActionsTimer=window.setTimeout(()=>{this._actionsPinned||this._actions?.matches(":hover")||this._activeRow?.matches(":hover")||this._actions?.contains(document.activeElement)||this._activeRow?.contains(document.activeElement)||this._hideActions()},V)}_cancelHideActions(){this._hideActionsTimer&&(window.clearTimeout(this._hideActionsTimer),this._hideActionsTimer=null)}_hideActions(){this._cancelHideActions(),this._actions&&(this._actions.hidden=!0),this._removeActionsListeners(),this._actionsOpen=!1,this._actionsPinned=!1,this._activeRow=null}_scrollFormIntoView(){const t=this._form;t&&window.requestAnimationFrame(()=>{if(!this._form||this._form!==t)return;const e=t.getBoundingClientRect();if(e.top>=0&&e.left>=0&&e.bottom<=window.innerHeight&&e.right<=window.innerWidth)return;const n=window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth";t.scrollIntoView({behavior:n,block:"center",inline:"nearest"})})}async form(t){const e=t!=null&&t!=="",i=e?c(this.submission)?.[Number(t)]:void 0,n=document.createElement("form");n.className=r.form.table.form,e&&(n.dataset.index=t);for(const h of this.schema.columns??[]){const u=await T(this._rowRenderer(),h,i?.[h.id]);u.edit&&n.appendChild(u.edit)}const s=n.appendChild(document.createElement("div"));s.className=r.button.group;const o=s.appendChild(document.createElement("button"));o.className=r.button.submit,o.dataset.kind="cancel",o.dataset.role="cancel",o.textContent="Cancel";const a=s.appendChild(document.createElement("button"));return a.className=r.button.submit,a.textContent=e?"Save Changes":"Add Row",a.dataset.role="validate",n.addEventListener("change",h=>{h.stopPropagation()}),n.addEventListener("updated",h=>{h.stopPropagation()}),n}destroy(){this._clearPendingTouchAction(),this._hideActions(),!this.renderer.readonly&&this._tbody&&(this._tbody.removeEventListener("pointerover",this._rowPointerOver),this._tbody.removeEventListener("pointerdown",this._rowPointerDown),this._tbody.removeEventListener("pointermove",this._rowPointerMove),this._tbody.removeEventListener("click",this._rowClick),this._tbody.removeEventListener("focusin",this._rowFocusIn),this._tbody.removeEventListener("pointerleave",this._scheduleHideActions),this._tbody.removeEventListener("focusout",this._scheduleHideActions)),!this.renderer.readonly&&this._edit&&this._edit.removeEventListener("click",this._click),this._actions=null,super.destroy()}}var M=Object.freeze({__proto__:null,TableElement:I});class B extends g{get value(){return this.signatureInput?.value??null}changed(t){return!w(this.value,t)}get read(){if(this._read)return this._read;this._read=document.createElement("div"),this._read.className=r.signature.pad;const t=this._read.appendChild(document.createElement("img"));return t.src=String(this.submission),t.alt="Signature",this.submission&&this.signatureInput&&(this.signatureInput.value=this.schema.id),this._read.classList.add("group-data-[mode=edit]/element:hidden"),this._read}get edit(){if(this._edit)return this._edit;if(this._edit=document.createElement("div"),this._edit.className="flex flex-col gap-2",this.label){const s=m.label({label:this.label,tag:"h3"});this._edit.appendChild(s)}this.signatureInput=this._edit.appendChild(m.input({name:this.schema.id,type:"hidden"})),this.submission&&(this.signatureInput.value=this.schema.id);const t=this._edit.appendChild(document.createElement("div"));t.dataset.role="signature",t.className=r.signature.pad;const e=t.appendChild(document.createElement("button"));e.className=r.signature.reset,e.id="reset-button";const i=e.appendChild(document.createElement("span"));f(i,"reset");const n=new A(t,typeof this.submission=="string"?this.submission:null,this.schema.id);return this.signature=n,this.signature.init(),this.destroyables.push(this.signature),e.addEventListener("click",()=>this.clear()),this._edit.addEventListener("updated",()=>{this.signatureInput&&(this.signatureInput.value=n.inputName)}),t.classList.add("group-data-[mode=read]/element:hidden"),this._edit}clear(){this.submission=null,this.signature&&this.signature.clear(),this.signatureInput&&(this.signatureInput.value="")}}class A{constructor(t,e=null,i="signature-image"){this.container=t,this.imageUrl=e,this.inputName=i,this.canvas=null,this.ctx=null,this.isDrawing=!1,this.lastX=0,this.lastY=0,this.fileInput=null,this.resizeObserver=null,this.intersectionObserver=null,this.resetButton=null,this.boundHandlers={},this.debouncedSave=N(()=>this.saveSignature(),300)}init(){this.canvas=this.container.appendChild(document.createElement("canvas")),this.canvas.className="touch-none select-none cursor-crosshair",this.fileInput=this.container.appendChild(document.createElement("input")),this.fileInput.type="file",this.fileInput.name=this.inputName,this.fileInput.accept="image/png",this.fileInput.style.display="none",this.ctx=this.canvas.getContext("2d",{willReadFrequently:!1}),this.setupCanvas(),this.attachEventListeners(),this.imageUrl&&this.loadSignature(this.imageUrl)}setupCanvas(){this.intersectionObserver=new IntersectionObserver((t,e)=>{for(const i of t)i.isIntersecting&&(this.resizeCanvas(),e.disconnect())},{threshold:.1}),this.intersectionObserver.observe(this.container),this.resizeObserver=new ResizeObserver(()=>{this.resizeCanvas()}),this.resizeObserver.observe(this.container),this.boundHandlers.resize=()=>this.resizeCanvas(),window.addEventListener("resize",this.boundHandlers.resize)}resizeCanvas(){const{canvas:t,ctx:e,fileInput:i}=this;if(!t||!e||!i)return;const n=this.container.getBoundingClientRect();if(n.width===0||n.height===0)return;const s=document.createElement("canvas"),o=s.getContext("2d");s.width=t.width,s.height=t.height,t.width>0&&t.height>0&&o?.drawImage(t,0,0),t.width=n.width,t.height=n.height;const a=i.files?.[0];a?this.loadSignatureFromFile(a):s.width>0&&s.height>0&&e.drawImage(s,0,0)}attachEventListeners(){this.canvas&&(this.boundHandlers.pointerDown=this.handlePointerDown.bind(this),this.boundHandlers.pointerMove=this.handlePointerMove.bind(this),this.boundHandlers.pointerUp=this.handlePointerUp.bind(this),this.boundHandlers.pointerLeave=this.handlePointerLeave.bind(this),this.canvas.addEventListener("pointerdown",this.boundHandlers.pointerDown),this.canvas.addEventListener("pointermove",this.boundHandlers.pointerMove),this.canvas.addEventListener("pointerup",this.boundHandlers.pointerUp),this.canvas.addEventListener("pointerleave",this.boundHandlers.pointerLeave))}handlePointerDown(t){if(!this.canvas||!this.ctx)return;t.preventDefault(),this.isDrawing=!0;const e=this.canvas.getBoundingClientRect();this.lastX=t.clientX-e.left,this.lastY=t.clientY-e.top,this.ctx.strokeStyle="#000000",this.ctx.lineWidth=2,this.ctx.lineCap="round",this.ctx.lineJoin="round"}handlePointerMove(t){if(!this.isDrawing||!this.canvas||!this.ctx)return;t.preventDefault();const e=this.canvas.getBoundingClientRect(),i=t.clientX-e.left,n=t.clientY-e.top;this.ctx.beginPath(),this.ctx.moveTo(this.lastX,this.lastY),this.ctx.lineTo(i,n),this.ctx.stroke(),this.lastX=i,this.lastY=n}handlePointerUp(){this.isDrawing&&(this.isDrawing=!1,this.debouncedSave())}handlePointerLeave(){this.isDrawing&&(this.isDrawing=!1,this.debouncedSave())}async saveSignature(){const{canvas:t,fileInput:e}=this;if(!t||!e)return;const i=await new Promise(o=>{t.toBlob(o,"image/png",1)});if(!i)return;const n=new File([i],"signature.png",{type:"image/png",lastModified:Date.now()}),s=new DataTransfer;s.items.add(n),e.files=s.files,this.container.dispatchEvent(new CustomEvent("updated",{bubbles:!0}))}async loadSignature(t){return new Promise((e,i)=>{const n=new Image;n.crossOrigin="anonymous",n.onload=()=>{this._drawImage(n),e()},n.onerror=s=>{console.error("Failed to load signature image:",s),i(s)},n.src=t})}loadSignatureFromFile(t){const e=new FileReader;e.onload=()=>{if(typeof e.result!="string")return;const i=new Image;i.onload=()=>this._drawImage(i),i.src=e.result},e.readAsDataURL(t)}_drawImage(t){!this.canvas||!this.ctx||(this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height),this.ctx.drawImage(t,0,0,this.canvas.width,this.canvas.height))}clear(){this.canvas&&this.ctx?.clearRect(0,0,this.canvas.width,this.canvas.height),this.fileInput&&(this.fileInput.value="")}destroy(){if(this.resizeObserver&&this.resizeObserver.disconnect(),this.intersectionObserver&&this.intersectionObserver.disconnect(),this.boundHandlers.resize&&window.removeEventListener("resize",this.boundHandlers.resize),this.canvas){const{pointerDown:t,pointerMove:e,pointerUp:i,pointerLeave:n}=this.boundHandlers;t&&this.canvas.removeEventListener("pointerdown",t),e&&this.canvas.removeEventListener("pointermove",e),i&&this.canvas.removeEventListener("pointerup",i),n&&this.canvas.removeEventListener("pointerleave",n)}}}var F=Object.freeze({__proto__:null,Signature:A,SignatureElement:B});function z(d){return!!(d&&typeof d=="object"&&"text"in d&&typeof d.text=="string")}const l=(d,{resetChecked:t=!1}={})=>{if(!d||typeof d!="object"||!("items"in d)||!Array.isArray(d.items))return null;const e=d.items.filter(z).map(i=>({text:i.text.trim(),checked:t?!1:i.checked===!0})).filter(i=>i.text);return e.length>0?{items:e}:null};class $ extends g{constructor(t,e,i){super(t,e,l(i)),this._input=null,this._editing=!1,this._draftVisible=!1,this._draft="",this._renamingIndex=null,this._renameValue="",this._historyValue=null,this._click=this._click.bind(this),this._change=this._change.bind(this),this._inputEvent=this._inputEvent.bind(this),this._keydown=this._keydown.bind(this)}get value(){return l({items:this._payloadItems()})}get mode(){return this._editing?"edit":"read"}changed(t){return!w(this.value,l(t))}_items(){return l(this.submission)?.items??[]}_payloadItems(){const t=this._items();if(this._renamingIndex!==null&&t[this._renamingIndex]){const e=this._renameValue.trim();e&&(t[this._renamingIndex].text=e)}if(this._editing&&this._draftVisible){const e=this._draft.trim();e&&t.push({text:e,checked:!1})}return t}_setSubmission(t){this.submission=l(t),this._syncInput()}_syncInput(){if(!this._input)return;const t=this.value;this._input.value=t?JSON.stringify(t):""}_notifyChange(){this._input?.dispatchEvent(new Event("change",{bubbles:!0}))}_commitItems(t,{notify:e=!0,render:i=!0}={}){this._setSubmission({items:t}),i&&this._render(),e&&this._notifyChange()}_focus(t,{select:e=!1}={}){queueMicrotask(()=>{const i=this._elt?.querySelector(`[data-role='${t}']`);i&&(i.focus(),e&&i.select())})}_button({role:t,icon:e,label:i,kind:n=null,header:s=!1}){const o=document.createElement("button");return o.type="button",o.dataset.role=t,n&&(o.dataset.kind=n),o.ariaLabel=i,o.title=i,o.className=s?r.form.icon:r.form.table.actionButton,f(o.appendChild(document.createElement("span")),e,"icon-sm"),o}_checkbox(t,e,{disabled:i=!1}={}){const n=m.checkbox({checked:t.checked,disabled:i}),s=n.querySelector("input");return s&&(s.dataset.role="todo-check",s.dataset.index=String(e),s.ariaLabel=`${t.checked?"Uncheck":"Check"} ${t.text}`),n}_itemRow(t,e){const i=document.createElement("li");if(i.className=r.form.todo.row,i.dataset.index=String(e),i.appendChild(this._checkbox(t,e,{disabled:this.readonly||this._editing})),this._editing&&this._renamingIndex===e){const n=i.appendChild(document.createElement("input"));n.type="text",n.autocomplete="off",n.dataset.role="todo-rename-input",n.dataset.index=String(e),n.value=this._renameValue,n.className=r.form.todo.inlineInput,n.ariaLabel=`Rename ${t.text}`}else if(this._editing){const n=i.appendChild(document.createElement("button"));n.type="button",n.dataset.role="todo-rename",n.dataset.index=String(e),n.textContent=t.text,n.className=r.form.todo.text,n.ariaLabel=`Rename ${t.text}`}else{const n=i.appendChild(document.createElement("span"));n.textContent=t.text,n.className=`${r.form.todo.text} ${t.checked?r.form.todo.completeText:""}`.trim()}if(this._editing){const n=i.appendChild(document.createElement("div"));n.className=r.form.todo.actions,n.appendChild(this._button({role:"todo-remove",icon:"remove",label:`Remove ${t.text}`,kind:"delete"}))}return i}_draftRow(){const t=document.createElement("li");t.className=r.form.todo.row,t.dataset.role="todo-draft-row",t.appendChild(this._checkbox({text:"new todo",checked:!1},"draft",{disabled:!0}));const e=t.appendChild(document.createElement("input"));e.type="text",e.autocomplete="off",e.dataset.role="todo-draft",e.value=this._draft,e.className=r.form.todo.inlineInput,e.placeholder="Add a todo\u2026",e.ariaLabel=`Add item to ${this.label}`;const i=t.appendChild(document.createElement("div"));return i.className=r.form.todo.actions,i.append(this._button({role:"todo-dismiss-draft",icon:"remove",label:"Dismiss new todo",kind:"delete"}),this._button({role:"todo-commit-draft",icon:"success",label:"Add todo"})),t}_render(){if(!this._elt||!this._input)return;this._elt.dataset.mode=this.mode,this._elt.replaceChildren(this._input);const t=this._elt.appendChild(m.label({label:this.label,tag:"h3",styles:{label:r.label.row}}));if(!this.readonly){const i=t;if(this._editing)i.appendChild(this._button({role:"todo-done",icon:"success",label:`Done editing ${this.label}`,kind:"success",header:!0}));else{const n=super.historyFillButton(this._historyValue);n&&i.appendChild(n),i.appendChild(this._button({role:"todo-edit",icon:this.hasSubmission?"edit":"addRow",label:this.hasSubmission?`Edit ${this.label}`:`Add to ${this.label}`,kind:this.hasSubmission?null:"add",header:!0}))}}const e=this._items();if(e.length>0||this._editing&&this._draftVisible){const i=this._elt.appendChild(document.createElement("ul"));i.className=r.form.todo.list,e.forEach((n,s)=>{i.appendChild(this._itemRow(n,s))}),this._editing&&this._draftVisible&&i.appendChild(this._draftRow())}else this.readonly&&this.showEmptyFields&&this._elt.appendChild(this.readonlyPlaceholder());this._syncInput()}_enterEdit(){this._editing=!0,this._draftVisible=!0,this._draft="",this._renamingIndex=null,this._render(),this._focus("todo-draft")}_commitDraft({continueEditing:t=!0}={}){this._commitRename({render:!1});const e=this._draft.trim(),i=this._items();return e&&i.push({text:e,checked:!1}),this._draft="",this._draftVisible=t,this._renamingIndex=null,this._commitItems(i,{notify:!!e}),t&&this._focus("todo-draft"),!!e}_commitRename({render:t=!0}={}){if(this._renamingIndex===null)return!1;const e=this._items(),i=e[this._renamingIndex],n=this._renameValue.trim(),s=!!(i&&n&&n!==i.text);return s&&(i.text=n),this._renamingIndex=null,this._renameValue="",this._commitItems(e,{notify:s,render:t}),s}_done(){this._commitRename({render:!1});const t=this._draftVisible?this._draft.trim():"";if(t){const e=this._items();e.push({text:t,checked:!1}),this._setSubmission({items:e}),this._notifyChange()}this._draft="",this._draftVisible=!1,this._editing=!1,this._render()}_click(t){const e=t.target instanceof Element?t.target.closest("[data-role]"):null;if(!e||!this._elt?.contains(e))return;const i=e.dataset.role;if(!(!i||!new Set(["todo-edit","todo-done","todo-commit-draft","todo-dismiss-draft","todo-remove","todo-rename"]).has(i))){if(t.preventDefault(),t.stopPropagation(),i==="todo-edit")this._enterEdit();else if(i==="todo-done")this._done();else if(i==="todo-commit-draft")this._commitDraft();else if(i==="todo-dismiss-draft"){const s=!!this._draft.trim();this._draft="",this._draftVisible=!1,this._syncInput(),this._render(),s&&this._notifyChange()}else if(i==="todo-remove"){this._commitRename({render:!1});const s=Number.parseInt(e.closest("[data-index]")?.dataset.index??"",10);if(Number.isNaN(s))return;const o=this._items().filter((a,h)=>h!==s);this._renamingIndex=null,this._commitItems(o)}else if(i==="todo-rename"){this._commitRename({render:!1});const s=Number.parseInt(e.dataset.index??"",10),o=this._items()[s];if(!o)return;this._renamingIndex=s,this._renameValue=o.text,this._render(),this._focus("todo-rename-input",{select:!0})}}}_change(t){const e=t.target instanceof Element?t.target.closest("[data-role='todo-check']"):null;if(!e||this._editing||this.readonly)return;const i=Number.parseInt(e.dataset.index??"",10),n=this._items();Number.isNaN(i)||!n[i]||(n[i].checked=e.checked,this._setSubmission({items:n}))}_inputEvent(t){const{target:e}=t;e instanceof HTMLInputElement&&(e.dataset.role==="todo-draft"?(this._draft=e.value,this._syncInput()):e.dataset.role==="todo-rename-input"&&(this._renameValue=e.value,this._syncInput()))}_keydown(t){const{target:e}=t,i=e&&"dataset"in e?e.dataset:null,n=i&&typeof i=="object"&&"role"in i?i.role:null;n==="todo-draft"?t.key==="Enter"||t.key==="Tab"&&!t.shiftKey?(t.preventDefault(),this._commitDraft()):t.key==="Escape"&&(t.preventDefault(),this._draft="",this._draftVisible=!1,this._render()):n==="todo-rename-input"&&(t.key==="Enter"||t.key==="Tab"&&!t.shiftKey?(t.preventDefault(),this._commitRename(),this._focus("todo-draft")):t.key==="Escape"&&(t.preventDefault(),this._renamingIndex=null,this._renameValue="",this._render()))}fillFromHistory(t){const e=l(t,{resetChecked:!0});return e?(this._editing=!1,this._draftVisible=!1,this._draft="",this._renamingIndex=null,this._setSubmission(e),this._render(),this._notifyChange(),!0):!1}addHistoryFill(t){return this._historyValue=typeof t=="function"?t:l(t,{resetChecked:!0}),this._render(),!!this._elt?.querySelector("[data-role='history-fill']")}updateSubmission(t){this._editing=!1,this._draftVisible=!1,this._draft="",this._renamingIndex=null,this._setSubmission(t),this._render()}create(){const t=document.createElement("div");return t.id=this.id,t.className=`${r.form.todo.container} form-element group/element`,t.dataset.kind=String(this.renderer.kind),t._lp_element=this,this._elt=t,this._input=document.createElement("input"),this._input.type="hidden",this._input.name=this.schema.id,t.addEventListener("click",this._click),t.addEventListener("change",this._change),t.addEventListener("input",this._inputEvent),t.addEventListener("keydown",this._keydown),this._render(),t}destroy(){this._elt&&(this._elt.removeEventListener("click",this._click),this._elt.removeEventListener("change",this._change),this._elt.removeEventListener("input",this._inputEvent),this._elt.removeEventListener("keydown",this._keydown)),this._input=null,super.destroy()}}var q=Object.freeze({__proto__:null,TodoElement:$,normalizeTodoValue:l});export{I as T,q as a,F as s,M as t};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b6ea3fe0';
+import { E as ENDPOINTS, f as areEqual, w as withTransition, r as request, c as captureError, d as debounce } from './foundation.js?v=b6ea3fe0';
+import { B as BaseElement, L as LinkElement, I as InputElement, C as CheckboxElement, g as getFormElement } from './forms.js?v=b6ea3fe0';
+import { p as primitives } from './ui-controls.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+
+const COMPACT_COLUMN_TYPES = /* @__PURE__ */ new Set(["checkbox"]);
+const TABLE_CELL_ELEMENTS = {
+  checkbox: CheckboxElement,
+  input: InputElement,
+  link: LinkElement
+};
+const TAP_MOVE_TOLERANCE = 8;
+const HOVER_SUPPRESSION_MS = 250;
+const HOVER_HIDE_DELAY_MS = 500;
+const TAP_SUPPRESSION_MS = 500;
+const ACTIONS = [
+  ["moveUp", "up", "Move row up"],
+  ["moveDown", "down", "Move row down"],
+  ["edit", "edit", "Edit row"],
+  ["delete", "delete", "Delete row"]
+];
+function isRowSubmission(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+function tableRows(value) {
+  if (!isRowSubmission(value) || !Array.isArray(value.rows)) return null;
+  return value.rows.filter(isRowSubmission);
+}
+class TableElement extends BaseElement {
+  constructor(renderer, schema, submission) {
+    super(renderer, schema, submission);
+    this._input = null;
+    this._table = null;
+    this._tbody = null;
+    this._thead = null;
+    this._form = null;
+    this._container = null;
+    this._createButton = null;
+    this._actions = null;
+    this._activeRow = null;
+    this._actionsOpen = false;
+    this._actionsPinned = false;
+    this._actionsListenersAdded = false;
+    this._hideActionsTimer = null;
+    this._pendingTouchAction = null;
+    this._suppressHoverUntil = 0;
+    this._suppressTapUntil = 0;
+    if (!this.renderer.readonly) {
+      const key = this.renderer.form?.key;
+      if (key)
+        this._validate = ENDPOINTS.renderer.validateRow(key, this.schema.id);
+      this._click = this._click.bind(this);
+      this._rowPointerOver = this._rowPointerOver.bind(this);
+      this._rowPointerDown = this._rowPointerDown.bind(this);
+      this._rowPointerMove = this._rowPointerMove.bind(this);
+      this._rowPointerUp = this._rowPointerUp.bind(this);
+      this._rowPointerCancel = this._rowPointerCancel.bind(this);
+      this._rowClick = this._rowClick.bind(this);
+      this._rowFocusIn = this._rowFocusIn.bind(this);
+      this._scheduleHideActions = this._scheduleHideActions.bind(this);
+      this._cancelHideActions = this._cancelHideActions.bind(this);
+      this._documentPointerDown = this._documentPointerDown.bind(this);
+      this._documentKeyDown = this._documentKeyDown.bind(this);
+    }
+  }
+  get value() {
+    return this.submission;
+  }
+  get mode() {
+    return this.renderer.readonly ? "read" : "edit";
+  }
+  changed(value) {
+    if (areEqual(this.value, value)) return false;
+    return true;
+  }
+  _setSubmission(value) {
+    this.submission = value;
+    if (this._input) {
+      const rows = tableRows(value);
+      this._input.value = rows ? JSON.stringify(rows) : "";
+    }
+  }
+  updateSubmission(value) {
+    this._hideActions();
+    this._setSubmission(value);
+    this._redrawRows();
+  }
+  _redrawRows() {
+    const { _tbody: tbody, _container: container } = this;
+    if (!tbody || !container) return;
+    const rows = tableRows(this.submission) ?? [];
+    if (rows.length === 0) {
+      tbody.innerHTML = "";
+      container.dataset.visible = "false";
+      return;
+    }
+    const existing = Array.from(tbody.rows);
+    for (let i = 0; i < rows.length; i++) {
+      const serialized = JSON.stringify(rows[i]);
+      if (i < existing.length) {
+        if (existing[i].dataset.submission !== serialized) {
+          existing[i].replaceWith(this.row(i, rows[i]));
+        } else {
+          existing[i].dataset.index = String(i);
+          const actions = existing[i].querySelector(
+            "[data-role='row-actions']"
+          );
+          if (actions) actions.dataset.index = String(i);
+        }
+      } else {
+        tbody.appendChild(this.row(i, rows[i]));
+      }
+    }
+    while (tbody.children.length > rows.length) {
+      tbody.lastChild?.remove();
+    }
+    container.dataset.visible = "true";
+  }
+  _redrawTable({
+    after = null,
+    dispatchChange = false
+  } = {}) {
+    return withTransition(() => {
+      this._hideActions();
+      this._redrawRows();
+      if (after) after();
+      if (dispatchChange) {
+        this._edit?.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+  }
+  _commitRows(rows, { after = null } = {}) {
+    const value = rows.length > 0 ? { rows } : null;
+    this._suppressHoverUntil = performance.now() + HOVER_SUPPRESSION_MS;
+    this._setSubmission(value);
+    return this._redrawTable({ after, dispatchChange: true });
+  }
+  _removeForm() {
+    this._form?.remove();
+    this._form = null;
+    if (this._container) {
+      this._container.dataset.visible = this._tbody?.children.length ? "true" : "false";
+    }
+  }
+  _actionRow(target) {
+    return target.closest("tr[data-index]") || this._activeRow;
+  }
+  _moveRow(index, direction) {
+    const rows = tableRows(this.submission) ?? [];
+    const newIndex = direction === "moveUp" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= rows.length) return;
+    [rows[index], rows[newIndex]] = [rows[newIndex], rows[index]];
+    this._commitRows(rows);
+  }
+  async _click(e) {
+    e.stopPropagation();
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const role = target.closest("[data-role]")?.dataset.role;
+    const handled = [
+      "create",
+      "cancel",
+      "edit",
+      "delete",
+      "validate",
+      "moveUp",
+      "moveDown"
+    ];
+    if (role && handled.includes(role)) {
+      e.preventDefault();
+      e.stopPropagation();
+    } else if (role) {
+      e.stopPropagation();
+      return;
+    }
+    if (role === "create") {
+      if (this._form) return;
+      const form = await this.form();
+      await withTransition(
+        () => {
+          if (!this._container || !this._edit) return;
+          this._container.dataset.visible = "false";
+          this._form = form;
+          this._edit.appendChild(this._form);
+        },
+        { label: "embedded-form:create" }
+      );
+    } else if (role === "cancel") {
+      withTransition(() => {
+        this._removeForm();
+      });
+    } else if (role === "edit") {
+      const index = this._actionRow(target)?.dataset.index;
+      if (index === void 0) return;
+      this._hideActions();
+      const form = await this.form(index);
+      const success = await withTransition(
+        () => {
+          if (!this._container || !this._edit) return;
+          this._container.dataset.visible = "false";
+          this._form = form;
+          this._edit.appendChild(this._form);
+        },
+        { label: "embedded-form:edit" }
+      );
+      if (success) this._scrollFormIntoView();
+    } else if (role === "delete") {
+      const index = Number.parseInt(
+        this._actionRow(target)?.dataset.index ?? "",
+        10
+      );
+      const previousRows = tableRows(this.submission);
+      if (Number.isNaN(index) || !previousRows) return;
+      const rows = previousRows.filter((_, rowIndex) => rowIndex !== index);
+      this._commitRows(rows);
+    } else if (role === "moveUp" || role === "moveDown") {
+      const index = Number.parseInt(
+        this._actionRow(target)?.dataset.index ?? "",
+        10
+      );
+      if (Number.isNaN(index)) return;
+      this._moveRow(index, role);
+    } else if (role === "validate") {
+      const button = target.closest("button");
+      const form = this._form;
+      const route = this._validate;
+      if (!button || !form || !route) return;
+      const index = form.dataset.index;
+      const formData = new FormData(form);
+      button.disabled = true;
+      try {
+        const response = await request.get(route, formData);
+        if (!response?.ok || this._form !== form) return;
+        const row = response.row;
+        if (!isRowSubmission(row)) return;
+        const rows = tableRows(this.submission) ?? [];
+        if (index !== void 0 && index !== "") {
+          rows[Number.parseInt(index, 10)] = row;
+        } else {
+          rows.push(row);
+        }
+        await this._commitRows(rows, { after: () => this._removeForm() });
+      } catch (error) {
+        captureError(error);
+      } finally {
+        button.disabled = false;
+      }
+    }
+  }
+  table() {
+    this._container = document.createElement("div");
+    this._container.className = "table-container";
+    this._container.dataset.visible = "false";
+    const table = this._container.appendChild(document.createElement("table"));
+    table.className = STYLES.form.table.table;
+    const thead = table.appendChild(document.createElement("thead"));
+    this._thead = thead;
+    thead.className = "bg-base-bg";
+    this.schema.columns?.forEach((column) => {
+      const headerCell = thead.appendChild(document.createElement("th"));
+      headerCell.className = COMPACT_COLUMN_TYPES.has(column.type) ? STYLES.form.table.cell.compact.th : STYLES.form.table.cell.th;
+      const title = headerCell.appendChild(document.createElement("div"));
+      title.className = STYLES.form.table.cell.title;
+      const span = title.appendChild(document.createElement("span"));
+      span.textContent = column.title ?? null;
+    });
+    if (!this.renderer.readonly) {
+      const actionHeader = this._thead.appendChild(
+        document.createElement("th")
+      );
+      actionHeader.className = STYLES.form.table.rowActionHeader;
+      actionHeader.setAttribute("aria-hidden", "true");
+    }
+    this._tbody = table.appendChild(document.createElement("tbody"));
+    this._tbody.className = STYLES.form.table.body;
+    if (!this.renderer.readonly) {
+      this._tbody.addEventListener("pointerover", this._rowPointerOver);
+      this._tbody.addEventListener("pointerdown", this._rowPointerDown);
+      this._tbody.addEventListener("pointermove", this._rowPointerMove);
+      this._tbody.addEventListener("click", this._rowClick);
+      this._tbody.addEventListener("focusin", this._rowFocusIn);
+      this._tbody.addEventListener("pointerleave", this._scheduleHideActions);
+      this._tbody.addEventListener("focusout", this._scheduleHideActions);
+    }
+    const rows = tableRows(this.submission) ?? [];
+    for (const [index, submission] of rows.entries()) {
+      this._tbody.appendChild(this.row(index, submission));
+    }
+    if (rows.length > 0) {
+      this._container.dataset.visible = "true";
+    }
+    return this._container;
+  }
+  get embedded() {
+    if (this._embedded) return this._embedded;
+    this._embedded = this.table();
+    return this._embedded;
+  }
+  get edit() {
+    if (this._edit) return this._edit;
+    this._edit = document.createElement("div");
+    this._edit.className = STYLES.form.table.container;
+    this._edit.dataset.kind = String(this.renderer.kind);
+    const rows = tableRows(this.submission);
+    this._input = this._edit.appendChild(
+      primitives.input({
+        name: this.schema.id,
+        type: "hidden",
+        value: rows ? JSON.stringify(rows) : ""
+      })
+    );
+    const label = this._edit.appendChild(
+      primitives.label({
+        label: this.schema.title,
+        tag: "h3",
+        styles: { label: STYLES.label.row }
+      })
+    );
+    if (!this.renderer.readonly) {
+      this._createButton = document.createElement("button");
+      this._createButton.dataset.role = "create";
+      this._createButton.className = `group-data-[mode=read]/element:hidden ${STYLES.form.icon}`;
+      this._createButton.dataset.kind = "add";
+      setIcon(
+        this._createButton.appendChild(document.createElement("span")),
+        "addRow",
+        "icon-sm"
+      );
+      label.appendChild(this._createButton);
+    }
+    this._table = this.table();
+    this._edit.appendChild(this._table);
+    if (!this.renderer.readonly) {
+      this._edit.addEventListener("click", this._click);
+      this._edit.addEventListener("submit", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    }
+    return this._edit;
+  }
+  _tableCellElement(column, submission) {
+    const ElementClass = column.type === "checkbox" || column.type === "input" || column.type === "link" ? TABLE_CELL_ELEMENTS[column.type] : null;
+    if (!ElementClass) {
+      captureError(new Error(`Unsupported table column type: ${column.type}`));
+      return null;
+    }
+    return new ElementClass(this._rowRenderer(), column, submission[column.id]);
+  }
+  _rowRenderer() {
+    return { id: this.id, readonly: this.readonly, mode: this.mode };
+  }
+  row(index, submission) {
+    const rowElt = document.createElement("tr");
+    rowElt.dataset.index = String(index);
+    rowElt.dataset.submission = JSON.stringify(submission);
+    if (!this.renderer.readonly) rowElt.tabIndex = 0;
+    this.schema.columns?.forEach((column) => {
+      const cell = document.createElement("td");
+      cell.className = COMPACT_COLUMN_TYPES.has(column.type) ? STYLES.form.table.cell.compact.default : STYLES.form.table.cell.default;
+      rowElt.appendChild(cell);
+      const element = this._tableCellElement(column, submission);
+      const content = element?.cell;
+      cell.innerHTML = typeof content === "string" ? content : content?.outerHTML ?? "";
+    });
+    if (!this.renderer.readonly) {
+      const actionCell = rowElt.appendChild(document.createElement("td"));
+      actionCell.className = STYLES.form.table.rowActionCell;
+      actionCell.appendChild(this._rowActions(index));
+    }
+    return rowElt;
+  }
+  _rowActions(index) {
+    const actions = document.createElement("div");
+    actions.dataset.role = "row-actions";
+    actions.dataset.index = String(index);
+    actions.setAttribute("aria-label", "Row actions");
+    actions.className = STYLES.form.table.rowActions;
+    actions.hidden = true;
+    for (const [role, icon, label] of ACTIONS) {
+      const button = actions.appendChild(document.createElement("button"));
+      button.type = "button";
+      button.dataset.role = role;
+      button.className = STYLES.form.table.actionButton;
+      button.title = label;
+      button.setAttribute("aria-label", label);
+      if (role === "delete") button.dataset.kind = "delete";
+      const iconElement = button.appendChild(document.createElement("span"));
+      setIcon(iconElement, icon, "icon-sm");
+    }
+    actions.addEventListener("pointerenter", this._cancelHideActions);
+    actions.addEventListener("pointerleave", this._scheduleHideActions);
+    actions.addEventListener("focusin", this._cancelHideActions);
+    actions.addEventListener("focusout", this._scheduleHideActions);
+    return actions;
+  }
+  _rowPointerOver(e) {
+    if (e.pointerType && e.pointerType !== "mouse") return;
+    if (performance.now() < this._suppressHoverUntil) return;
+    if (this._actionsPinned) return;
+    const row = e.target instanceof Element ? e.target.closest("tr[data-index]") : null;
+    if (!row) return;
+    this._showActions(row);
+  }
+  _rowPointerDown(e) {
+    if (e.pointerType === "mouse") return;
+    const target = e.target;
+    if (!(target instanceof Element) || target.closest("a, button, input, select, textarea, [data-role]")) {
+      return;
+    }
+    const row = target.closest("tr[data-index]");
+    if (!row) return;
+    this._pendingTouchAction = {
+      row,
+      pointerId: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      canceled: false
+    };
+    document.addEventListener("pointermove", this._rowPointerMove, true);
+    document.addEventListener("pointerup", this._rowPointerUp, true);
+    document.addEventListener("pointercancel", this._rowPointerCancel, true);
+  }
+  _rowPointerMove(e) {
+    const pending = this._pendingTouchAction;
+    if (!pending || pending.pointerId !== e.pointerId) return;
+    const moved = Math.hypot(e.clientX - pending.x, e.clientY - pending.y);
+    if (moved > TAP_MOVE_TOLERANCE) {
+      pending.canceled = true;
+      this._suppressTapUntil = performance.now() + TAP_SUPPRESSION_MS;
+      this._hideActions();
+    }
+  }
+  _rowPointerUp(e) {
+    const pending = this._pendingTouchAction;
+    if (!pending || pending.pointerId !== e.pointerId) return;
+    const hideActiveActions = !pending.canceled && this._actionsOpen && this._actionsPinned && pending.row === this._activeRow;
+    this._clearPendingTouchAction();
+    if (!pending.canceled) {
+      this._suppressTapUntil = performance.now() + TAP_SUPPRESSION_MS;
+      if (hideActiveActions) {
+        this._hideActions();
+        return;
+      }
+      this._showActions(pending.row, { pinned: true });
+    }
+  }
+  _rowPointerCancel(e) {
+    if (this._pendingTouchAction && this._pendingTouchAction.pointerId !== e.pointerId) {
+      return;
+    }
+    this._clearPendingTouchAction();
+  }
+  _rowClick(e) {
+    if (performance.now() < this._suppressTapUntil) return;
+    const fineHover = window.matchMedia(
+      "(hover: hover) and (pointer: fine)"
+    ).matches;
+    if (fineHover) return;
+    const target = e.target;
+    if (!(target instanceof Element) || target.closest("a, button, input, select, textarea, [data-role]")) {
+      return;
+    }
+    const row = target.closest("tr[data-index]");
+    if (!row) return;
+    if (this._actionsOpen && this._actionsPinned && row === this._activeRow) {
+      this._hideActions();
+      return;
+    }
+    this._showActions(row, { pinned: true });
+  }
+  _clearPendingTouchAction() {
+    this._pendingTouchAction = null;
+    document.removeEventListener("pointermove", this._rowPointerMove, true);
+    document.removeEventListener("pointerup", this._rowPointerUp, true);
+    document.removeEventListener("pointercancel", this._rowPointerCancel, true);
+  }
+  _rowFocusIn(e) {
+    if (this._pendingTouchAction) return;
+    const row = e.target instanceof Element ? e.target.closest("tr[data-index]") : null;
+    if (!row) return;
+    this._showActions(row, { pinned: true });
+  }
+  _showActions(row, { pinned = false } = {}) {
+    if (this._form || !row || !this._edit?.contains(row)) return;
+    this._cancelHideActions();
+    this._activeRow = row;
+    this._actionsPinned = pinned;
+    const actions = row.querySelector("[data-role='row-actions']");
+    if (!actions) return;
+    if (this._actions && this._actions !== actions) {
+      this._actions.hidden = true;
+    }
+    this._actions = actions;
+    this._updateActionStates(row);
+    actions.hidden = false;
+    if (!this._actionsOpen) {
+      this._actionsOpen = true;
+      this._addActionsListeners();
+    }
+  }
+  _updateActionStates(row) {
+    const index = Number.parseInt(row.dataset.index ?? "", 10);
+    const length = tableRows(this.submission)?.length || this._tbody?.children.length || 0;
+    if (Number.isNaN(index)) return;
+    const states = {
+      moveUp: index <= 0,
+      moveDown: index >= length - 1
+    };
+    for (const [role, disabled] of Object.entries(states)) {
+      const button = this._actions?.querySelector(
+        `[data-role='${role}']`
+      );
+      if (!button) continue;
+      button.disabled = disabled;
+      button.setAttribute("aria-disabled", disabled ? "true" : "false");
+    }
+  }
+  _addActionsListeners() {
+    if (this._actionsListenersAdded) return;
+    document.addEventListener("pointerdown", this._documentPointerDown, true);
+    document.addEventListener("keydown", this._documentKeyDown, true);
+    this._actionsListenersAdded = true;
+  }
+  _removeActionsListeners() {
+    if (!this._actionsListenersAdded) return;
+    document.removeEventListener(
+      "pointerdown",
+      this._documentPointerDown,
+      true
+    );
+    document.removeEventListener("keydown", this._documentKeyDown, true);
+    this._actionsListenersAdded = false;
+  }
+  _documentPointerDown(e) {
+    if (!(e.target instanceof Node)) return;
+    if (this._actions?.contains(e.target)) return;
+    if (this._activeRow?.contains(e.target)) return;
+    this._hideActions();
+  }
+  _documentKeyDown(e) {
+    if (e.key === "Escape") this._hideActions();
+  }
+  _scheduleHideActions() {
+    this._cancelHideActions();
+    this._hideActionsTimer = window.setTimeout(() => {
+      if (this._actionsPinned) return;
+      if (this._actions?.matches(":hover")) return;
+      if (this._activeRow?.matches(":hover")) return;
+      if (this._actions?.contains(document.activeElement)) return;
+      if (this._activeRow?.contains(document.activeElement)) return;
+      this._hideActions();
+    }, HOVER_HIDE_DELAY_MS);
+  }
+  _cancelHideActions() {
+    if (this._hideActionsTimer) {
+      window.clearTimeout(this._hideActionsTimer);
+      this._hideActionsTimer = null;
+    }
+  }
+  _hideActions() {
+    this._cancelHideActions();
+    if (this._actions) {
+      this._actions.hidden = true;
+    }
+    this._removeActionsListeners();
+    this._actionsOpen = false;
+    this._actionsPinned = false;
+    this._activeRow = null;
+  }
+  _scrollFormIntoView() {
+    const form = this._form;
+    if (!form) return;
+    window.requestAnimationFrame(() => {
+      if (!this._form || this._form !== form) return;
+      const rect = form.getBoundingClientRect();
+      const isVisible = rect.top >= 0 && rect.left >= 0 && rect.bottom <= window.innerHeight && rect.right <= window.innerWidth;
+      if (isVisible) return;
+      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+      form.scrollIntoView({
+        behavior,
+        block: "center",
+        inline: "nearest"
+      });
+    });
+  }
+  async form(index) {
+    const hasIndex = index !== void 0 && index !== null && index !== "";
+    const submission = hasIndex ? tableRows(this.submission)?.[Number(index)] : void 0;
+    const form = document.createElement("form");
+    form.className = STYLES.form.table.form;
+    if (hasIndex) {
+      form.dataset.index = index;
+    }
+    for (const column of this.schema.columns ?? []) {
+      const element = await getFormElement(
+        this._rowRenderer(),
+        column,
+        submission?.[column.id]
+      );
+      if (element.edit) form.appendChild(element.edit);
+    }
+    const buttons = form.appendChild(document.createElement("div"));
+    buttons.className = STYLES.button.group;
+    const cancel = buttons.appendChild(document.createElement("button"));
+    cancel.className = STYLES.button.submit;
+    cancel.dataset.kind = "cancel";
+    cancel.dataset.role = "cancel";
+    cancel.textContent = "Cancel";
+    const submit = buttons.appendChild(document.createElement("button"));
+    submit.className = STYLES.button.submit;
+    submit.textContent = hasIndex ? "Save Changes" : "Add Row";
+    submit.dataset.role = "validate";
+    form.addEventListener("change", (e) => {
+      e.stopPropagation();
+    });
+    form.addEventListener("updated", (e) => {
+      e.stopPropagation();
+    });
+    return form;
+  }
+  destroy() {
+    this._clearPendingTouchAction();
+    this._hideActions();
+    if (!this.renderer.readonly && this._tbody) {
+      this._tbody.removeEventListener("pointerover", this._rowPointerOver);
+      this._tbody.removeEventListener("pointerdown", this._rowPointerDown);
+      this._tbody.removeEventListener("pointermove", this._rowPointerMove);
+      this._tbody.removeEventListener("click", this._rowClick);
+      this._tbody.removeEventListener("focusin", this._rowFocusIn);
+      this._tbody.removeEventListener(
+        "pointerleave",
+        this._scheduleHideActions
+      );
+      this._tbody.removeEventListener("focusout", this._scheduleHideActions);
+    }
+    if (!this.renderer.readonly && this._edit) {
+      this._edit.removeEventListener("click", this._click);
+    }
+    this._actions = null;
+    super.destroy();
+  }
+}
+
+var table = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	TableElement: TableElement
+});
+
+class SignatureElement extends BaseElement {
+  get value() {
+    return this.signatureInput?.value ?? null;
+  }
+  changed(value) {
+    if (areEqual(this.value, value)) return false;
+    return true;
+  }
+  get read() {
+    if (this._read) return this._read;
+    this._read = document.createElement("div");
+    this._read.className = STYLES.signature.pad;
+    const signature = this._read.appendChild(document.createElement("img"));
+    signature.src = String(this.submission);
+    signature.alt = "Signature";
+    if (this.submission && this.signatureInput) {
+      this.signatureInput.value = this.schema.id;
+    }
+    this._read.classList.add("group-data-[mode=edit]/element:hidden");
+    return this._read;
+  }
+  get edit() {
+    if (this._edit) return this._edit;
+    this._edit = document.createElement("div");
+    this._edit.className = "flex flex-col gap-2";
+    if (this.label) {
+      const label = primitives.label({
+        label: this.label,
+        tag: "h3"
+      });
+      this._edit.appendChild(label);
+    }
+    this.signatureInput = this._edit.appendChild(
+      primitives.input({
+        name: this.schema.id,
+        type: "hidden"
+      })
+    );
+    if (this.submission) {
+      this.signatureInput.value = this.schema.id;
+    }
+    const signatureContainer = this._edit.appendChild(
+      document.createElement("div")
+    );
+    signatureContainer.dataset.role = "signature";
+    signatureContainer.className = STYLES.signature.pad;
+    const reset = signatureContainer.appendChild(
+      document.createElement("button")
+    );
+    reset.className = STYLES.signature.reset;
+    reset.id = "reset-button";
+    const resetIcon = reset.appendChild(document.createElement("span"));
+    setIcon(resetIcon, "reset");
+    const signature = new Signature(
+      signatureContainer,
+      typeof this.submission === "string" ? this.submission : null,
+      this.schema.id
+    );
+    this.signature = signature;
+    this.signature.init();
+    this.destroyables.push(this.signature);
+    reset.addEventListener("click", () => this.clear());
+    this._edit.addEventListener("updated", () => {
+      if (this.signatureInput) this.signatureInput.value = signature.inputName;
+    });
+    signatureContainer.classList.add("group-data-[mode=read]/element:hidden");
+    return this._edit;
+  }
+  clear() {
+    this.submission = null;
+    if (this.signature) {
+      this.signature.clear();
+    }
+    if (this.signatureInput) {
+      this.signatureInput.value = "";
+    }
+  }
+}
+class Signature {
+  constructor(container, imageUrl = null, inputName = "signature-image") {
+    this.container = container;
+    this.imageUrl = imageUrl;
+    this.inputName = inputName;
+    this.canvas = null;
+    this.ctx = null;
+    this.isDrawing = false;
+    this.lastX = 0;
+    this.lastY = 0;
+    this.fileInput = null;
+    this.resizeObserver = null;
+    this.intersectionObserver = null;
+    this.resetButton = null;
+    this.boundHandlers = {};
+    this.debouncedSave = debounce(() => this.saveSignature(), 300);
+  }
+  init() {
+    this.canvas = this.container.appendChild(document.createElement("canvas"));
+    this.canvas.className = `touch-none select-none cursor-crosshair`;
+    this.fileInput = this.container.appendChild(
+      document.createElement("input")
+    );
+    this.fileInput.type = "file";
+    this.fileInput.name = this.inputName;
+    this.fileInput.accept = "image/png";
+    this.fileInput.style.display = "none";
+    this.ctx = this.canvas.getContext("2d", { willReadFrequently: false });
+    this.setupCanvas();
+    this.attachEventListeners();
+    if (this.imageUrl) {
+      this.loadSignature(this.imageUrl);
+    }
+  }
+  setupCanvas() {
+    this.intersectionObserver = new IntersectionObserver(
+      (entries, observer) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            this.resizeCanvas();
+            observer.disconnect();
+          }
+        }
+      },
+      { threshold: 0.1 }
+    );
+    this.intersectionObserver.observe(this.container);
+    this.resizeObserver = new ResizeObserver(() => {
+      this.resizeCanvas();
+    });
+    this.resizeObserver.observe(this.container);
+    this.boundHandlers.resize = () => this.resizeCanvas();
+    window.addEventListener("resize", this.boundHandlers.resize);
+  }
+  resizeCanvas() {
+    const { canvas, ctx, fileInput } = this;
+    if (!canvas || !ctx || !fileInput) return;
+    const rect = this.container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const tempCanvas = document.createElement("canvas");
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    if (canvas.width > 0 && canvas.height > 0) {
+      tempCtx?.drawImage(canvas, 0, 0);
+    }
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    const file = fileInput.files?.[0];
+    if (file) {
+      this.loadSignatureFromFile(file);
+    } else if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+      ctx.drawImage(tempCanvas, 0, 0);
+    }
+  }
+  attachEventListeners() {
+    if (!this.canvas) return;
+    this.boundHandlers.pointerDown = this.handlePointerDown.bind(this);
+    this.boundHandlers.pointerMove = this.handlePointerMove.bind(this);
+    this.boundHandlers.pointerUp = this.handlePointerUp.bind(this);
+    this.boundHandlers.pointerLeave = this.handlePointerLeave.bind(this);
+    this.canvas.addEventListener("pointerdown", this.boundHandlers.pointerDown);
+    this.canvas.addEventListener("pointermove", this.boundHandlers.pointerMove);
+    this.canvas.addEventListener("pointerup", this.boundHandlers.pointerUp);
+    this.canvas.addEventListener(
+      "pointerleave",
+      this.boundHandlers.pointerLeave
+    );
+  }
+  handlePointerDown(e) {
+    if (!this.canvas || !this.ctx) return;
+    e.preventDefault();
+    this.isDrawing = true;
+    const rect = this.canvas.getBoundingClientRect();
+    this.lastX = e.clientX - rect.left;
+    this.lastY = e.clientY - rect.top;
+    this.ctx.strokeStyle = "#000000";
+    this.ctx.lineWidth = 2;
+    this.ctx.lineCap = "round";
+    this.ctx.lineJoin = "round";
+  }
+  handlePointerMove(e) {
+    if (!this.isDrawing || !this.canvas || !this.ctx) return;
+    e.preventDefault();
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    this.ctx.beginPath();
+    this.ctx.moveTo(this.lastX, this.lastY);
+    this.ctx.lineTo(x, y);
+    this.ctx.stroke();
+    this.lastX = x;
+    this.lastY = y;
+  }
+  handlePointerUp() {
+    if (!this.isDrawing) return;
+    this.isDrawing = false;
+    this.debouncedSave();
+  }
+  handlePointerLeave() {
+    if (!this.isDrawing) return;
+    this.isDrawing = false;
+    this.debouncedSave();
+  }
+  async saveSignature() {
+    const { canvas, fileInput } = this;
+    if (!canvas || !fileInput) return;
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, "image/png", 1);
+    });
+    if (!blob) return;
+    const file = new File([blob], "signature.png", {
+      type: "image/png",
+      lastModified: Date.now()
+    });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    fileInput.files = dataTransfer.files;
+    this.container.dispatchEvent(new CustomEvent("updated", { bubbles: true }));
+  }
+  async loadSignature(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        this._drawImage(img);
+        resolve();
+      };
+      img.onerror = (error) => {
+        console.error("Failed to load signature image:", error);
+        reject(error);
+      };
+      img.src = url;
+    });
+  }
+  loadSignatureFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      const img = new Image();
+      img.onload = () => this._drawImage(img);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  _drawImage(image) {
+    if (!this.canvas || !this.ctx) return;
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.drawImage(image, 0, 0, this.canvas.width, this.canvas.height);
+  }
+  clear() {
+    if (this.canvas)
+      this.ctx?.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    if (this.fileInput) this.fileInput.value = "";
+  }
+  destroy() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    if (this.intersectionObserver) {
+      this.intersectionObserver.disconnect();
+    }
+    if (this.boundHandlers.resize) {
+      window.removeEventListener("resize", this.boundHandlers.resize);
+    }
+    if (this.canvas) {
+      const { pointerDown, pointerMove, pointerUp, pointerLeave } = this.boundHandlers;
+      if (pointerDown)
+        this.canvas.removeEventListener("pointerdown", pointerDown);
+      if (pointerMove)
+        this.canvas.removeEventListener("pointermove", pointerMove);
+      if (pointerUp) this.canvas.removeEventListener("pointerup", pointerUp);
+      if (pointerLeave)
+        this.canvas.removeEventListener("pointerleave", pointerLeave);
+    }
+  }
+}
+
+var signature = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	Signature: Signature,
+	SignatureElement: SignatureElement
+});
+
+function isTodoItem(value) {
+  return Boolean(
+    value && typeof value === "object" && "text" in value && typeof value.text === "string"
+  );
+}
+const normalizeTodoValue = (value, { resetChecked = false } = {}) => {
+  if (!value || typeof value !== "object" || !("items" in value) || !Array.isArray(value.items))
+    return null;
+  const items = value.items.filter(isTodoItem).map((item) => ({
+    text: item.text.trim(),
+    checked: resetChecked ? false : item.checked === true
+  })).filter((item) => item.text);
+  return items.length > 0 ? { items } : null;
+};
+class TodoElement extends BaseElement {
+  constructor(renderer, schema, submission) {
+    super(renderer, schema, normalizeTodoValue(submission));
+    this._input = null;
+    this._editing = false;
+    this._draftVisible = false;
+    this._draft = "";
+    this._renamingIndex = null;
+    this._renameValue = "";
+    this._historyValue = null;
+    this._click = this._click.bind(this);
+    this._change = this._change.bind(this);
+    this._inputEvent = this._inputEvent.bind(this);
+    this._keydown = this._keydown.bind(this);
+  }
+  get value() {
+    return normalizeTodoValue({ items: this._payloadItems() });
+  }
+  get mode() {
+    return this._editing ? "edit" : "read";
+  }
+  changed(value) {
+    return !areEqual(this.value, normalizeTodoValue(value));
+  }
+  _items() {
+    return normalizeTodoValue(this.submission)?.items ?? [];
+  }
+  _payloadItems() {
+    const items = this._items();
+    if (this._renamingIndex !== null && items[this._renamingIndex]) {
+      const text = this._renameValue.trim();
+      if (text) items[this._renamingIndex].text = text;
+    }
+    if (this._editing && this._draftVisible) {
+      const text = this._draft.trim();
+      if (text) items.push({ text, checked: false });
+    }
+    return items;
+  }
+  _setSubmission(value) {
+    this.submission = normalizeTodoValue(value);
+    this._syncInput();
+  }
+  _syncInput() {
+    if (!this._input) return;
+    const value = this.value;
+    this._input.value = value ? JSON.stringify(value) : "";
+  }
+  _notifyChange() {
+    this._input?.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  _commitItems(items, { notify = true, render = true } = {}) {
+    this._setSubmission({ items });
+    if (render) this._render();
+    if (notify) this._notifyChange();
+  }
+  _focus(role, { select = false } = {}) {
+    queueMicrotask(() => {
+      const input = this._elt?.querySelector(
+        `[data-role='${role}']`
+      );
+      if (!input) return;
+      input.focus();
+      if (select) input.select();
+    });
+  }
+  _button({ role, icon, label, kind = null, header = false }) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.role = role;
+    if (kind) button.dataset.kind = kind;
+    button.ariaLabel = label;
+    button.title = label;
+    button.className = header ? STYLES.form.icon : STYLES.form.table.actionButton;
+    setIcon(
+      button.appendChild(document.createElement("span")),
+      icon,
+      "icon-sm"
+    );
+    return button;
+  }
+  _checkbox(item, index, { disabled = false } = {}) {
+    const checkbox = primitives.checkbox({
+      checked: item.checked,
+      disabled
+    });
+    const input = checkbox.querySelector("input");
+    if (!input) return checkbox;
+    input.dataset.role = "todo-check";
+    input.dataset.index = String(index);
+    input.ariaLabel = `${item.checked ? "Uncheck" : "Check"} ${item.text}`;
+    return checkbox;
+  }
+  _itemRow(item, index) {
+    const row = document.createElement("li");
+    row.className = STYLES.form.todo.row;
+    row.dataset.index = String(index);
+    row.appendChild(
+      this._checkbox(item, index, {
+        disabled: this.readonly || this._editing
+      })
+    );
+    if (this._editing && this._renamingIndex === index) {
+      const input = row.appendChild(document.createElement("input"));
+      input.type = "text";
+      input.autocomplete = "off";
+      input.dataset.role = "todo-rename-input";
+      input.dataset.index = String(index);
+      input.value = this._renameValue;
+      input.className = STYLES.form.todo.inlineInput;
+      input.ariaLabel = `Rename ${item.text}`;
+    } else if (this._editing) {
+      const text = row.appendChild(document.createElement("button"));
+      text.type = "button";
+      text.dataset.role = "todo-rename";
+      text.dataset.index = String(index);
+      text.textContent = item.text;
+      text.className = STYLES.form.todo.text;
+      text.ariaLabel = `Rename ${item.text}`;
+    } else {
+      const text = row.appendChild(document.createElement("span"));
+      text.textContent = item.text;
+      text.className = `${STYLES.form.todo.text} ${item.checked ? STYLES.form.todo.completeText : ""}`.trim();
+    }
+    if (this._editing) {
+      const actions = row.appendChild(document.createElement("div"));
+      actions.className = STYLES.form.todo.actions;
+      actions.appendChild(
+        this._button({
+          role: "todo-remove",
+          icon: "remove",
+          label: `Remove ${item.text}`,
+          kind: "delete"
+        })
+      );
+    }
+    return row;
+  }
+  _draftRow() {
+    const row = document.createElement("li");
+    row.className = STYLES.form.todo.row;
+    row.dataset.role = "todo-draft-row";
+    row.appendChild(
+      this._checkbox({ text: "new todo", checked: false }, "draft", {
+        disabled: true
+      })
+    );
+    const input = row.appendChild(document.createElement("input"));
+    input.type = "text";
+    input.autocomplete = "off";
+    input.dataset.role = "todo-draft";
+    input.value = this._draft;
+    input.className = STYLES.form.todo.inlineInput;
+    input.placeholder = "Add a todo\u2026";
+    input.ariaLabel = `Add item to ${this.label}`;
+    const actions = row.appendChild(document.createElement("div"));
+    actions.className = STYLES.form.todo.actions;
+    actions.append(
+      this._button({
+        role: "todo-dismiss-draft",
+        icon: "remove",
+        label: "Dismiss new todo",
+        kind: "delete"
+      }),
+      this._button({
+        role: "todo-commit-draft",
+        icon: "success",
+        label: "Add todo"
+      })
+    );
+    return row;
+  }
+  _render() {
+    if (!this._elt || !this._input) return;
+    this._elt.dataset.mode = this.mode;
+    this._elt.replaceChildren(this._input);
+    const label = this._elt.appendChild(
+      primitives.label({
+        label: this.label,
+        tag: "h3",
+        styles: { label: STYLES.label.row }
+      })
+    );
+    if (!this.readonly) {
+      const controls = label;
+      if (this._editing) {
+        controls.appendChild(
+          this._button({
+            role: "todo-done",
+            icon: "success",
+            label: `Done editing ${this.label}`,
+            kind: "success",
+            header: true
+          })
+        );
+      } else {
+        const historyButton = super.historyFillButton(this._historyValue);
+        if (historyButton) controls.appendChild(historyButton);
+        controls.appendChild(
+          this._button({
+            role: "todo-edit",
+            icon: this.hasSubmission ? "edit" : "addRow",
+            label: this.hasSubmission ? `Edit ${this.label}` : `Add to ${this.label}`,
+            kind: this.hasSubmission ? null : "add",
+            header: true
+          })
+        );
+      }
+    }
+    const items = this._items();
+    if (items.length > 0 || this._editing && this._draftVisible) {
+      const list = this._elt.appendChild(document.createElement("ul"));
+      list.className = STYLES.form.todo.list;
+      items.forEach((item, index) => {
+        list.appendChild(this._itemRow(item, index));
+      });
+      if (this._editing && this._draftVisible) {
+        list.appendChild(this._draftRow());
+      }
+    } else if (this.readonly && this.showEmptyFields) {
+      this._elt.appendChild(this.readonlyPlaceholder());
+    }
+    this._syncInput();
+  }
+  _enterEdit() {
+    this._editing = true;
+    this._draftVisible = true;
+    this._draft = "";
+    this._renamingIndex = null;
+    this._render();
+    this._focus("todo-draft");
+  }
+  _commitDraft({ continueEditing = true } = {}) {
+    this._commitRename({ render: false });
+    const text = this._draft.trim();
+    const items = this._items();
+    if (text) items.push({ text, checked: false });
+    this._draft = "";
+    this._draftVisible = continueEditing;
+    this._renamingIndex = null;
+    this._commitItems(items, { notify: Boolean(text) });
+    if (continueEditing) this._focus("todo-draft");
+    return Boolean(text);
+  }
+  _commitRename({ render = true } = {}) {
+    if (this._renamingIndex === null) return false;
+    const items = this._items();
+    const item = items[this._renamingIndex];
+    const text = this._renameValue.trim();
+    const changed = Boolean(item && text && text !== item.text);
+    if (changed) item.text = text;
+    this._renamingIndex = null;
+    this._renameValue = "";
+    this._commitItems(items, { notify: changed, render });
+    return changed;
+  }
+  _done() {
+    this._commitRename({ render: false });
+    const text = this._draftVisible ? this._draft.trim() : "";
+    if (text) {
+      const items = this._items();
+      items.push({ text, checked: false });
+      this._setSubmission({ items });
+      this._notifyChange();
+    }
+    this._draft = "";
+    this._draftVisible = false;
+    this._editing = false;
+    this._render();
+  }
+  _click(event) {
+    const target = event.target instanceof Element ? event.target.closest("[data-role]") : null;
+    if (!target || !this._elt?.contains(target)) return;
+    const role = target.dataset.role;
+    const handled = /* @__PURE__ */ new Set([
+      "todo-edit",
+      "todo-done",
+      "todo-commit-draft",
+      "todo-dismiss-draft",
+      "todo-remove",
+      "todo-rename"
+    ]);
+    if (!role || !handled.has(role)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (role === "todo-edit") {
+      this._enterEdit();
+    } else if (role === "todo-done") {
+      this._done();
+    } else if (role === "todo-commit-draft") {
+      this._commitDraft();
+    } else if (role === "todo-dismiss-draft") {
+      const hadDraft = Boolean(this._draft.trim());
+      this._draft = "";
+      this._draftVisible = false;
+      this._syncInput();
+      this._render();
+      if (hadDraft) this._notifyChange();
+    } else if (role === "todo-remove") {
+      this._commitRename({ render: false });
+      const index = Number.parseInt(
+        target.closest("[data-index]")?.dataset.index ?? "",
+        10
+      );
+      if (Number.isNaN(index)) return;
+      const items = this._items().filter((_, itemIndex) => itemIndex !== index);
+      this._renamingIndex = null;
+      this._commitItems(items);
+    } else if (role === "todo-rename") {
+      this._commitRename({ render: false });
+      const index = Number.parseInt(target.dataset.index ?? "", 10);
+      const item = this._items()[index];
+      if (!item) return;
+      this._renamingIndex = index;
+      this._renameValue = item.text;
+      this._render();
+      this._focus("todo-rename-input", { select: true });
+    }
+  }
+  _change(event) {
+    const checkbox = event.target instanceof Element ? event.target.closest("[data-role='todo-check']") : null;
+    if (!checkbox || this._editing || this.readonly) return;
+    const index = Number.parseInt(checkbox.dataset.index ?? "", 10);
+    const items = this._items();
+    if (Number.isNaN(index) || !items[index]) return;
+    items[index].checked = checkbox.checked;
+    this._setSubmission({ items });
+  }
+  _inputEvent(event) {
+    const { target } = event;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.dataset.role === "todo-draft") {
+      this._draft = target.value;
+      this._syncInput();
+    } else if (target.dataset.role === "todo-rename-input") {
+      this._renameValue = target.value;
+      this._syncInput();
+    }
+  }
+  _keydown(event) {
+    const { target } = event;
+    const dataset = target && "dataset" in target ? target.dataset : null;
+    const role = dataset && typeof dataset === "object" && "role" in dataset ? dataset.role : null;
+    if (role === "todo-draft") {
+      if (event.key === "Enter" || event.key === "Tab" && !event.shiftKey) {
+        event.preventDefault();
+        this._commitDraft();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        this._draft = "";
+        this._draftVisible = false;
+        this._render();
+      }
+    } else if (role === "todo-rename-input") {
+      if (event.key === "Enter" || event.key === "Tab" && !event.shiftKey) {
+        event.preventDefault();
+        this._commitRename();
+        this._focus("todo-draft");
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        this._renamingIndex = null;
+        this._renameValue = "";
+        this._render();
+      }
+    }
+  }
+  fillFromHistory(value) {
+    const restored = normalizeTodoValue(value, { resetChecked: true });
+    if (!restored) return false;
+    this._editing = false;
+    this._draftVisible = false;
+    this._draft = "";
+    this._renamingIndex = null;
+    this._setSubmission(restored);
+    this._render();
+    this._notifyChange();
+    return true;
+  }
+  addHistoryFill(value) {
+    this._historyValue = typeof value === "function" ? value : normalizeTodoValue(value, { resetChecked: true });
+    this._render();
+    return Boolean(this._elt?.querySelector("[data-role='history-fill']"));
+  }
+  updateSubmission(value) {
+    this._editing = false;
+    this._draftVisible = false;
+    this._draft = "";
+    this._renamingIndex = null;
+    this._setSubmission(value);
+    this._render();
+  }
+  create() {
+    const elt = document.createElement("div");
+    elt.id = this.id;
+    elt.className = `${STYLES.form.todo.container} form-element group/element`;
+    elt.dataset.kind = String(this.renderer.kind);
+    elt._lp_element = this;
+    this._elt = elt;
+    this._input = document.createElement("input");
+    this._input.type = "hidden";
+    this._input.name = this.schema.id;
+    elt.addEventListener("click", this._click);
+    elt.addEventListener("change", this._change);
+    elt.addEventListener("input", this._inputEvent);
+    elt.addEventListener("keydown", this._keydown);
+    this._render();
+    return elt;
+  }
+  destroy() {
+    if (this._elt) {
+      this._elt.removeEventListener("click", this._click);
+      this._elt.removeEventListener("change", this._change);
+      this._elt.removeEventListener("input", this._inputEvent);
+      this._elt.removeEventListener("keydown", this._keydown);
+    }
+    this._input = null;
+    super.destroy();
+  }
+}
+
+var todo = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	TodoElement: TodoElement,
+	normalizeTodoValue: normalizeTodoValue
+});
+
+export { TableElement as T, todo as a, signature as s, table as t };

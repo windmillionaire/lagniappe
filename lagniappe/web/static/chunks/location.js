@@ -1,2 +1,431 @@
-import{S as u,s as m}from"./ui-resources.js?v=b9ad6d22";import{B as b}from"./forms.js?v=b9ad6d22";import{E as x,r as g}from"./foundation.js?v=b9ad6d22";import{p as f}from"./ui-controls.js?v=b9ad6d22";import{u as p}from"./account.js?v=b9ad6d22";import{a as y}from"./combobox.js?v=b9ad6d22";import"./modal.js?v=b9ad6d22";import"./upstreamUnavailable.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";class v extends y{constructor(t,{name:e=null,onSelect:s=null}={}){super(t),this.index="location",this.fieldName=e||this.name,this.location=null,this.onSelect=s,this.endpoint=x.location}init(){this.element.name&&(this.fieldName=this.element.name),super.init(),this.element.removeAttribute("name"),this.basePlaceholder=this.element.placeholder,this._createHiddenInput(),this.element.setAttribute("autocomplete","bork"),p()}_input(t){const e=t.target.value.trim();if(e.length>2)return this._search(e);this.settleQueryInput({clear:!0})}elementClick(t){p(),super.elementClick(t,!1)}_search(t){const e=new URLSearchParams;return e.set("q",t),this.runQuery(t,async s=>(await p(),s.signal?.aborted?null:g.get(this.endpoint,e,{signal:s.signal})),s=>(this.clearQueryResults(),s?.ok&&this.updatePanel(s.results||null),this.panel||this._createPanel(),this._appendManualOption(t),this.showPanel()))}_setManualAddress(t,e=!0){const s=this._cleanText(t);s&&(this._selectLocation({address:s,name:s},{notify:e}),this.element.value="",this.hidePanel())}selectOption(t){if(t.dataset.manual==="true"){this._setManualAddress(t.dataset.address);return}if(!t.dataset.details)return;const e=JSON.parse(t.dataset.details);this._selectLocation(e),this.element.value="",this.hidePanel()}elementKeydown(t){if(super.elementKeydown(t),!t.defaultPrevented)if(t.key==="Enter"){const e=this.element.value.trim();if(!e)return;t.stopPropagation(),t.preventDefault(),this._setManualAddress(e)}else this.location&&!this.element.value&&(t.key==="Backspace"||t.key==="Delete")&&(t.stopPropagation(),t.preventDefault(),this.clear())}addOption(t={},e=!0){Object.keys(t).length!==0&&this._selectLocation(t,{notify:e})}clear({notify:t=!0}={}){this.values.clear(),this.location=null,this.focusedIndex=-1,this.element.value="",this.element.placeholder=this.basePlaceholder||this.placeholder||"",this.element.dataset.values="false",this.hiddenInput&&(this.hiddenInput.value=""),this.hidePanel(),this.onSelect&&this.onSelect(null,{notify:t}),t&&!this.onSelect&&this._dispatchChange()}_appendManualOption(t){const e=this._cleanText(t);if(!this.panel||!e)return;const s=document.createElement("div");s.setAttribute("role","option"),s.className=u.dropdown.search.result,s.dataset.manual="true",s.dataset.address=e,s.dataset.id=`manual:${e}`,s.dataset.name=`Use "${e}"`,s.dataset.details=JSON.stringify({address:e,name:e}),s.dataset.index=String(this.options.length),s.id=`${this.panel.id}-manual`;const a=s.appendChild(document.createElement("p")),d=a.appendChild(document.createElement("span"));d.className="text-base-default";const r=d.appendChild(document.createElement("span"));m(r,"location",u.dropdown.icon);const i=a.appendChild(document.createElement("span"));i.className="font-medium text-base-default",i.textContent=`Use "${e}"`,this.panel.appendChild(s),this.options.push({id:s.dataset.id,name:s.dataset.name,address:e})}_selectLocation(t,{notify:e=!0}={}){const s=this._normalizeLocation(t);s&&(this.location=s,this.values.clear(),s.id&&this.values.add(s.id),this.hiddenInput&&(this.hiddenInput.value=s.id||""),this.element.value="",this.element.placeholder=this._displayText(s),this.element.dataset.values="true",this.onSelect&&this.onSelect(s,{notify:e}),e&&!this.onSelect&&this._dispatchChange())}_createHiddenInput(){this.hiddenInput||!this.fieldName||(this.hiddenInput=document.createElement("input"),this.hiddenInput.type="hidden",this.hiddenInput.name=`${this.fieldName}:id`,this.element.after(this.hiddenInput))}_cleanText(t){return t==null?null:String(t).trim()||null}_normalizeLocation(t){if(!t||typeof t!="object")return null;const e=t,s=this._cleanText(e.id||e.place_id),a=this._cleanText(e.address),d=this._cleanText(e.name)||a,r=this._cleanText(e.address2),i={};return s&&(i.id=s),d&&(i.name=d),a&&(i.address=a),r&&(i.address2=r),Object.keys(i).length>0?i:null}_displayText(t){return this._cleanText(t?.name)||this._cleanText(t?.address)||this.basePlaceholder||this.placeholder||""}_dispatchChange(){(this.hiddenInput||this.element).dispatchEvent(new Event("change",{bubbles:!0}))}}const C="https://www.google.com/maps/search/";function c(n){return n&&typeof n=="object"&&!Array.isArray(n)?n:null}function l(n){return n==null?"":String(n).trim()}function _(n={}){const t=l(n.address),e=l(n.address2);if(!t||!e)return t||"";if(t.toLowerCase().includes(e.toLowerCase()))return t;const s=t.indexOf(",");return s<0?`${t}, ${e}`:`${t.slice(0,s)}, ${e}${t.slice(s)}`}function I(n={}){const t=l(n.name),e=_(n);return t&&e&&t!==l(n.address)?`${t}, ${e}`:e||t}function E(n={}){const t=I(n);if(!t)return"#";const e=new URL(C);e.searchParams.set("api","1"),e.searchParams.set("query",t);const s=l(n.id||n.place_id);return s&&e.searchParams.set("query_place_id",s),e.toString()}class L extends b{constructor(t,e,s){super(t,e,s),this.location=null,this._handleLocationSelect=this._handleLocationSelect.bind(this),this._unitInput=this._unitInput.bind(this),this._unitChange=this._unitChange.bind(this)}get value(){return this._payload()||c(this.submission)}changed(t){const e=c(t),s=c(this.submission);if(!e&&!s)return!1;if(!e||!s)return!0;const a=h=>l(h.id||h.place_id),d=a(e),r=a(s),i=h=>l(h.address2);if(d&&r&&d===r&&i(e)===i(s))return!1;const o=h=>l(h.address||h.name);return!(!d&&!r&&o(e)&&o(e)===o(s)&&i(e)===i(s))}get read(){if(this._read)return this._read;this._read=document.createElement("div");const t=c(this.submission)??{},e=l(t.name),s=_(t),a=e&&s&&e.toLowerCase()!==l(t.address).toLowerCase()?s:null;this._read.className=a?u.form.submission.grows:u.form.submission.default;const d=this._read.appendChild(document.createElement("div"));d.className="flex flex-row items-start gap-2";const r=d.appendChild(document.createElement("span"));m(r,"map");const i=d.appendChild(document.createElement("div"));i.className="flex flex-col";const o=i.appendChild(document.createElement("a"));if(o.dataset.kind="page",o.className=`${u.link.default} ${u.form.linkLabel}`,o.target="_blank",o.href=E(t),o.textContent=a?e:s||e,a){const h=i.appendChild(document.createElement("span"));h.className="text-xs font-normal text-base-medium",h.textContent=a}return this._read.classList.add("group-data-[mode=edit]/element:hidden"),this._read}get edit(){if(this._edit)return this._edit;if(this.location=null,this._edit=document.createElement("div"),this._edit.className="flex flex-col gap-2",this.label){const s=f.label({label:this.label,tag:"h3"});this._edit.appendChild(s)}const t=this._edit.appendChild(document.createElement("div"));t.className="flex flex-col gap-2 group-data-[mode=read]/element:hidden",this.searchInput=f.input({type:"text",kind:this.renderer.kind,placeholder:"search for a location..."}),t.appendChild(this.searchInput),this.unitInput=this._createUnitInput(),t.appendChild(this.unitInput),this.nameInput=this._createDetailInput("name"),this.addressInput=this._createDetailInput("address"),t.append(this.nameInput,this.addressInput),this.unitInput.addEventListener("input",this._unitInput),this.unitInput.addEventListener("change",this._unitChange),this.combobox=new v(t,{name:this.schema.id,onSelect:this._handleLocationSelect}),this.combobox.init(),this.idInput=this.combobox.hiddenInput,this.destroyables.push(this.combobox);const e=c(this.submission);return e?this.combobox.addOption(e,!1):this._syncHidden({notify:!1}),this._edit}clear(){this.combobox&&this.combobox.clear({notify:!1}),this.location=null,this.searchInput&&(this.searchInput.value=""),this.unitInput&&(this.unitInput.value=""),this.nameInput&&(this.nameInput.value=""),this.addressInput&&(this.addressInput.value=""),this.submission=null,this._syncHidden()}destroy(){this.unitInput?.removeEventListener("input",this._unitInput),this.unitInput?.removeEventListener("change",this._unitChange),super.destroy(),this.location=null,this.searchInput=null,this.unitInput=null,this.idInput=null,this.nameInput=null,this.addressInput=null}_handleLocationSelect(t,{notify:e=!0}={}){this._setLocation(t,{notify:e}),this.searchInput&&(this.searchInput.value="")}_createDetailInput(t){const e=document.createElement("input");return e.type="hidden",e.name=`${this.schema.id}:${t}`,e.value="",e}_createUnitInput(){const t=document.createElement("input");return t.type="text",t.name=`${this.schema.id}:address2`,t.autocomplete="off",t.placeholder="Apt, suite, unit",t.setAttribute("aria-label","Apt, suite, unit"),t.setAttribute("data-1p-ignore",""),t.className=u.input,t.pattern=".*",t}_setLocation(t,{notify:e=!0}={}){if(!t){this.location=null,this.unitInput&&(this.unitInput.value=""),this._syncHidden({notify:e});return}const s=l(t.address2)||this._unitValue(),a=l(t.id||t.place_id),d=l(t.address),r=l(t.name)||d;this.location={},a&&(this.location.id=a),r&&(this.location.name=r),d&&(this.location.address=d),s&&(this.location.address2=s),!this.location.name&&!this.location.address&&!this.location.id&&(this.location=null),this.unitInput&&(this.unitInput.value=s||""),this._syncHidden({notify:e})}_payload(){if(!this.location)return null;const t={...this.location},e=this._unitValue();return e?t.address2=e:delete t.address2,Object.keys(t).length>0?t:null}_syncHidden({notify:t=!0}={}){const e=this._payload();this.idInput&&(this.idInput.value=e?.id||""),this.nameInput&&(this.nameInput.value=e?.name||""),this.addressInput&&(this.addressInput.value=e?.address||""),this.searchInput&&(this.searchInput.dataset.values=e?"true":"false",this.searchInput.placeholder=e?this._selectedPlaceholder(e):this.searchInput.dataset.placeholder||"search for a location..."),t&&this.idInput&&this.idInput.dispatchEvent(new Event("change",{bubbles:!0}))}_unitInput(){this._syncHidden({notify:!1})}_unitChange(){this._syncHidden()}_unitValue(){return l(this.unitInput?.value)}_selectedPlaceholder(t){return I(t)||"search for a location..."}}export{L as LocationElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b6ea3fe0';
+import { B as BaseElement } from './forms.js?v=b6ea3fe0';
+import { E as ENDPOINTS, r as request } from './foundation.js?v=b6ea3fe0';
+import { p as primitives } from './ui-controls.js?v=b6ea3fe0';
+import { u as updateUserLocation } from './account.js?v=b6ea3fe0';
+import { a as RemoteQueryCombobox } from './combobox.js?v=b6ea3fe0';
+import './modal.js?v=b6ea3fe0';
+import './upstreamUnavailable.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+
+class LocationBox extends RemoteQueryCombobox {
+  constructor(element, { name = null, onSelect = null } = {}) {
+    super(element);
+    this.index = "location";
+    this.fieldName = name || this.name;
+    this.location = null;
+    this.onSelect = onSelect;
+    this.endpoint = ENDPOINTS.location;
+  }
+  init() {
+    if (this.element.name) {
+      this.fieldName = this.element.name;
+    }
+    super.init();
+    this.element.removeAttribute("name");
+    this.basePlaceholder = this.element.placeholder;
+    this._createHiddenInput();
+    this.element.setAttribute("autocomplete", "bork");
+    void updateUserLocation();
+  }
+  _input(event) {
+    const query = event.target.value.trim();
+    if (query.length > 2) {
+      return this._search(query);
+    }
+    this.settleQueryInput({ clear: true });
+  }
+  elementClick(event) {
+    void updateUserLocation();
+    super.elementClick(event, false);
+  }
+  _search(query) {
+    const params = new URLSearchParams();
+    params.set("q", query);
+    return this.runQuery(
+      query,
+      async (token) => {
+        await updateUserLocation();
+        if (token.signal?.aborted) return null;
+        return request.get(this.endpoint, params, {
+          signal: token.signal
+        });
+      },
+      (response) => {
+        this.clearQueryResults();
+        if (response?.ok) this.updatePanel(response.results || null);
+        if (!this.panel) this._createPanel();
+        this._appendManualOption(query);
+        return this.showPanel();
+      }
+    );
+  }
+  _setManualAddress(text, notify = true) {
+    const address = this._cleanText(text);
+    if (!address) return;
+    this._selectLocation({ address, name: address }, { notify });
+    this.element.value = "";
+    this.hidePanel();
+  }
+  selectOption(option) {
+    if (option.dataset.manual === "true") {
+      this._setManualAddress(option.dataset.address);
+      return;
+    }
+    if (!option.dataset.details) return;
+    const details = JSON.parse(option.dataset.details);
+    this._selectLocation(details);
+    this.element.value = "";
+    this.hidePanel();
+  }
+  elementKeydown(event) {
+    super.elementKeydown(event);
+    if (event.defaultPrevented) return;
+    if (event.key === "Enter") {
+      const text = this.element.value.trim();
+      if (!text) return;
+      event.stopPropagation();
+      event.preventDefault();
+      this._setManualAddress(text);
+    } else if (this.location && !this.element.value && (event.key === "Backspace" || event.key === "Delete")) {
+      event.stopPropagation();
+      event.preventDefault();
+      this.clear();
+    }
+  }
+  addOption(option = {}, notify = true) {
+    if (Object.keys(option).length === 0) return;
+    this._selectLocation(option, { notify });
+  }
+  clear({ notify = true } = {}) {
+    this.values.clear();
+    this.location = null;
+    this.focusedIndex = -1;
+    this.element.value = "";
+    this.element.placeholder = this.basePlaceholder || this.placeholder || "";
+    this.element.dataset.values = "false";
+    if (this.hiddenInput) this.hiddenInput.value = "";
+    this.hidePanel();
+    if (this.onSelect) this.onSelect(null, { notify });
+    if (notify && !this.onSelect) this._dispatchChange();
+  }
+  _appendManualOption(query) {
+    const address = this._cleanText(query);
+    if (!this.panel || !address) return;
+    const option = document.createElement("div");
+    option.setAttribute("role", "option");
+    option.className = STYLES.dropdown.search.result;
+    option.dataset.manual = "true";
+    option.dataset.address = address;
+    option.dataset.id = `manual:${address}`;
+    option.dataset.name = `Use "${address}"`;
+    option.dataset.details = JSON.stringify({ address, name: address });
+    option.dataset.index = String(this.options.length);
+    option.id = `${this.panel.id}-manual`;
+    const row = option.appendChild(document.createElement("p"));
+    const icon = row.appendChild(document.createElement("span"));
+    icon.className = "text-base-default";
+    const iconElt = icon.appendChild(document.createElement("span"));
+    setIcon(iconElt, "location", STYLES.dropdown.icon);
+    const label = row.appendChild(document.createElement("span"));
+    label.className = "font-medium text-base-default";
+    label.textContent = `Use "${address}"`;
+    this.panel.appendChild(option);
+    this.options.push({
+      id: option.dataset.id,
+      name: option.dataset.name,
+      address
+    });
+  }
+  _selectLocation(location, { notify = true } = {}) {
+    const selected = this._normalizeLocation(location);
+    if (!selected) return;
+    this.location = selected;
+    this.values.clear();
+    if (selected.id) this.values.add(selected.id);
+    if (this.hiddenInput) this.hiddenInput.value = selected.id || "";
+    this.element.value = "";
+    this.element.placeholder = this._displayText(selected);
+    this.element.dataset.values = "true";
+    if (this.onSelect) {
+      this.onSelect(selected, { notify });
+    }
+    if (notify && !this.onSelect) this._dispatchChange();
+  }
+  _createHiddenInput() {
+    if (this.hiddenInput || !this.fieldName) return;
+    this.hiddenInput = document.createElement("input");
+    this.hiddenInput.type = "hidden";
+    this.hiddenInput.name = `${this.fieldName}:id`;
+    this.element.after(this.hiddenInput);
+  }
+  _cleanText(value) {
+    if (value === null || value === void 0) return null;
+    const text = String(value).trim();
+    return text || null;
+  }
+  _normalizeLocation(location) {
+    if (!location || typeof location !== "object") return null;
+    const details = location;
+    const id = this._cleanText(details.id || details.place_id);
+    const address = this._cleanText(details.address);
+    const name = this._cleanText(details.name) || address;
+    const address2 = this._cleanText(details.address2);
+    const normalized = {};
+    if (id) normalized.id = id;
+    if (name) normalized.name = name;
+    if (address) normalized.address = address;
+    if (address2) normalized.address2 = address2;
+    return Object.keys(normalized).length > 0 ? normalized : null;
+  }
+  _displayText(location) {
+    return this._cleanText(location?.name) || this._cleanText(location?.address) || this.basePlaceholder || this.placeholder || "";
+  }
+  _dispatchChange() {
+    const target = this.hiddenInput || this.element;
+    target.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
+const MAPS_SEARCH = "https://www.google.com/maps/search/";
+function locationSelection(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+function cleanText(value) {
+  if (value === null || value === void 0) return "";
+  return String(value).trim();
+}
+function addressWithUnit(location = {}) {
+  const address = cleanText(location.address);
+  const address2 = cleanText(location.address2);
+  if (!address || !address2) return address || "";
+  if (address.toLowerCase().includes(address2.toLowerCase())) return address;
+  const index = address.indexOf(",");
+  if (index < 0) return `${address}, ${address2}`;
+  return `${address.slice(0, index)}, ${address2}${address.slice(index)}`;
+}
+function displayText(location = {}) {
+  const name = cleanText(location.name);
+  const address = addressWithUnit(location);
+  if (name && address && name !== cleanText(location.address)) {
+    return `${name}, ${address}`;
+  }
+  return address || name;
+}
+function mapsUrl(location = {}) {
+  const query = displayText(location);
+  if (!query) return "#";
+  const url = new URL(MAPS_SEARCH);
+  url.searchParams.set("api", "1");
+  url.searchParams.set("query", query);
+  const placeId = cleanText(location.id || location.place_id);
+  if (placeId) url.searchParams.set("query_place_id", placeId);
+  return url.toString();
+}
+class LocationElement extends BaseElement {
+  constructor(renderer, schema, submission) {
+    super(renderer, schema, submission);
+    this.location = null;
+    this._handleLocationSelect = this._handleLocationSelect.bind(this);
+    this._unitInput = this._unitInput.bind(this);
+    this._unitChange = this._unitChange.bind(this);
+  }
+  get value() {
+    return this._payload() || locationSelection(this.submission);
+  }
+  changed(value) {
+    const incoming = locationSelection(value);
+    const submission = locationSelection(this.submission);
+    if (!incoming && !submission) return false;
+    if (!incoming || !submission) return true;
+    const pid = (v) => cleanText(v.id || v.place_id);
+    const a = pid(incoming);
+    const b = pid(submission);
+    const address2 = (v) => cleanText(v.address2);
+    if (a && b && a === b && address2(incoming) === address2(submission)) {
+      return false;
+    }
+    const addr = (v) => cleanText(v.address || v.name);
+    if (!a && !b && addr(incoming) && addr(incoming) === addr(submission) && address2(incoming) === address2(submission)) {
+      return false;
+    }
+    return true;
+  }
+  get read() {
+    if (this._read) return this._read;
+    this._read = document.createElement("div");
+    const sub = locationSelection(this.submission) ?? {};
+    const name = cleanText(sub.name);
+    const address = addressWithUnit(sub);
+    const details = name && address && name.toLowerCase() !== cleanText(sub.address).toLowerCase() ? address : null;
+    this._read.className = details ? STYLES.form.submission.grows : STYLES.form.submission.default;
+    const container = this._read.appendChild(document.createElement("div"));
+    container.className = `flex flex-row items-start gap-2`;
+    const out = container.appendChild(document.createElement("span"));
+    setIcon(out, "map");
+    const text = container.appendChild(document.createElement("div"));
+    text.className = "flex flex-col";
+    const link = text.appendChild(document.createElement("a"));
+    link.dataset.kind = "page";
+    link.className = `${STYLES.link.default} ${STYLES.form.linkLabel}`;
+    link.target = "_blank";
+    link.href = mapsUrl(sub);
+    link.textContent = details ? name : address || name;
+    if (details) {
+      const detail = text.appendChild(document.createElement("span"));
+      detail.className = "text-xs font-normal text-base-medium";
+      detail.textContent = details;
+    }
+    this._read.classList.add("group-data-[mode=edit]/element:hidden");
+    return this._read;
+  }
+  get edit() {
+    if (this._edit) return this._edit;
+    this.location = null;
+    this._edit = document.createElement("div");
+    this._edit.className = "flex flex-col gap-2";
+    if (this.label) {
+      const label = primitives.label({
+        label: this.label,
+        tag: "h3"
+      });
+      this._edit.appendChild(label);
+    }
+    const controls = this._edit.appendChild(document.createElement("div"));
+    controls.className = "flex flex-col gap-2 group-data-[mode=read]/element:hidden";
+    this.searchInput = primitives.input({
+      type: "text",
+      kind: this.renderer.kind,
+      placeholder: "search for a location..."
+    });
+    controls.appendChild(this.searchInput);
+    this.unitInput = this._createUnitInput();
+    controls.appendChild(this.unitInput);
+    this.nameInput = this._createDetailInput("name");
+    this.addressInput = this._createDetailInput("address");
+    controls.append(this.nameInput, this.addressInput);
+    this.unitInput.addEventListener("input", this._unitInput);
+    this.unitInput.addEventListener("change", this._unitChange);
+    this.combobox = new LocationBox(controls, {
+      name: this.schema.id,
+      onSelect: this._handleLocationSelect
+    });
+    this.combobox.init();
+    this.idInput = this.combobox.hiddenInput;
+    this.destroyables.push(this.combobox);
+    const submission = locationSelection(this.submission);
+    if (submission) {
+      this.combobox.addOption(submission, false);
+    } else {
+      this._syncHidden({ notify: false });
+    }
+    return this._edit;
+  }
+  clear() {
+    if (this.combobox) {
+      this.combobox.clear({ notify: false });
+    }
+    this.location = null;
+    if (this.searchInput) this.searchInput.value = "";
+    if (this.unitInput) this.unitInput.value = "";
+    if (this.nameInput) this.nameInput.value = "";
+    if (this.addressInput) this.addressInput.value = "";
+    this.submission = null;
+    this._syncHidden();
+  }
+  destroy() {
+    this.unitInput?.removeEventListener("input", this._unitInput);
+    this.unitInput?.removeEventListener("change", this._unitChange);
+    super.destroy();
+    this.location = null;
+    this.searchInput = null;
+    this.unitInput = null;
+    this.idInput = null;
+    this.nameInput = null;
+    this.addressInput = null;
+  }
+  _handleLocationSelect(location, { notify = true } = {}) {
+    this._setLocation(location, { notify });
+    if (this.searchInput) this.searchInput.value = "";
+  }
+  _createDetailInput(part) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = `${this.schema.id}:${part}`;
+    input.value = "";
+    return input;
+  }
+  _createUnitInput() {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.name = `${this.schema.id}:address2`;
+    input.autocomplete = "off";
+    input.placeholder = "Apt, suite, unit";
+    input.setAttribute("aria-label", "Apt, suite, unit");
+    input.setAttribute("data-1p-ignore", "");
+    input.className = STYLES.input;
+    input.pattern = ".*";
+    return input;
+  }
+  _setLocation(details, { notify = true } = {}) {
+    if (!details) {
+      this.location = null;
+      if (this.unitInput) this.unitInput.value = "";
+      this._syncHidden({ notify });
+      return;
+    }
+    const address2 = cleanText(details.address2) || this._unitValue();
+    const id = cleanText(details.id || details.place_id);
+    const address = cleanText(details.address);
+    const name = cleanText(details.name) || address;
+    this.location = {};
+    if (id) this.location.id = id;
+    if (name) this.location.name = name;
+    if (address) this.location.address = address;
+    if (address2) this.location.address2 = address2;
+    if (!this.location.name && !this.location.address && !this.location.id) {
+      this.location = null;
+    }
+    if (this.unitInput) this.unitInput.value = address2 || "";
+    this._syncHidden({ notify });
+  }
+  _payload() {
+    if (!this.location) return null;
+    const payload = { ...this.location };
+    const address2 = this._unitValue();
+    if (address2) {
+      payload.address2 = address2;
+    } else {
+      delete payload.address2;
+    }
+    return Object.keys(payload).length > 0 ? payload : null;
+  }
+  _syncHidden({ notify = true } = {}) {
+    const payload = this._payload();
+    if (this.idInput) this.idInput.value = payload?.id || "";
+    if (this.nameInput) this.nameInput.value = payload?.name || "";
+    if (this.addressInput) this.addressInput.value = payload?.address || "";
+    if (this.searchInput) {
+      this.searchInput.dataset.values = payload ? "true" : "false";
+      this.searchInput.placeholder = payload ? this._selectedPlaceholder(payload) : this.searchInput.dataset.placeholder || "search for a location...";
+    }
+    if (notify && this.idInput) {
+      this.idInput.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+  _unitInput() {
+    this._syncHidden({ notify: false });
+  }
+  _unitChange() {
+    this._syncHidden();
+  }
+  _unitValue() {
+    return cleanText(this.unitInput?.value);
+  }
+  _selectedPlaceholder(payload) {
+    return displayText(payload) || "search for a location...";
+  }
+}
+
+export { LocationElement };

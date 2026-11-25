@@ -139,6 +139,44 @@ def test_create_task_form(get_admin, get_user):
 
 
 @pytest.mark.e2e
+def test_create_unscheduled_personal_task_updates_my_page_and_shows_feedback(
+    get_admin, get_user
+):
+    """
+    Verify creating an undated personal task from Home updates My Page count
+    immediately and shows an actionable confirmation banner linking to My Page.
+    """
+    user = get_admin()
+    home = user.go(SitePages.HOME)
+    task_name = f"Unscheduled home task {uuid4().hex[:8]}"
+
+    user_task_count = user.locate(home.USER_TASK_COUNT)
+    expect(user_task_count).to_have_text("0")
+
+    create_form = home.create_task_form()
+    create_form.locator(FormElements.NAME).fill(task_name)
+
+    with user.page.expect_response("**/personal"):
+        SpinnerButtons.CREATE.click(create_form)
+
+    expect(create_form).not_to_be_visible()
+    expect(user_task_count).to_have_text("1")
+    expect(user_task_count).to_contain_class("text-task-default")
+
+    feedback = user.locate("#tasks [data-role='task-feedback']")
+    expect(feedback).to_be_visible()
+    expect(feedback).to_contain_text(task_name)
+    expect(feedback).to_contain_text("unscheduled")
+
+    feedback.locator("[data-role='task-feedback-link']").click()
+    expect(user.page).to_have_url(re.compile(r"/pages/.+\?tab=tasks"))
+    expect(user.locate("[data-widget='PageTaskList']")).to_contain_text(task_name)
+
+    home = user.go(SitePages.HOME)
+    expect(user.locate(home.USER_TASK_COUNT)).to_have_text("1")
+
+
+@pytest.mark.e2e
 def test_create_personal_task_due_today(get_admin, get_user):
     """
     Verify personal task creation with today's due date via UI.

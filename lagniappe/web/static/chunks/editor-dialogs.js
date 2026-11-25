@@ -1,2 +1,921 @@
-import{F as m}from"./forms.js?v=b9ad6d22";import{r as p,E as w,w as v}from"./foundation.js?v=b9ad6d22";import{p as d,b as u}from"./ui-controls.js?v=b9ad6d22";import{C as y,F as E,I as k,T as R,r as T,g as C,n as I}from"./document.js?v=b9ad6d22";import{S as l}from"./ui-resources.js?v=b9ad6d22";import{a as U,R as L}from"./combobox.js?v=b9ad6d22";import{Modal as O}from"./modal.js?v=b9ad6d22";import{B as F,u as _,U as A}from"./uploads.js?v=b9ad6d22";class N{constructor(t){this.toolbar=t,this.name="pinVersion",this.messages={submit:"Pin Version",submitting:"Pinning Version...",name:"Please name this version"},this._active=!1,this.submit=this.submit.bind(this)}get active(){return this._active}set active(t){this._active=t,t&&this.focus()}init(){this.target=this.toolbar.element.appendChild(document.createElement("form")),this.target.className='mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="pinVersion"]/toolbar:flex',this.target.dataset.option=this.name,this.input=d.input({name:"name",placeholder:"Name this version",type:"text"}),this.input.maxLength=100,this.html=[this.input,u.submit({kind:"editor"})],this.form=new m(this),this.form.init()}focus(){this.input?.focus(),this.input?.select()}reset(){this.input.value="",this.form?.resetSubmitButton()}async submit(){const t=this.input.value.trim();if(!t){this.form.showError(this.messages.name),this.form.resetSubmitButton();return}const e=this.toolbar.endpoints?.history,i=this.toolbar.editor.getHTML(),s=await p.post(`${e}/pin`,{name:t,html:i});if(!s?.ok){this.form.showError(s?.error||"Unable to pin this version"),this.form.resetSubmitButton();return}this.reset(),await this.toolbar.closeForm(this.name),await this.toolbar.toggles.documentHistory?.refresh?.()}destroy(){this.form?.destroy()}}var B=Object.freeze({__proto__:null,pinVersion:N});class M{constructor(t){this.toolbar=t,this.name="setColor",this.usedWithEditor=!0,this.active=!1,this.toggles=new Map}_colorSwatch(t,e){const i=document.createElement("button");return i.className="size-6 rounded transition-transform hover:scale-110 hover:outline-2 hover:outline-offset-2 data-[active=true]:outline-2 data-[active=true]:outline-offset-2",i.style.backgroundColor=t,i.style.outlineColor=t,i.title=e,i.dataset.active="false",i.dataset.color=t,i}setActiveColor(t){this.toggles.forEach((e,i)=>{const s=i===t;s!==e.active&&(e.button.dataset.active=s?"true":"false",e.active=s)})}init(){const t=this.toolbar.element.appendChild(document.createElement("div"));t.dataset.option=this.name,t.className='mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setColor"]/toolbar:flex group',y.forEach(({color:e,title:i})=>{const s=this._colorSwatch(e,i);this.toggles.set(e,{active:!1,button:s})}),t.append(...Array.from(this.toggles.values()).map(e=>e.button)),this.active=!0,t.addEventListener("click",e=>{const i=e.target?.closest("button");if(!i)return;const s=i.dataset.color;if(!s)return;const o=this.toggles.get(s);if(!o)return;const a=Array.from(this.toggles.values()).find(r=>r.active&&r!==o);a&&(a.active=!1,a.button.dataset.active="false"),o.active=!o.active,i.dataset.active=o.active?"true":"false",o.active?this.toolbar.editor.chain().focus().setColor(s).run():this.toolbar.editor.chain().focus().unsetColor().run()})}}var P=Object.freeze({__proto__:null,setColor:M});class ${constructor(t){this.toolbar=t,this.name="setFontFamily",this.usedWithEditor=!0,this.active=!1,this.toggles=new Map}_fontToggle(t,e){const i=document.createElement("button");return i.className="cursor-pointer rounded bg-slate-200 px-3 py-1.5 text-base transition-transform hover:scale-110 hover:bg-slate-300 data-[active=true]:bg-slate-300 sm:text-sm",i.textContent=e,i.dataset.style=t,i.title=e,i.dataset.active="false",i}setActiveFontStyle(t){this.toggles.forEach((e,i)=>{const s=i===t;s!==e.active&&(e.button.dataset.active=s?"true":"false",e.active=s)})}init(){const t=this.toolbar.element.appendChild(document.createElement("div"));t.dataset.option=this.name,t.className='group mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setFontFamily"]/toolbar:flex',E.forEach(({style:e,name:i})=>{const s=this._fontToggle(e,i);this.toggles.set(e,{active:!1,button:s})}),t.append(...Array.from(this.toggles.values()).map(e=>e.button)),this.active=!0,t.addEventListener("click",e=>{const i=e.target?.closest("button");if(!i)return;const s=i.dataset.style;if(!s)return;const o=this.toggles.get(s);if(!o)return;const a=Array.from(this.toggles.values()).find(r=>r.active&&r!==o);a&&(a.active=!1,a.button.dataset.active="false"),o.active=!o.active,i.dataset.active=o.active?"true":"false",o.active?this.toolbar.editor.chain().focus().setFontFamily(s).run():this.toolbar.editor.chain().focus().unsetFontFamily().run()})}}var z=Object.freeze({__proto__:null,setFontFamily:$});class H{constructor(t){this.toolbar=t,this.name="setImage",this.usedWithEditor=!0,this.active=!1,this.toggles={},this.imagePosition=null}init(){const t=this.toolbar.element.appendChild(document.createElement("div"));t.dataset.option=this.name,t.dataset.position="false",t.className=`${l.editor.toolbar.imageSettings}`,k.forEach((e,i)=>{const s=t.appendChild(document.createElement("div"));if(s.className=`${l.editor.toolbar.tools}`,e.forEach(o=>{const a=new R(this.toolbar);a.init(o),a.onClick=()=>this.toggleOption(a),this.toggles[String(a.name)]=a,a.name&&(this.toolbar.options[a.name]=a),s.appendChild(a.button)}),i<k.length-1){const o=document.createElement("div");o.className=`${l.editor.toolbar.divider}`,t.appendChild(o)}})}toggleOption(t){const e=Object.values(this.toggles).find(i=>i.active&&i.name);t.active=!t.active,t.active?t.enable():t.disable(),e?.disable(),T(this.toolbar.editor.chain(),t.command,t.args,!0)}}var D=Object.freeze({__proto__:null,setImage:H});const x=/^[a-z][a-z0-9+.-]*:/i,W=/^[^\s/]+\.[^\s]+(?:\/.*)?$/;class Y extends U{constructor(t,e){super(t),this.addLink=e,this.index="search",this.results=new L(this.index),this.endpoints=w.search,this.placement="bottom-start"}init(){this.styles.panel=`${l.dropdown.panel} ${l.editor.toolbar.portalIconContext} w-64 sm:w-96 mt-2`,super.init()}_input(t){const e=t.target.value.trim();if(this.addLink.linkHref(e)){this.settleQueryInput({clear:!0});return}if(e.length>2)return this._search(e);this.settleQueryInput({clear:!0})}elementClick(t){super.elementClick(t),!this.panelOpen&&this.options.length>0&&this.showPanel()}_search(t){const e=new URLSearchParams;return e.set("q",t),this.runQuery(t,i=>p.get(this.endpoints.bar,e,{signal:i.signal}),i=>(i?.ok?this.updatePanel(i.results||null):this.clearQueryResults(),this.showPanel()))}selectOption(t){t.dataset.url&&(this.results.save(t),this.hidePanel(),this.addLink.applySearchResult(t.dataset.url))}}class j{constructor(t){this.toolbar=t,this.editor=t.editor,this.submit=this.submit.bind(this),this.name="addLink",this.messages={select:"Please select some text first",link:"Please add a URL",submit:"Set Link"},this.usedWithEditor=!1,this._onSelectionUpdate=this._onSelectionUpdate.bind(this),this._active=!1,this.linkState=null,this.combobox=null}get active(){return this._active}set active(t){this._active=t,t?(this.captureSelection(),this.focus(),this.editor.on("selectionUpdate",this._onSelectionUpdate)):(this.editor.off("selectionUpdate",this._onSelectionUpdate),this.editor.commands.clearSelectionHighlight())}get emailMode(){return this.toolbar.kind==="email"}_onSelectionUpdate(){this._active&&this.captureSelection()}init(){this.target=this.toolbar.element.appendChild(document.createElement("form")),this.target.className='mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addLink"]/toolbar:flex',this.target.dataset.option=this.name,this.link=d.input({name:"link",placeholder:"Paste URL or search...",type:"search"}),this.combobox=new Y(this.link,this);const t=u.submit({kind:"editor"});this.html=[this.link,t],this.form=new m(this),this.form.init(),this.form.destroyables.push(this.combobox),this.combobox.init()}focus(){this.link?.focus(),this.link?.select()}captureSelection(){const{from:t,to:e}=this.editor.state.selection;t!==e?this.editor.commands.setSelectionHighlight():this.editor.commands.clearSelectionHighlight(),this.linkState=this.findCurrentLink(),this.link.value=this.displayHref(this.linkState?.attrs?.href||"")}findCurrentLink(){const t=this.editor.state.schema.marks.link;if(!t)return null;const{selection:e}=this.editor.state;if(e.empty){const i=C(e.$from,t);return i?this.singleLinkInRange(i):null}return this.singleLinkInRange({from:e.from,to:e.to})}singleLinkInRange(t){const e=this.editor.state.schema.marks.link,i=new Map;this.editor.state.doc.nodesBetween(t.from,t.to,(a,r)=>{if(!a.isText)return!0;const h=a.marks.find(S=>S.type===e);if(!h)return!0;const f=JSON.stringify(h.attrs),g=Math.max(t.from,r),b=Math.min(t.to,r+a.nodeSize),c=i.get(f)||{attrs:h.attrs,from:g,to:b};return c.from=Math.min(c.from,g),c.to=Math.max(c.to,b),i.set(f,c),!0});const s=Array.from(i.values());if(s.length!==1)return null;const o=s[0];return{attrs:o.attrs,range:{from:o.from,to:o.to}}}highlightRange(){return this.editor.commands.getSelectionHighlightRange()}activeRange(){return this.linkState?.range||this.highlightRange()}displayHref(t){return!t||!this.emailMode?t:this.fullyQualifiedUrl(t)||t}linkHref(t){const e=t.trim();return e?this.emailMode?this.fullyQualifiedUrl(e):x.test(e)||e.startsWith("//")||e.startsWith("/")||e.startsWith("#")||e.startsWith("?")?e:W.test(e)?`https://${e}`:null:""}fullyQualifiedUrl(t){const e=t.trim();if(!e)return"";try{return x.test(e)?new URL(e).href:e.startsWith("//")?new URL(`${window.location.protocol}${e}`).href:e.startsWith("/")||e.startsWith("#")||e.startsWith("?")?new URL(e,window.location.origin).href:new URL(`https://${e}`).href}catch{return null}}linkAttributes(t){return this.emailMode?{href:t}:I({href:t})}applySearchResult(t){const e=this.emailMode?this.fullyQualifiedUrl(t):t;if(!e){this.form.showError(this.messages.link);return}this.link.value=e,this.submit()}reset(){this.linkState=null,this.link.value="",this.combobox?.hidePanel(),this.form?.resetSubmitButton()}submit(){const t=this.activeRange(),e=this.linkHref(this.link.value);if(e&&t)this.editor.chain().focus().setTextSelection(t).setLink(this.linkAttributes(e)).run(),this.form.resetSubmitButton(),this.toolbar.closeForm(this.name);else if(!this.link.value.trim()&&t){const i=this.linkState?.range||this.singleLinkInRange(t)?.range;if(!i){this.form.showError(this.messages.link);return}this.editor.chain().focus().setTextSelection(i).unsetLink().run(),this.form.resetSubmitButton(),this.toolbar.closeForm(this.name)}else t?this.form.showError(this.messages.link):this.form.showError(this.messages.select)}destroy(){this.form?.destroy()}}var q=Object.freeze({__proto__:null,addLink:j});const G="Drop image here, click to upload, or tap to choose camera/files<br>All images will be sized down to 1280x720";class Q extends F{constructor(t){super(),this.toolbar=t,this.name="addImage",this.inputName="add-image",this.messages={submit:"Upload Image",submitting:"Uploading Image",submitted:"Image Uploaded"},this.uploadType="image",this.target=this.toolbar.element.appendChild(document.createElement("form")),this.target.dataset.mode="upload",this.target.className='mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addImage"]/toolbar:flex group/upload',this.target.dataset.option=this.name,this.dropzone=_.dropzone({text:G}),this.menuOptions=["remove",...this.toolbar.aiCreate?["generate"]:[],"paste"],this.uploadMenu=new A(this),this.generate=_.generateDocumentImage(),this.submitButton=u.submit({kind:"editor"}),this.submit=this.submit.bind(this)}get html(){return[this.dropzone.element,...this.toolbar.aiCreate?[this.generate.element]:[],this.submitButton]}async init(){await super.init(),this.submitButton.dataset.visible="false",this.target.addEventListener("click",t=>{t.target?.closest("[data-role='cancel']")&&this.hideGenerateForm()})}showGenerateForm(){v(()=>{this.dropzone.hide(),this.reset(),this.form.toggleSubForm(this.generate),this.generate.show()})}hideGenerateForm(){v(()=>{this.form.toggleSubForm(null),this.generate.hide(),this.generate.reset(),this.dropzone.show()})}reset(){this.generate.reset(),super.reset()}async submit(t){if(this.toolbar.document.addDraftImage){const a=this.fileInput?.element?.files?.[0];if(!a)return;const r=this.toolbar.document.addDraftImage(a);this.toolbar.editor.chain().focus().setImage({src:r}).run(),this.toolbar.toggleForm(this.name);return}const e=this.toolbar.endpoints?.addImage;if(!e||!await this.prepareSubmit({route:e}))return;const s=new FormData(this.target);this.applyDirectUploads(s),s.append("role",t?.dataset?.role||"upload"),s.append("content",this.toolbar.editor.getText()),t&&(t.disabled=!0);const o=await p.post(e,s);t&&(t.disabled=!1),o?.ok&&o.modal?new O(this.toolbar.builder).attach(o.modal,this):o?.ok&&o.src?(this.toolbar.editor.chain().focus().setImage({src:o.src}).run(),this.toolbar.toggleForm(this.name)):o?.error&&(this.form.showError(o.error),this.reset())}}var V=Object.freeze({__proto__:null,addImage:Q});class J{constructor(t){this.toolbar=t,this.submit=this.submit.bind(this),this.endpoints=t.endpoints,this.name="addYouTube",this.messages={url:"Please add a YouTube URL",submit:"Add YouTube Video"},this._active=!1}get active(){return this._active}set active(t){this._active=t,this.link.focus()}init(){this.target=this.toolbar.element.appendChild(document.createElement("form")),this.target.className='mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addYouTube"]/toolbar:flex',this.target.dataset.option=this.name,this.link=d.input({name:"url",placeholder:"YouTube URL...",type:"url"});const t=u.submit({kind:"editor"});this.html=[this.link,t],this.form=new m(this),this.form.init()}submit(){const t=this.link.value;t?(this.toolbar.editor.chain().focus().setYoutubeVideo({src:t}).run(),this.form.resetSubmitButton(),this.toolbar.toggleForm(this.name),this.link.value=""):this.form.showError(this.messages.url)}}var X=Object.freeze({__proto__:null,addYouTube:J});class Z{constructor(t){this.toolbar=t,this.submit=this.submit.bind(this),this.editor=t.editor,this.endpoints=t.endpoints,this.name="generateText",this.messages={prompt:"Please describe the text you'd like to generate.",submit:"Generate",submitting:"Thinking...",submitted:"Text Generated"},this.submitButton=u.submit({kind:"editor"}),this.usedWithEditor=!0,this._onSelectionUpdate=this._onSelectionUpdate.bind(this),this._active=!1,this._capturedRange=null}get active(){return this._active}set active(t){this._active=t,t?(this._captureSelection(),this.prompt.focus(),this.toolbar.editor.on("selectionUpdate",this._onSelectionUpdate)):(this.toolbar.editor.off("selectionUpdate",this._onSelectionUpdate),this.toolbar.editor.commands.clearSelectionHighlight(),this._capturedRange=null)}_onSelectionUpdate(){this._active&&(this.toolbar.editor.commands.setSelectionHighlight(),this._captureSelection())}_captureSelection(){const{from:t,to:e}=this.editor.state.selection,i=t!==e;if(this._capturedRange={from:t,to:e},i){this.appendRadio&&(this.appendRadio.checked=!1),this.replaceSelectionRadio&&(this.replaceSelectionRadio.checked=!0);const s=this.editor.state.doc.textBetween(t,e," ");this.selectedTextInput.value=s,s.length>0&&(this.prompt.placeholder=`Describe how to modify the selected text: "${s.length>50?`${s.substring(0,50)}...`:s}"`)}else this.appendRadio&&(this.appendRadio.checked=!0),this.replaceSelectionRadio&&(this.replaceSelectionRadio.checked=!1),this.selectedTextInput.value="",this.prompt.placeholder="Describe the text you want to generate..."}init(){this.toolbar.editor.commands.setSelectionHighlight(),this.target=this.toolbar.element.appendChild(document.createElement("form")),this.target.className='mt-4 hidden flex-col gap-2 rounded-md bg-slate-200 p-4 group-data-[open-form="generateText"]/toolbar:flex',this.target.dataset.option=this.name,this.prompt=d.textarea({name:"prompt",rows:3,placeholder:"Describe the text you want to generate..."}),this.selectedTextInput=document.createElement("input"),this.selectedTextInput.type="hidden",this.selectedTextInput.name="selected_text",this.selectedTextInput.value="";const t=this._createInsertModeOptions();this.html=[this.prompt,this.selectedTextInput,t],this.form=new m(this),this.form.init()}_createInsertModeOptions(){const t=document.createElement("div");t.dataset.role="insert-mode",t.className=l.editor.toolbar.optionPanel;const e=t.appendChild(document.createElement("h3"));e.className=l.editor.toolbar.optionHeader,e.textContent="Insert Mode";const i=t.appendChild(document.createElement("div"));return i.dataset.role="insert-mode",i.className=`${l.upload.context}`,[{value:"append",text:"Append to end of document",checked:!0},{value:"replace",text:"Replace entire document"},{value:"prepend",text:"Prepend to beginning"},{value:"quote-top",text:"Add as quote at top"},{value:"cursor",text:"Insert at cursor position"},{value:"replace-selection",text:"Replace selected text"}].forEach(o=>{i.appendChild(d.radio({name:"insert_mode",value:o.value,label:o.text,checked:o.checked||!1}))}),this.appendRadio=i.querySelector('input[name="insert_mode"][value="append"]'),this.replaceSelectionRadio=i.querySelector('input[name="insert_mode"][value="replace-selection"]'),t}async submit(t){const e=this.endpoints?.generateText;if(!e)return;if(!this.prompt.value){this.form.showError(this.messages.prompt);return}t&&(t.disabled=!0);const i=new FormData(this.target);i.append("role",t?.dataset?.role||"generate");const s=await p.post(e,i);if(t&&(t.disabled=!1),s?.ok&&s.markup){const o=i.get("insert_mode")||"replace";this._addText(s.markup,o)}else s?.error&&this.form.showError(s.error)}_selectionRange(){const t=this.editor.commands.getSelectionHighlightRange();if(t)return t;const{from:e,to:i}=this._capturedRange??this.editor.state.selection;return e!==i?{from:e,to:i}:null}_addText(t,e="replace"){const i=e==="replace-selection"?this._selectionRange():null,s=e==="cursor"?this._capturedRange:null;this.editor.commands.clearSelectionHighlight();const o=this.editor.chain().focus();switch(e){case"replace":o.setContent(t).run();break;case"append":o.command(({commands:a})=>{a.focus("end");const h=this.editor.getJSON().content?.length===0?"":"<p></p>";return a.insertContent(`${h}${t}`)}).run();break;case"prepend":o.command(({commands:a})=>{a.focus("start");const h=this.editor.getJSON().content?.length===0?"":"<p></p>";return a.insertContent(`${t}${h}`)}).run();break;case"quote-top":o.command(({commands:a})=>(a.focus("start"),a.insertContent(`<blockquote>${t}</blockquote><p></p>`))).run();break;case"cursor":s?o.insertContentAt(s,t).run():o.insertContent(t).run();break;case"replace-selection":i?o.insertContentAt(i,t).run():o.insertContent(t).run();break;default:o.setContent(t).run()}this.toolbar.toggleForm(this.name)}reset(){this.prompt.value="",this.prompt.placeholder="Describe the text you want to generate...",this.selectedTextInput.value="",this.appendRadio&&this.replaceSelectionRadio&&(this.appendRadio.checked=!0,this.replaceSelectionRadio.checked=!1),this.form.resetSubmitButton()}}var K=Object.freeze({__proto__:null,generateText:Z});export{z as a,D as b,q as c,V as d,X as e,K as g,B as p,P as s};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormController } from './forms.js?v=b6ea3fe0';
+import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=b6ea3fe0';
+import { p as primitives, b as buttons } from './ui-controls.js?v=b6ea3fe0';
+import { C as COLOR_MENU, F as FONT_MENU, I as IMAGE_GROUPS, T as ToolbarButton, r as runToolCommand, g as getMarkRange, n as normalizeLinkAttributes } from './document.js?v=b6ea3fe0';
+import { S as STYLES } from './ui-resources.js?v=b6ea3fe0';
+import { a as RemoteQueryCombobox, R as Results } from './combobox.js?v=b6ea3fe0';
+import { Modal } from './modal.js?v=b6ea3fe0';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './uploads.js?v=b6ea3fe0';
+
+class PinVersion {
+  constructor(toolbar) {
+    this.toolbar = toolbar;
+    this.name = "pinVersion";
+    this.messages = {
+      submit: "Pin Version",
+      submitting: "Pinning Version...",
+      name: "Please name this version"
+    };
+    this._active = false;
+    this.submit = this.submit.bind(this);
+  }
+  get active() {
+    return this._active;
+  }
+  set active(value) {
+    this._active = value;
+    if (value) this.focus();
+  }
+  init() {
+    this.target = this.toolbar.element.appendChild(
+      document.createElement("form")
+    );
+    this.target.className = `mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="pinVersion"]/toolbar:flex`;
+    this.target.dataset.option = this.name;
+    this.input = primitives.input({
+      name: "name",
+      placeholder: "Name this version",
+      type: "text"
+    });
+    this.input.maxLength = 100;
+    this.html = [this.input, buttons.submit({ kind: "editor" })];
+    this.form = new FormController(this);
+    this.form.init();
+  }
+  focus() {
+    this.input?.focus();
+    this.input?.select();
+  }
+  reset() {
+    this.input.value = "";
+    this.form?.resetSubmitButton();
+  }
+  async submit() {
+    const name = this.input.value.trim();
+    if (!name) {
+      this.form.showError(this.messages.name);
+      this.form.resetSubmitButton();
+      return;
+    }
+    const endpoint = this.toolbar.endpoints?.history;
+    const html = this.toolbar.editor.getHTML();
+    const response = await request.post(`${endpoint}/pin`, { name, html });
+    if (!response?.ok) {
+      this.form.showError(response?.error || "Unable to pin this version");
+      this.form.resetSubmitButton();
+      return;
+    }
+    this.reset();
+    await this.toolbar.closeForm(this.name);
+    await this.toolbar.toggles.documentHistory?.refresh?.();
+  }
+  destroy() {
+    this.form?.destroy();
+  }
+}
+
+var pinVersion = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	pinVersion: PinVersion
+});
+
+class ColorPicker {
+  constructor(toolbar) {
+    this.toolbar = toolbar;
+    this.name = "setColor";
+    this.usedWithEditor = true;
+    this.active = false;
+    this.toggles = /* @__PURE__ */ new Map();
+  }
+  _colorSwatch(color, title) {
+    const colorButton = document.createElement("button");
+    colorButton.className = `size-6 rounded transition-transform hover:scale-110 hover:outline-2 hover:outline-offset-2 data-[active=true]:outline-2 data-[active=true]:outline-offset-2`;
+    colorButton.style.backgroundColor = color;
+    colorButton.style.outlineColor = color;
+    colorButton.title = title;
+    colorButton.dataset.active = "false";
+    colorButton.dataset.color = color;
+    return colorButton;
+  }
+  setActiveColor(activeColor) {
+    this.toggles.forEach((toggle, color) => {
+      const isActive = color === activeColor;
+      if (isActive !== toggle.active) {
+        toggle.button.dataset.active = isActive ? "true" : "false";
+        toggle.active = isActive;
+      }
+    });
+  }
+  init() {
+    const colorOptions = this.toolbar.element.appendChild(
+      document.createElement("div")
+    );
+    colorOptions.dataset.option = this.name;
+    colorOptions.className = `mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setColor"]/toolbar:flex group`;
+    COLOR_MENU.forEach(({ color, title }) => {
+      const colorButton = this._colorSwatch(color, title);
+      this.toggles.set(color, { active: false, button: colorButton });
+    });
+    colorOptions.append(
+      ...Array.from(this.toggles.values()).map((toggle) => toggle.button)
+    );
+    this.active = true;
+    colorOptions.addEventListener("click", (e) => {
+      const colorButton = e.target?.closest("button");
+      if (!colorButton) return;
+      const color = colorButton.dataset.color;
+      if (!color) return;
+      const toggle = this.toggles.get(color);
+      if (!toggle) return;
+      const currentActive = Array.from(this.toggles.values()).find(
+        (t) => t.active && t !== toggle
+      );
+      if (currentActive) {
+        currentActive.active = false;
+        currentActive.button.dataset.active = "false";
+      }
+      toggle.active = !toggle.active;
+      colorButton.dataset.active = toggle.active ? "true" : "false";
+      if (toggle.active) {
+        this.toolbar.editor.chain().focus().setColor(color).run();
+      } else {
+        this.toolbar.editor.chain().focus().unsetColor().run();
+      }
+    });
+  }
+}
+
+var setColor = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	setColor: ColorPicker
+});
+
+class FontFamilyPicker {
+  constructor(toolbar) {
+    this.toolbar = toolbar;
+    this.name = "setFontFamily";
+    this.usedWithEditor = true;
+    this.active = false;
+    this.toggles = /* @__PURE__ */ new Map();
+  }
+  _fontToggle(style, name) {
+    const fontButton = document.createElement("button");
+    fontButton.className = `cursor-pointer rounded bg-slate-200 px-3 py-1.5 text-base transition-transform hover:scale-110 hover:bg-slate-300 data-[active=true]:bg-slate-300 sm:text-sm`;
+    fontButton.textContent = name;
+    fontButton.dataset.style = style;
+    fontButton.title = name;
+    fontButton.dataset.active = "false";
+    return fontButton;
+  }
+  setActiveFontStyle(activeFont) {
+    this.toggles.forEach((toggle, style) => {
+      const isActive = style === activeFont;
+      if (isActive !== toggle.active) {
+        toggle.button.dataset.active = isActive ? "true" : "false";
+        toggle.active = isActive;
+      }
+    });
+  }
+  init() {
+    const fontOptions = this.toolbar.element.appendChild(
+      document.createElement("div")
+    );
+    fontOptions.dataset.option = this.name;
+    fontOptions.className = `group mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setFontFamily"]/toolbar:flex`;
+    FONT_MENU.forEach(({ style, name }) => {
+      const fontButton = this._fontToggle(style, name);
+      this.toggles.set(style, { active: false, button: fontButton });
+    });
+    fontOptions.append(
+      ...Array.from(this.toggles.values()).map((toggle) => toggle.button)
+    );
+    this.active = true;
+    fontOptions.addEventListener("click", (e) => {
+      const fontButton = e.target?.closest("button");
+      if (!fontButton) return;
+      const style = fontButton.dataset.style;
+      if (!style) return;
+      const toggle = this.toggles.get(style);
+      if (!toggle) return;
+      const currentActive = Array.from(this.toggles.values()).find(
+        (t) => t.active && t !== toggle
+      );
+      if (currentActive) {
+        currentActive.active = false;
+        currentActive.button.dataset.active = "false";
+      }
+      toggle.active = !toggle.active;
+      fontButton.dataset.active = toggle.active ? "true" : "false";
+      if (toggle.active) {
+        this.toolbar.editor.chain().focus().setFontFamily(style).run();
+      } else {
+        this.toolbar.editor.chain().focus().unsetFontFamily().run();
+      }
+    });
+  }
+}
+
+var setFontFamily = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	setFontFamily: FontFamilyPicker
+});
+
+class ImageOptions {
+  constructor(toolbar) {
+    this.toolbar = toolbar;
+    this.name = "setImage";
+    this.usedWithEditor = true;
+    this.active = false;
+    this.toggles = {};
+    this.imagePosition = null;
+  }
+  init() {
+    const imageSettings = this.toolbar.element.appendChild(
+      document.createElement("div")
+    );
+    imageSettings.dataset.option = this.name;
+    imageSettings.dataset.position = "false";
+    imageSettings.className = `${STYLES.editor.toolbar.imageSettings}`;
+    IMAGE_GROUPS.forEach((group, index) => {
+      const wrapper = imageSettings.appendChild(document.createElement("div"));
+      wrapper.className = `${STYLES.editor.toolbar.tools}`;
+      group.forEach((settings) => {
+        const option = new ToolbarButton(this.toolbar);
+        option.init(settings);
+        option.onClick = () => this.toggleOption(option);
+        this.toggles[String(option.name)] = option;
+        if (option.name) {
+          this.toolbar.options[option.name] = option;
+        }
+        wrapper.appendChild(option.button);
+      });
+      if (index < IMAGE_GROUPS.length - 1) {
+        const divider = document.createElement("div");
+        divider.className = `${STYLES.editor.toolbar.divider}`;
+        imageSettings.appendChild(divider);
+      }
+    });
+  }
+  toggleOption(option) {
+    const currentOption = Object.values(this.toggles).find(
+      (toggle) => toggle.active && toggle.name
+    );
+    option.active = !option.active;
+    option.active ? option.enable() : option.disable();
+    currentOption?.disable();
+    runToolCommand(
+      this.toolbar.editor.chain(),
+      option.command,
+      option.args,
+      true
+    );
+  }
+}
+
+var setImage = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	setImage: ImageOptions
+});
+
+const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
+const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;
+class LinkSearchBox extends RemoteQueryCombobox {
+  constructor(element, addLink) {
+    super(element);
+    this.addLink = addLink;
+    this.index = "search";
+    this.results = new Results(this.index);
+    this.endpoints = ENDPOINTS.search;
+    this.placement = "bottom-start";
+  }
+  init() {
+    this.styles.panel = `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext} w-64 sm:w-96 mt-2`;
+    super.init();
+  }
+  _input(event) {
+    const query = event.target.value.trim();
+    if (this.addLink.linkHref(query)) {
+      this.settleQueryInput({ clear: true });
+      return;
+    }
+    if (query.length > 2) {
+      return this._search(query);
+    }
+    this.settleQueryInput({ clear: true });
+  }
+  elementClick(event) {
+    super.elementClick(event);
+    if (!this.panelOpen && this.options.length > 0) this.showPanel();
+  }
+  _search(query) {
+    const params = new URLSearchParams();
+    params.set("q", query);
+    return this.runQuery(
+      query,
+      (token) => request.get(this.endpoints.bar, params, {
+        signal: token.signal
+      }),
+      (response) => {
+        if (response?.ok) {
+          this.updatePanel(response.results || null);
+        } else {
+          this.clearQueryResults();
+        }
+        return this.showPanel();
+      }
+    );
+  }
+  selectOption(option) {
+    if (!option.dataset.url) return;
+    this.results.save(option);
+    this.hidePanel();
+    this.addLink.applySearchResult(option.dataset.url);
+  }
+}
+class AddLink {
+  constructor(toolbar) {
+    this.toolbar = toolbar;
+    this.editor = toolbar.editor;
+    this.submit = this.submit.bind(this);
+    this.name = "addLink";
+    this.messages = {
+      select: "Please select some text first",
+      link: "Please add a URL",
+      submit: "Set Link"
+    };
+    this.usedWithEditor = false;
+    this._onSelectionUpdate = this._onSelectionUpdate.bind(this);
+    this._active = false;
+    this.linkState = null;
+    this.combobox = null;
+  }
+  get active() {
+    return this._active;
+  }
+  set active(value) {
+    this._active = value;
+    if (value) {
+      this.captureSelection();
+      this.focus();
+      this.editor.on("selectionUpdate", this._onSelectionUpdate);
+    } else {
+      this.editor.off("selectionUpdate", this._onSelectionUpdate);
+      this.editor.commands.clearSelectionHighlight();
+    }
+  }
+  get emailMode() {
+    return this.toolbar.kind === "email";
+  }
+  _onSelectionUpdate() {
+    if (this._active) {
+      this.captureSelection();
+    }
+  }
+  init() {
+    this.target = this.toolbar.element.appendChild(
+      document.createElement("form")
+    );
+    this.target.className = `mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addLink"]/toolbar:flex`;
+    this.target.dataset.option = this.name;
+    this.link = primitives.input({
+      name: "link",
+      placeholder: "Paste URL or search...",
+      type: "search"
+    });
+    this.combobox = new LinkSearchBox(this.link, this);
+    const submit = buttons.submit({
+      kind: "editor"
+    });
+    this.html = [this.link, submit];
+    this.form = new FormController(this);
+    this.form.init();
+    this.form.destroyables.push(this.combobox);
+    this.combobox.init();
+  }
+  focus() {
+    this.link?.focus();
+    this.link?.select();
+  }
+  captureSelection() {
+    const { from, to } = this.editor.state.selection;
+    if (from !== to) {
+      this.editor.commands.setSelectionHighlight();
+    } else {
+      this.editor.commands.clearSelectionHighlight();
+    }
+    this.linkState = this.findCurrentLink();
+    this.link.value = this.displayHref(this.linkState?.attrs?.href || "");
+  }
+  findCurrentLink() {
+    const linkType = this.editor.state.schema.marks.link;
+    if (!linkType) return null;
+    const { selection } = this.editor.state;
+    if (selection.empty) {
+      const range = getMarkRange(selection.$from, linkType);
+      return range ? this.singleLinkInRange(range) : null;
+    }
+    return this.singleLinkInRange({
+      from: selection.from,
+      to: selection.to
+    });
+  }
+  singleLinkInRange(range) {
+    const linkType = this.editor.state.schema.marks.link;
+    const links = /* @__PURE__ */ new Map();
+    this.editor.state.doc.nodesBetween(range.from, range.to, (node, pos) => {
+      if (!node.isText) return true;
+      const mark = node.marks.find((mark2) => mark2.type === linkType);
+      if (!mark) return true;
+      const key = JSON.stringify(mark.attrs);
+      const from = Math.max(range.from, pos);
+      const to = Math.min(range.to, pos + node.nodeSize);
+      const link2 = links.get(key) || { attrs: mark.attrs, from, to };
+      link2.from = Math.min(link2.from, from);
+      link2.to = Math.max(link2.to, to);
+      links.set(key, link2);
+      return true;
+    });
+    const values = Array.from(links.values());
+    if (values.length !== 1) return null;
+    const link = values[0];
+    return {
+      attrs: link.attrs,
+      range: { from: link.from, to: link.to }
+    };
+  }
+  highlightRange() {
+    return this.editor.commands.getSelectionHighlightRange();
+  }
+  activeRange() {
+    return this.linkState?.range || this.highlightRange();
+  }
+  displayHref(href) {
+    if (!href || !this.emailMode) return href;
+    return this.fullyQualifiedUrl(href) || href;
+  }
+  linkHref(value) {
+    const href = value.trim();
+    if (!href) return "";
+    if (this.emailMode) {
+      return this.fullyQualifiedUrl(href);
+    }
+    if (ABSOLUTE_URL_PATTERN.test(href) || href.startsWith("//") || href.startsWith("/") || href.startsWith("#") || href.startsWith("?")) {
+      return href;
+    }
+    if (BARE_DOMAIN_PATTERN.test(href)) {
+      return `https://${href}`;
+    }
+    return null;
+  }
+  fullyQualifiedUrl(value) {
+    const href = value.trim();
+    if (!href) return "";
+    try {
+      if (ABSOLUTE_URL_PATTERN.test(href)) {
+        return new URL(href).href;
+      }
+      if (href.startsWith("//")) {
+        return new URL(`${window.location.protocol}${href}`).href;
+      }
+      if (href.startsWith("/") || href.startsWith("#") || href.startsWith("?")) {
+        return new URL(href, window.location.origin).href;
+      }
+      return new URL(`https://${href}`).href;
+    } catch (_error) {
+      return null;
+    }
+  }
+  linkAttributes(href) {
+    if (this.emailMode) return { href };
+    return normalizeLinkAttributes({ href });
+  }
+  applySearchResult(url) {
+    const href = this.emailMode ? this.fullyQualifiedUrl(url) : url;
+    if (!href) {
+      this.form.showError(this.messages.link);
+      return;
+    }
+    this.link.value = href;
+    this.submit();
+  }
+  reset() {
+    this.linkState = null;
+    this.link.value = "";
+    this.combobox?.hidePanel();
+    this.form?.resetSubmitButton();
+  }
+  submit() {
+    const range = this.activeRange();
+    const href = this.linkHref(this.link.value);
+    if (href && range) {
+      this.editor.chain().focus().setTextSelection(range).setLink(this.linkAttributes(href)).run();
+      this.form.resetSubmitButton();
+      this.toolbar.closeForm(this.name);
+    } else if (!this.link.value.trim() && range) {
+      const linkRange = this.linkState?.range || this.singleLinkInRange(range)?.range;
+      if (!linkRange) {
+        this.form.showError(this.messages.link);
+        return;
+      }
+      this.editor.chain().focus().setTextSelection(linkRange).unsetLink().run();
+      this.form.resetSubmitButton();
+      this.toolbar.closeForm(this.name);
+    } else if (!range) {
+      this.form.showError(this.messages.select);
+    } else {
+      this.form.showError(this.messages.link);
+    }
+  }
+  destroy() {
+    this.form?.destroy();
+  }
+}
+
+var addLink = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	addLink: AddLink
+});
+
+const IMAGE_DROPZONE_TEXT = "Drop image here, click to upload, or tap to choose camera/files<br>All images will be sized down to 1280x720";
+class Image extends BaseUpload {
+  constructor(toolbar) {
+    super();
+    this.toolbar = toolbar;
+    this.name = "addImage";
+    this.inputName = "add-image";
+    this.messages = {
+      submit: "Upload Image",
+      submitting: "Uploading Image",
+      submitted: "Image Uploaded"
+    };
+    this.uploadType = "image";
+    this.target = this.toolbar.element.appendChild(
+      document.createElement("form")
+    );
+    this.target.dataset.mode = "upload";
+    this.target.className = `mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addImage"]/toolbar:flex group/upload`;
+    this.target.dataset.option = this.name;
+    this.dropzone = uploadElement.dropzone({ text: IMAGE_DROPZONE_TEXT });
+    this.menuOptions = [
+      "remove",
+      ...this.toolbar.aiCreate ? ["generate"] : [],
+      "paste"
+    ];
+    this.uploadMenu = new UploadMenu(this);
+    this.generate = uploadElement.generateDocumentImage();
+    this.submitButton = buttons.submit({
+      kind: "editor"
+    });
+    this.submit = this.submit.bind(this);
+  }
+  get html() {
+    return [
+      this.dropzone.element,
+      ...this.toolbar.aiCreate ? [this.generate.element] : [],
+      this.submitButton
+    ];
+  }
+  async init() {
+    await super.init();
+    this.submitButton.dataset.visible = "false";
+    this.target.addEventListener("click", (e) => {
+      if (e.target?.closest("[data-role='cancel']")) {
+        this.hideGenerateForm();
+      }
+    });
+  }
+  showGenerateForm() {
+    withTransition(() => {
+      this.dropzone.hide();
+      this.reset();
+      this.form.toggleSubForm(this.generate);
+      this.generate.show();
+    });
+  }
+  hideGenerateForm() {
+    withTransition(() => {
+      this.form.toggleSubForm(null);
+      this.generate.hide();
+      this.generate.reset();
+      this.dropzone.show();
+    });
+  }
+  reset() {
+    this.generate.reset();
+    super.reset();
+  }
+  async submit(submitter) {
+    if (this.toolbar.document.addDraftImage) {
+      const file = this.fileInput?.element?.files?.[0];
+      if (!file) return;
+      const src = this.toolbar.document.addDraftImage(file);
+      this.toolbar.editor.chain().focus().setImage({ src }).run();
+      this.toolbar.toggleForm(this.name);
+      return;
+    }
+    const route = this.toolbar.endpoints?.addImage;
+    if (!route) return;
+    const prepared = await this.prepareSubmit({ route });
+    if (!prepared) return;
+    const formData = new FormData(this.target);
+    this.applyDirectUploads(formData);
+    formData.append("role", submitter?.dataset?.role || "upload");
+    formData.append("content", this.toolbar.editor.getText());
+    if (submitter) submitter.disabled = true;
+    const response = await request.post(route, formData);
+    if (submitter) submitter.disabled = false;
+    if (response?.ok && response.modal) {
+      const modal = new Modal(this.toolbar.builder);
+      void modal.attach(response.modal, this);
+    } else if (response?.ok && response.src) {
+      this.toolbar.editor.chain().focus().setImage({ src: response.src }).run();
+      this.toolbar.toggleForm(this.name);
+    } else if (response?.error) {
+      this.form.showError(response.error);
+      this.reset();
+    }
+  }
+}
+
+var addImage = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	addImage: Image
+});
+
+class AddYouTube {
+  constructor(toolbar) {
+    this.toolbar = toolbar;
+    this.submit = this.submit.bind(this);
+    this.endpoints = toolbar.endpoints;
+    this.name = "addYouTube";
+    this.messages = {
+      url: "Please add a YouTube URL",
+      submit: "Add YouTube Video"
+    };
+    this._active = false;
+  }
+  get active() {
+    return this._active;
+  }
+  set active(value) {
+    this._active = value;
+    this.link.focus();
+  }
+  init() {
+    this.target = this.toolbar.element.appendChild(
+      document.createElement("form")
+    );
+    this.target.className = `mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addYouTube"]/toolbar:flex`;
+    this.target.dataset.option = this.name;
+    this.link = primitives.input({
+      name: "url",
+      placeholder: "YouTube URL...",
+      type: "url"
+    });
+    const submit = buttons.submit({
+      kind: "editor"
+    });
+    this.html = [this.link, submit];
+    this.form = new FormController(this);
+    this.form.init();
+  }
+  submit() {
+    const url = this.link.value;
+    if (url) {
+      this.toolbar.editor.chain().focus().setYoutubeVideo({ src: url }).run();
+      this.form.resetSubmitButton();
+      this.toolbar.toggleForm(this.name);
+      this.link.value = "";
+    } else {
+      this.form.showError(this.messages.url);
+    }
+  }
+}
+
+var addYouTube = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	addYouTube: AddYouTube
+});
+
+class GenerateText {
+  constructor(toolbar) {
+    this.toolbar = toolbar;
+    this.submit = this.submit.bind(this);
+    this.editor = toolbar.editor;
+    this.endpoints = toolbar.endpoints;
+    this.name = "generateText";
+    this.messages = {
+      prompt: "Please describe the text you'd like to generate.",
+      submit: "Generate",
+      submitting: "Thinking...",
+      submitted: "Text Generated"
+    };
+    this.submitButton = buttons.submit({
+      kind: "editor"
+    });
+    this.usedWithEditor = true;
+    this._onSelectionUpdate = this._onSelectionUpdate.bind(this);
+    this._active = false;
+    this._capturedRange = null;
+  }
+  get active() {
+    return this._active;
+  }
+  set active(value) {
+    this._active = value;
+    if (value) {
+      this._captureSelection();
+      this.prompt.focus();
+      this.toolbar.editor.on("selectionUpdate", this._onSelectionUpdate);
+    } else {
+      this.toolbar.editor.off("selectionUpdate", this._onSelectionUpdate);
+      this.toolbar.editor.commands.clearSelectionHighlight();
+      this._capturedRange = null;
+    }
+  }
+  _onSelectionUpdate() {
+    if (this._active) {
+      this.toolbar.editor.commands.setSelectionHighlight();
+      this._captureSelection();
+    }
+  }
+  _captureSelection() {
+    const { from, to } = this.editor.state.selection;
+    const hasSelection = from !== to;
+    this._capturedRange = { from, to };
+    if (hasSelection) {
+      if (this.appendRadio) this.appendRadio.checked = false;
+      if (this.replaceSelectionRadio) this.replaceSelectionRadio.checked = true;
+      const selectedText = this.editor.state.doc.textBetween(from, to, " ");
+      this.selectedTextInput.value = selectedText;
+      if (selectedText.length > 0) {
+        this.prompt.placeholder = `Describe how to modify the selected text: "${selectedText.length > 50 ? `${selectedText.substring(0, 50)}...` : selectedText}"`;
+      }
+    } else {
+      if (this.appendRadio) this.appendRadio.checked = true;
+      if (this.replaceSelectionRadio)
+        this.replaceSelectionRadio.checked = false;
+      this.selectedTextInput.value = "";
+      this.prompt.placeholder = "Describe the text you want to generate...";
+    }
+  }
+  init() {
+    this.toolbar.editor.commands.setSelectionHighlight();
+    this.target = this.toolbar.element.appendChild(
+      document.createElement("form")
+    );
+    this.target.className = `mt-4 hidden flex-col gap-2 rounded-md bg-slate-200 p-4 group-data-[open-form="generateText"]/toolbar:flex`;
+    this.target.dataset.option = this.name;
+    this.prompt = primitives.textarea({
+      name: "prompt",
+      rows: 3,
+      placeholder: "Describe the text you want to generate..."
+    });
+    this.selectedTextInput = document.createElement("input");
+    this.selectedTextInput.type = "hidden";
+    this.selectedTextInput.name = "selected_text";
+    this.selectedTextInput.value = "";
+    const insertModeOptions = this._createInsertModeOptions();
+    this.html = [this.prompt, this.selectedTextInput, insertModeOptions];
+    this.form = new FormController(this);
+    this.form.init();
+  }
+  _createInsertModeOptions() {
+    const optionsContainer = document.createElement("div");
+    optionsContainer.dataset.role = "insert-mode";
+    optionsContainer.className = STYLES.editor.toolbar.optionPanel;
+    const optionsHeader = optionsContainer.appendChild(
+      document.createElement("h3")
+    );
+    optionsHeader.className = STYLES.editor.toolbar.optionHeader;
+    optionsHeader.textContent = "Insert Mode";
+    const processing = optionsContainer.appendChild(
+      document.createElement("div")
+    );
+    processing.dataset.role = "insert-mode";
+    processing.className = `${STYLES.upload.context}`;
+    const insertOptions = [
+      { value: "append", text: "Append to end of document", checked: true },
+      { value: "replace", text: "Replace entire document" },
+      { value: "prepend", text: "Prepend to beginning" },
+      { value: "quote-top", text: "Add as quote at top" },
+      { value: "cursor", text: "Insert at cursor position" },
+      { value: "replace-selection", text: "Replace selected text" }
+    ];
+    insertOptions.forEach((option) => {
+      processing.appendChild(
+        primitives.radio({
+          name: "insert_mode",
+          value: option.value,
+          label: option.text,
+          checked: option.checked || false
+        })
+      );
+    });
+    this.appendRadio = processing.querySelector(
+      'input[name="insert_mode"][value="append"]'
+    );
+    this.replaceSelectionRadio = processing.querySelector(
+      'input[name="insert_mode"][value="replace-selection"]'
+    );
+    return optionsContainer;
+  }
+  async submit(submitter) {
+    const endpoint = this.endpoints?.generateText;
+    if (!endpoint) return;
+    if (!this.prompt.value) {
+      this.form.showError(this.messages.prompt);
+      return;
+    }
+    if (submitter) submitter.disabled = true;
+    const formData = new FormData(this.target);
+    formData.append("role", submitter?.dataset?.role || "generate");
+    const response = await request.post(endpoint, formData);
+    if (submitter) submitter.disabled = false;
+    if (response?.ok && response.markup) {
+      const insertMode = formData.get("insert_mode") || "replace";
+      this._addText(response.markup, insertMode);
+    } else if (response?.error) {
+      this.form.showError(response.error);
+    }
+  }
+  _selectionRange() {
+    const highlight = this.editor.commands.getSelectionHighlightRange();
+    if (highlight) return highlight;
+    const { from, to } = this._capturedRange ?? this.editor.state.selection;
+    if (from !== to) {
+      return { from, to };
+    }
+    return null;
+  }
+  _addText(html, insertMode = "replace") {
+    const highlightedRange = insertMode === "replace-selection" ? this._selectionRange() : null;
+    const cursorRange = insertMode === "cursor" ? this._capturedRange : null;
+    this.editor.commands.clearSelectionHighlight();
+    const chain = this.editor.chain().focus();
+    switch (insertMode) {
+      case "replace":
+        chain.setContent(html).run();
+        break;
+      case "append":
+        chain.command(({ commands }) => {
+          commands.focus("end");
+          const isEmpty = this.editor.getJSON().content?.length === 0;
+          const spacing = isEmpty ? "" : "<p></p>";
+          return commands.insertContent(`${spacing}${html}`);
+        }).run();
+        break;
+      case "prepend":
+        chain.command(({ commands }) => {
+          commands.focus("start");
+          const isEmpty = this.editor.getJSON().content?.length === 0;
+          const spacing = isEmpty ? "" : "<p></p>";
+          return commands.insertContent(`${html}${spacing}`);
+        }).run();
+        break;
+      case "quote-top":
+        chain.command(({ commands }) => {
+          commands.focus("start");
+          return commands.insertContent(
+            `<blockquote>${html}</blockquote><p></p>`
+          );
+        }).run();
+        break;
+      case "cursor":
+        if (cursorRange) {
+          chain.insertContentAt(cursorRange, html).run();
+        } else {
+          chain.insertContent(html).run();
+        }
+        break;
+      case "replace-selection":
+        if (highlightedRange) {
+          chain.insertContentAt(highlightedRange, html).run();
+        } else {
+          chain.insertContent(html).run();
+        }
+        break;
+      default:
+        chain.setContent(html).run();
+    }
+    this.toolbar.toggleForm(this.name);
+  }
+  reset() {
+    this.prompt.value = "";
+    this.prompt.placeholder = "Describe the text you want to generate...";
+    this.selectedTextInput.value = "";
+    if (this.appendRadio && this.replaceSelectionRadio) {
+      this.appendRadio.checked = true;
+      this.replaceSelectionRadio.checked = false;
+    }
+    this.form.resetSubmitButton();
+  }
+}
+
+var generateText = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	generateText: GenerateText
+});
+
+export { setFontFamily as a, setImage as b, addLink as c, addImage as d, addYouTube as e, generateText as g, pinVersion as p, setColor as s };

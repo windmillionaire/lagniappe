@@ -1,2 +1,318 @@
-import{r as h,E as b,w as r}from"./foundation.js?v=b9ad6d22";import{S as o,s as u}from"./ui-resources.js?v=b9ad6d22";import{p as m}from"./ui-controls.js?v=b9ad6d22";import{T as f}from"./form-complex.js?v=b9ad6d22";function g(a){return!!(a&&typeof a=="object"&&"field"in a&&typeof a.field=="string"&&(!("title"in a)||typeof a.title=="string")&&(!("selected"in a)||typeof a.selected=="boolean"))}class p{constructor(e,t=null){const i=JSON.parse(e.dataset.preload??"{}");this.tableElt=e,this.columns=i&&typeof i=="object"&&"columns"in i&&Array.isArray(i.columns)?i.columns.filter(g):[],this.storageKey=t,this.selected=this._loadSelected(),this.visibilityRow=this.tableElt.querySelector("[data-widget='TableVisibility']"),this.header=this.tableElt.querySelector("[data-role='column-header']"),this.actions=null,this.toggle=null,this._headerClick=this._headerClick.bind(this)}init(){this._createHeaderAction(),this.header?.addEventListener("click",this._headerClick),this.columns.forEach(e=>{this._setColumnVisibility(e.field,this.selected.includes(e.field))}),this._saveSelected(),this._createController()}_loadSelected(){const e=this.columns.filter(i=>i.selected).map(i=>i.field);if(!this.storageKey)return e;const t=localStorage.getItem(this.storageKey);if(t===null)return e;try{const i=JSON.parse(t);if(!Array.isArray(i))return e;const n=new Set(this.columns.map(s=>s.field));return[...new Set(i)].filter(s=>typeof s=="string"&&n.has(s))}catch{return e}}_saveSelected(){this.tableElt.dataset.selected=JSON.stringify(this.selected),this.storageKey&&localStorage.setItem(this.storageKey,JSON.stringify(this.selected))}_createHeaderAction(){if(!this.header)return;const e=this.header.appendChild(document.createElement("th"));e.className=o.table.thead.actionCell,e.scope="col",this.actions=e.appendChild(document.createElement("div")),this.actions.className=o.table.thead.actions,this.actions.dataset.role="embedded-table-actions",this.toggle=this.actions.appendChild(document.createElement("button")),this.toggle.type="button",this.toggle.className=o.table.thead.actionButton,this.toggle.dataset.role="embedded-table-visibility",this.toggle.setAttribute("aria-label","Choose visible columns"),this.toggle.setAttribute("aria-expanded","false"),this.toggle.title="Choose visible columns";const t=this.toggle.appendChild(document.createElement("span"));u(t,"column",o.table.thead.actionIcon)}_headerClick(e){!(e.target instanceof Element)||!e.target.closest("[data-role='embedded-table-visibility']")||(e.preventDefault(),e.stopPropagation(),this._toggleController())}_toggleController(){const e=this.visibilityRow?.dataset.visible==="true";return this._setControllerVisible(!e)}_setControllerVisible(e){return this.visibilityRow&&(this.visibilityRow.dataset.visible=e?"true":"false"),this.toggle?.setAttribute("aria-expanded",e?"true":"false"),e}_createController(){if(!this.visibilityRow||!this.header)return;const e=this.visibilityRow.appendChild(document.createElement("td"));e.colSpan=this.header.querySelectorAll("th").length,e.className="p-3 border-t bg-kind-bg border-slate-300 group";const t=e.appendChild(document.createElement("div"));t.className="flex flex-col gap-3";for(const i of this.columns){const n=t.appendChild(m.checkbox({name:i.field,checked:this.selected.includes(i.field),kind:this.tableElt.dataset.kind,label:i.title}));n.dataset.role="selector"}e.addEventListener("change",i=>{if(!(i.target instanceof HTMLInputElement)||i.target.type!=="checkbox")return;const[n,s]=[i.target.name,i.target.checked];this.selected=s?[...new Set([...this.selected,n])]:this.selected.filter(l=>l!==n),this._saveSelected(),this._setColumnVisibility(n,s)})}_setColumnVisibility(e,t){const i=t?"table-cell":"none";this.tableElt.querySelectorAll(`[data-column="${e}"]`).forEach(n=>{n.style.display=i})}}class y{constructor(e,t){this.view=e,this.button=t,this.row=null,this.table=null,this.destroy=this.destroy.bind(this),this.mobileQuery=window.matchMedia("(max-width: 640px)"),this.kind=null,this.submission=null,this.schema=null}async create(){const e=this.button.closest("tr"),t=e?.dataset.key,i=this.button.closest("[data-column]")?.dataset.column;if(!e||!t||!i)return;const n=Array.from(e.querySelectorAll("td")).length;this.row=document.createElement("tr"),this.row.dataset.embedded="true",this.row.dataset.visible="false",this.row.className="rounded-md border border-base-light/50 mx-4 mb-3 overflow-hidden sm:rounded-none sm:border-t sm:border-b sm:border-x-0 sm:mx-0 sm:mb-0",e.after(this.row);const s=this.row.appendChild(document.createElement("td"));if(s.colSpan=n,!this.kind||!this.submission||!this.schema){const l=await h.get(b.renderer.expandTableCell(t,i));if(!l?.ok)return;this.kind=l.kind||"form",this.submission=l.submission,this.schema=l.schema??null}this.schema&&(this.table=new f({readonly:!0},this.schema,this.submission).embedded,this.table.dataset.embedded="true",this.table.querySelectorAll("tr, th, table").forEach(l=>{l.dataset.embedded="true"}),this.table.querySelector("tbody")?.classList.add(`bg-${this.kind}-bg`),s.appendChild(this.table),this.mobileQuery.addEventListener("change",this.destroy))}get visible(){return this.row?.dataset.visible==="true"}async toggle(e=!1){this.table||await this.create(),await r(()=>{if(!this.row)return;const t=e?!0:this.visible;this.row.dataset.visible=t?"false":"true",this.view.mobile&&this.row.closest("[data-widget='IndexTable']")&&(this.row.style.display=t?"none":"block"),this.button.dataset.open=t?"false":"true",this.button.setAttribute("aria-expanded",t?"false":"true")},{label:"embedded-table:toggle"})}destroy(){this.row?.remove(),this.row=null,this.table=null,this.button.dataset.open="false",this.button.setAttribute("aria-expanded","false"),this.button._embeddedTable=null,this.mobileQuery.removeEventListener("change",this.destroy)}}class d{constructor(e){Object.assign(this,e),this.click=this._click.bind(this),this._visibility=null}init(){document.addEventListener("click",this.click),this.modified=!0,this.visible=!0}_click(e){this._clickExpandedTableCell(e)}_clickExpandedTableCell(e){const t=e.target instanceof Element?e.target.closest("button[data-role='expand']"):null;return!t||!this.target.contains(t)?!1:(e.preventDefault(),e.stopPropagation(),this._expandTableCell(t),!0)}initVisibility(e,t=null){return e?(this._visibility=new p(e,t),this._visibility.init(),this._visibility):null}async _expandTableCell(e){e._embeddedTable||(e._embeddedTable=new y(this.view,e)),e._embeddedTable.toggle()}destroy(){document.removeEventListener("click",this.click)}}class v extends d{constructor(e){super(e),this.keydown=this._keydown.bind(this)}init(){super.init(),document.addEventListener("keydown",this.keydown)}get header(){return this.component.elt.querySelector("thead > tr:first-child")}get visibilityWidget(){return this.component.widgets.TableVisibility}get sortingWidget(){return this.component.widgets.TableSorting}_click(e){if(this._clickExpandedTableCell(e))return;const t=e.target;if(!(t instanceof Element))return;const i=this.visibilityWidget,n=this.sortingWidget,s=i?.visible||n?.visible;if(!t.closest("thead")){s&&r(()=>{[i,n].forEach(l=>{l&&l.disable(),l&&l.reconcile()})});return}if(!t.closest("button[lp-show='table:TableVisibility']")&&this.header?.contains(t)){const l=t.closest("th[data-ordering]");if(!l)return;const c=new CustomEvent("toggle-column-filter",{detail:{button:t.closest("button"),column:l.dataset.column},bubbles:!0});this.target.dispatchEvent(c)}}_keydown(e){if(e.key==="Escape"){const t=this.visibilityWidget,i=this.sortingWidget;if(!(t?.visible||i?.visible))return;r(()=>{[t,i].forEach(s=>{s&&s.disable(),s&&s.reconcile()})})}}destroy(){super.destroy(),document.removeEventListener("keydown",this.keydown)}}export{v as B,d as E};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=b6ea3fe0';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b6ea3fe0';
+import { p as primitives } from './ui-controls.js?v=b6ea3fe0';
+import { T as TableElement } from './form-complex.js?v=b6ea3fe0';
+
+function isEmbeddedColumn(value) {
+  return Boolean(
+    value && typeof value === "object" && "field" in value && typeof value.field === "string" && (!("title" in value) || typeof value.title === "string") && (!("selected" in value) || typeof value.selected === "boolean")
+  );
+}
+class EmbeddedTableVisibility {
+  constructor(tableElt, storageKey = null) {
+    const preload = JSON.parse(tableElt.dataset.preload ?? "{}");
+    this.tableElt = tableElt;
+    this.columns = preload && typeof preload === "object" && "columns" in preload && Array.isArray(preload.columns) ? preload.columns.filter(isEmbeddedColumn) : [];
+    this.storageKey = storageKey;
+    this.selected = this._loadSelected();
+    this.visibilityRow = this.tableElt.querySelector(
+      "[data-widget='TableVisibility']"
+    );
+    this.header = this.tableElt.querySelector("[data-role='column-header']");
+    this.actions = null;
+    this.toggle = null;
+    this._headerClick = this._headerClick.bind(this);
+  }
+  init() {
+    this._createHeaderAction();
+    this.header?.addEventListener("click", this._headerClick);
+    this.columns.forEach((column) => {
+      this._setColumnVisibility(
+        column.field,
+        this.selected.includes(column.field)
+      );
+    });
+    this._saveSelected();
+    this._createController();
+  }
+  _loadSelected() {
+    const defaults = this.columns.filter((column) => column.selected).map((column) => column.field);
+    if (!this.storageKey) return defaults;
+    const saved = localStorage.getItem(this.storageKey);
+    if (saved === null) return defaults;
+    try {
+      const selected = JSON.parse(saved);
+      if (!Array.isArray(selected)) return defaults;
+      const available = new Set(this.columns.map((column) => column.field));
+      return [...new Set(selected)].filter(
+        (field) => typeof field === "string" && available.has(field)
+      );
+    } catch {
+      return defaults;
+    }
+  }
+  _saveSelected() {
+    this.tableElt.dataset.selected = JSON.stringify(this.selected);
+    if (this.storageKey) {
+      localStorage.setItem(this.storageKey, JSON.stringify(this.selected));
+    }
+  }
+  _createHeaderAction() {
+    if (!this.header) return;
+    const cell = this.header.appendChild(document.createElement("th"));
+    cell.className = STYLES.table.thead.actionCell;
+    cell.scope = "col";
+    this.actions = cell.appendChild(document.createElement("div"));
+    this.actions.className = STYLES.table.thead.actions;
+    this.actions.dataset.role = "embedded-table-actions";
+    this.toggle = this.actions.appendChild(document.createElement("button"));
+    this.toggle.type = "button";
+    this.toggle.className = STYLES.table.thead.actionButton;
+    this.toggle.dataset.role = "embedded-table-visibility";
+    this.toggle.setAttribute("aria-label", "Choose visible columns");
+    this.toggle.setAttribute("aria-expanded", "false");
+    this.toggle.title = "Choose visible columns";
+    const icon = this.toggle.appendChild(document.createElement("span"));
+    setIcon(icon, "column", STYLES.table.thead.actionIcon);
+  }
+  _headerClick(e) {
+    if (!(e.target instanceof Element) || !e.target.closest("[data-role='embedded-table-visibility']"))
+      return;
+    e.preventDefault();
+    e.stopPropagation();
+    this._toggleController();
+  }
+  _toggleController() {
+    const visible = this.visibilityRow?.dataset.visible === "true";
+    return this._setControllerVisible(!visible);
+  }
+  _setControllerVisible(visible) {
+    if (this.visibilityRow)
+      this.visibilityRow.dataset.visible = visible ? "true" : "false";
+    this.toggle?.setAttribute("aria-expanded", visible ? "true" : "false");
+    return visible;
+  }
+  _createController() {
+    if (!this.visibilityRow || !this.header) return;
+    const cell = this.visibilityRow.appendChild(document.createElement("td"));
+    cell.colSpan = this.header.querySelectorAll("th").length;
+    cell.className = `p-3 border-t bg-kind-bg border-slate-300 group`;
+    const container = cell.appendChild(document.createElement("div"));
+    container.className = "flex flex-col gap-3";
+    for (const column of this.columns) {
+      const checkbox = container.appendChild(
+        primitives.checkbox({
+          name: column.field,
+          checked: this.selected.includes(column.field),
+          kind: this.tableElt.dataset.kind,
+          label: column.title
+        })
+      );
+      checkbox.dataset.role = "selector";
+    }
+    cell.addEventListener("change", (e) => {
+      if (!(e.target instanceof HTMLInputElement) || e.target.type !== "checkbox")
+        return;
+      const [column, visible] = [e.target.name, e.target.checked];
+      this.selected = visible ? [.../* @__PURE__ */ new Set([...this.selected, column])] : this.selected.filter((field) => field !== column);
+      this._saveSelected();
+      this._setColumnVisibility(column, visible);
+    });
+  }
+  _setColumnVisibility(column, visible) {
+    const display = visible ? "table-cell" : "none";
+    this.tableElt.querySelectorAll(`[data-column="${column}"]`).forEach((col) => {
+      col.style.display = display;
+    });
+  }
+}
+class ExpandedTableCell {
+  constructor(view, button) {
+    this.view = view;
+    this.button = button;
+    this.row = null;
+    this.table = null;
+    this.destroy = this.destroy.bind(this);
+    this.mobileQuery = window.matchMedia("(max-width: 640px)");
+    this.kind = null;
+    this.submission = null;
+    this.schema = null;
+  }
+  async create() {
+    const row = this.button.closest("tr");
+    const key = row?.dataset.key;
+    const tableId = this.button.closest("[data-column]")?.dataset.column;
+    if (!row || !key || !tableId) return;
+    const colSpan = Array.from(row.querySelectorAll("td")).length;
+    this.row = document.createElement("tr");
+    this.row.dataset.embedded = "true";
+    this.row.dataset.visible = "false";
+    this.row.className = "rounded-md border border-base-light/50 mx-4 mb-3 overflow-hidden sm:rounded-none sm:border-t sm:border-b sm:border-x-0 sm:mx-0 sm:mb-0";
+    row.after(this.row);
+    const tableEmbed = this.row.appendChild(document.createElement("td"));
+    tableEmbed.colSpan = colSpan;
+    if (!this.kind || !this.submission || !this.schema) {
+      const response = await request.get(
+        ENDPOINTS.renderer.expandTableCell(key, tableId)
+      );
+      if (!response?.ok) return;
+      this.kind = response.kind || "form";
+      this.submission = response.submission;
+      this.schema = response.schema ?? null;
+    }
+    if (!this.schema) return;
+    this.table = new TableElement(
+      { readonly: true },
+      this.schema,
+      this.submission
+    ).embedded;
+    this.table.dataset.embedded = "true";
+    this.table.querySelectorAll("tr, th, table").forEach((tr) => {
+      tr.dataset.embedded = "true";
+    });
+    this.table.querySelector("tbody")?.classList.add(`bg-${this.kind}-bg`);
+    tableEmbed.appendChild(this.table);
+    this.mobileQuery.addEventListener("change", this.destroy);
+  }
+  get visible() {
+    return this.row?.dataset.visible === "true";
+  }
+  async toggle(hide = false) {
+    if (!this.table) await this.create();
+    await withTransition(
+      () => {
+        if (!this.row) return;
+        const visible = hide ? true : this.visible;
+        this.row.dataset.visible = visible ? "false" : "true";
+        if (this.view.mobile && this.row.closest("[data-widget='IndexTable']")) {
+          this.row.style.display = visible ? "none" : "block";
+        }
+        this.button.dataset.open = visible ? "false" : "true";
+        this.button.setAttribute("aria-expanded", visible ? "false" : "true");
+      },
+      { label: "embedded-table:toggle" }
+    );
+  }
+  destroy() {
+    this.row?.remove();
+    this.row = null;
+    this.table = null;
+    this.button.dataset.open = "false";
+    this.button.setAttribute("aria-expanded", "false");
+    this.button._embeddedTable = null;
+    this.mobileQuery.removeEventListener("change", this.destroy);
+  }
+}
+
+class EmbeddedTable {
+  constructor(attributes) {
+    Object.assign(this, attributes);
+    this.click = this._click.bind(this);
+    this._visibility = null;
+  }
+  init() {
+    document.addEventListener("click", this.click);
+    this.modified = true;
+    this.visible = true;
+  }
+  _click(e) {
+    this._clickExpandedTableCell(e);
+  }
+  _clickExpandedTableCell(e) {
+    const expand = e.target instanceof Element ? e.target.closest("button[data-role='expand']") : null;
+    if (!expand || !this.target.contains(expand)) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    this._expandTableCell(expand);
+    return true;
+  }
+  initVisibility(table, storageKey = null) {
+    if (!table) return null;
+    this._visibility = new EmbeddedTableVisibility(table, storageKey);
+    this._visibility.init();
+    return this._visibility;
+  }
+  async _expandTableCell(button) {
+    if (!button._embeddedTable) {
+      button._embeddedTable = new ExpandedTableCell(this.view, button);
+    }
+    button._embeddedTable.toggle();
+  }
+  destroy() {
+    document.removeEventListener("click", this.click);
+  }
+}
+class BaseTable extends EmbeddedTable {
+  constructor(attributes) {
+    super(attributes);
+    this.keydown = this._keydown.bind(this);
+  }
+  init() {
+    super.init();
+    document.addEventListener("keydown", this.keydown);
+  }
+  get header() {
+    return this.component.elt.querySelector("thead > tr:first-child");
+  }
+  get visibilityWidget() {
+    return this.component.widgets.TableVisibility;
+  }
+  get sortingWidget() {
+    return this.component.widgets.TableSorting;
+  }
+  _click(e) {
+    if (this._clickExpandedTableCell(e)) return;
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const visibility = this.visibilityWidget;
+    const sorting = this.sortingWidget;
+    const open = visibility?.visible || sorting?.visible;
+    if (!target.closest("thead")) {
+      open && withTransition(() => {
+        [visibility, sorting].forEach((widget) => {
+          if (widget) widget.disable();
+          if (widget) widget.reconcile();
+        });
+      });
+      return;
+    }
+    if (target.closest("button[lp-show='table:TableVisibility']")) {
+      return;
+    } else if (this.header?.contains(target)) {
+      const header = target.closest("th[data-ordering]");
+      if (!header) return;
+      const event = new CustomEvent(
+        "toggle-column-filter",
+        {
+          detail: {
+            button: target.closest("button"),
+            column: header.dataset.column
+          },
+          bubbles: true
+        }
+      );
+      this.target.dispatchEvent(event);
+    }
+  }
+  _keydown(e) {
+    if (e.key === "Escape") {
+      const visibility = this.visibilityWidget;
+      const sorting = this.sortingWidget;
+      const open = visibility?.visible || sorting?.visible;
+      if (!open) return;
+      withTransition(() => {
+        [visibility, sorting].forEach((widget) => {
+          if (widget) widget.disable();
+          if (widget) widget.reconcile();
+        });
+      });
+    }
+  }
+  destroy() {
+    super.destroy();
+    document.removeEventListener("keydown", this.keydown);
+  }
+}
+
+export { BaseTable as B, EmbeddedTable as E };

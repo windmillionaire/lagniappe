@@ -1,2 +1,641 @@
-import{ensureMessageComposer as f}from"../messageComposer.js?v=b9ad6d22";import{S as v,c as p}from"../ui-resources.js?v=b9ad6d22";import{r as h,E as d}from"../foundation.js?v=b9ad6d22";import"../connectivity.js?v=b9ad6d22";import{C as g}from"../core-foundation.js?v=b9ad6d22";import"../modal.js?v=b9ad6d22";import"../forms.js?v=b9ad6d22";import"../ui-controls.js?v=b9ad6d22";import"../combobox.js?v=b9ad6d22";import"../upstreamUnavailable.js?v=b9ad6d22";const C="view:channel:messages";function m(u){return typeof u?.id=="string"}function a(u,e){const t=u.querySelector(e);if(!t)throw new Error(`Missing message control: ${e}`);return t}class b extends g{_initPollingSubscription(){this.PollingCoordinator&&this.PollingCoordinator.subscribe({id:C,type:"channel",channel:"messages",revision:null},{mode:"periodic",initial:"scheduled",onResult:async e=>{e.status==="changed"&&await this.refresh()}})}_boostMessagePolling(){this.PollingCoordinator?.boost?.(C,{durationMs:6e4,pollAfterMs:2e3})}async init(){await super.init(),this.list=a(this.elt,"[data-role='conversation-list']"),this.selector=a(this.elt,"[data-role='conversation-selector']"),this.selectorLabel=a(this.selector,"[data-role='conversation-selector-label']"),this.mobileClearConversation=a(this.elt,"[data-role='mobile-clear-conversation']"),this.mobileClearConversationContainer=a(this.elt,"[data-role='mobile-clear-conversation-container']"),this.history=a(this.elt,"[data-role='message-history']"),this.header=a(this.elt,"[data-role='message-header']"),this.loadConversationsButton=a(this.elt,"[data-action='load-conversations']"),this.loadMessagesButton=a(this.elt,"[data-action='load-messages']"),this.replyForm=a(this.elt,"[data-role='message-reply']"),this.replyTextarea=a(this.replyForm,"textarea[name='body']"),this.replyError=a(this.replyForm,"[data-role='message-reply-error']"),this.replySubmit=a(this.replyForm,"button[type='submit']"),this.replySpinner=a(this.replySubmit,"[data-role='icon']"),this.current=null,this.conversationSelectionRevision=0,this.conversationListRevision=0,this.conversationCursor=null,this.messageCursor=null,this.conversations=new Map,this.conversationStorageKey=`messages-${this.elt.dataset.currentUser}-active`;const e=this.elt.dataset.initialConversation,t=localStorage.getItem(this.conversationStorageKey);this.preferredConversation=e||t||null;const i=this.elt.querySelector("[data-action='compose-message']");i&&(this.composer=f(this,{onSent:n=>this.handleMessageSent(n)}),i.addEventListener("click",()=>this.composer?.open())),this.list.addEventListener("click",n=>{const l=n.target?.closest?.("[data-conversation]")?.dataset.conversation;if(l){const c=this._beginConversationSelection(l);this.openConversation(l,{selectionRevision:c})}}),this._conversationSelectorClick=n=>{!this.mobile||this.conversationDropdown||(n.preventDefault(),n.stopPropagation(),this.runColdAction(this.selector,()=>this._ensureConversationDropdown(),r=>r?.showPanel?.(),this.selector))},this.selector.addEventListener("click",this._conversationSelectorClick),this._messagesMobileResize=()=>{this.mobile?this._ensureConversationDropdown():(this.conversationDropdown?.destroy?.(),this.conversationDropdown=null)},this.elt.addEventListener("mobile-resize",this._messagesMobileResize),this.history.addEventListener("click",n=>{const r=n.target?.closest?.("[data-action='delete-message']");r?.dataset.message&&this.deleteMessage(r.dataset.message)}),this.loadConversationsButton.addEventListener("click",()=>this.loadConversations({append:!0})),this.loadMessagesButton.addEventListener("click",()=>this.loadHistory({prepend:!0})),this.replyForm.addEventListener("submit",n=>{this.sendReply(n)}),await this.loadConversations();const s=[e,t,Array.from(this.conversations.values()).find(n=>n.unread)?.id||this.conversations.values().next().value?.id].filter((n,r,l)=>!!(n&&l.indexOf(n)===r));this.preferredConversation=s[0]||null,this.renderConversationSelector(),this.mobile&&s.length&&await this._ensureConversationDropdown();let o=!1;for(const n of s){if(this.preferredConversation=n,this.renderConversationSelector(),await this.openConversation(n)){o=!0;break}n===t&&localStorage.removeItem(this.conversationStorageKey)}return s.length&&!o&&(this.rememberConversation(null),this.renderConversationSelector()),this}async refresh(){if(this._messageRefresh)return this._messageRefresh;const e=this._refreshMessages().finally(()=>{this._messageRefresh===e&&(this._messageRefresh=null)});return this._messageRefresh=e,e}async _refreshMessages(){const e=this.conversationSelectionRevision,t=this.preferredConversation||this.current?.id;if(await this.loadConversations(),e!==this.conversationSelectionRevision)return!1;Array.from(this.conversations.values()).some(s=>s.unread)&&this._boostMessagePolling();const i=(t&&this.conversations.has(t)?t:null)||Array.from(this.conversations.values()).find(s=>s.unread)?.id||this.conversations.values().next().value?.id||null;return i?this.openConversation(i,{selectionRevision:e}):(this.current=null,this.messageCursor=null,this.history.replaceChildren(),this.header.textContent="Choose a conversation",this.renderReply(),this.rememberConversation(null),this.renderConversationSelector(),!1)}_beginConversationSelection(e){return this.preferredConversation=e||null,++this.conversationSelectionRevision}async handleMessageSent(e){const t=e.conversation?.id;if(!t)return!1;const i=this.current?.id||null,s=i?this.conversationSelectionRevision:this._beginConversationSelection(t);return this._boostMessagePolling(),await this.loadConversations(),s!==this.conversationSelectionRevision?!1:i&&i!==t?!0:this.openConversation(t,{selectionRevision:s})}async _ensureConversationDropdown(){return this.conversationDropdown||this._conversationDropdownPromise?this.conversationDropdown??this._conversationDropdownPromise??null:(this._conversationDropdownPromise=import("../combobox.js?v=b9ad6d22").then(function(e){return e.e}).then(({Dropdown:e})=>this._destroyed||!this.mobile?null:(this.conversationDropdown=new e(this.selector).init({items:[],matchReferenceWidth:!0}),this.renderConversationSelector(),this.conversationDropdown)).catch(e=>(this.reportStartupError(e,this.selector,"messages-conversation-dropdown"),null)).finally(()=>{this._conversationDropdownPromise=null}),this._conversationDropdownPromise)}async loadConversations({append:e=!1}={}){const t=++this.conversationListRevision,i=e&&this.conversationCursor?{cursor:this.conversationCursor}:null,s=await h.get(d.messages.conversations,i);if(s?.ok&&t===this.conversationListRevision){e||this.conversations.clear();for(const o of s.conversations||[])m(o)&&this.conversations.set(o.id,o);this.conversationCursor=s.cursor||null,this.renderConversations()}}renderConversations(){const e=Array.from(this.conversations.values());this.list.replaceChildren(...e.map(t=>{const i=document.createElement("div");i.dataset.conversationRow=t.id,i.className=`${v.list.itemHeader} group bg-white hover:bg-user-bg data-[active=true]:bg-user-bg/50`,t.id===this.current?.id&&(i.dataset.active="true");const s=document.createElement("button");s.type="button",s.dataset.conversation=t.id,s.className="flex min-w-0 grow items-center justify-between gap-2 text-left focus-visible:outline-none focus-visible:underline";const o=document.createElement("span");if(o.className="font-medium",o.textContent=t.peer.name,s.appendChild(o),t.unread){const r=document.createElement("span");r.className="rounded-full bg-user-default px-2 py-0.5 text-xs font-bold text-white",r.textContent=String(t.unread),s.appendChild(r)}const n=document.createElement("button");return n.type="button",n.className=v.toggle.container,n.dataset.controls="delete",n.dataset.kind="delete",n.dataset.active="false",n.dataset.deleteKey=t.id,n.dataset.deleteModalRoute=d.messages.clearModal(t.id),n.setAttribute("lp-control","delete"),n.setAttribute("lp-delete",""),n.setAttribute("aria-label",`Clear conversation with ${t.peer.name}`),n.title=`Clear conversation with ${t.peer.name}`,n.append(p("trash.active",`${v.toggle.icon.active} icon-lg`),p("trash.inactive",`${v.toggle.icon.inactive} icon-lg`)),i.append(s,n),i})),this.renderConversationSelector(),this.loadConversationsButton.classList.toggle("hidden",!this.conversationCursor)}renderConversationSelector(){const t=(this.current||this.preferredConversation&&this.conversations.get(this.preferredConversation)||null)?.peer?.name||"";this.selectorLabel.textContent=t,this.selector.classList.toggle("hidden",!t),this.selector.setAttribute("aria-label",t?`Conversation: ${t}`:"Conversation");const i=this.current||null;if(this.mobileClearConversationContainer.dataset.visible=i?"true":"false",this.mobileClearConversation.disabled=!i,i){this.mobileClearConversation.dataset.deleteKey=i.id,this.mobileClearConversation.dataset.deleteModalRoute=d.messages.clearModal(i.id);const s=`Clear conversation with ${i.peer.name}`;this.mobileClearConversation.setAttribute("aria-label",s),this.mobileClearConversation.title=s}else delete this.mobileClearConversation.dataset.deleteKey,delete this.mobileClearConversation.dataset.deleteModalRoute,this.mobileClearConversation.setAttribute("aria-label","Clear conversation"),this.mobileClearConversation.title="Clear conversation";this.conversationDropdown?.updateOptions(Array.from(this.conversations.values()).map(s=>({name:`${s.peer.name}${s.unread?` (${s.unread} unread)`:""}`,onClick:()=>{const o=this._beginConversationSelection(s.id);return this.openConversation(s.id,{selectionRevision:o})}})))}rememberConversation(e){this.preferredConversation=e||null,this.conversationStorageKey&&(e?localStorage.setItem(this.conversationStorageKey,e):localStorage.removeItem(this.conversationStorageKey))}async openConversation(e,{selectionRevision:t=null}={}){const i=await h.get(d.messages.history(e));return!i?.ok||!m(i.conversation)||t!==null&&t!==this.conversationSelectionRevision?!1:(this.current=i.conversation,this.rememberConversation(this.current.id),this.replyOperationId=this.operationId?.()||crypto.randomUUID(),this.conversations.set(this.current.id,this.current),this.messageCursor=i.cursor||null,this.renderHeader(),this.renderMessages(i.messages||[]),this.renderConversations(),this.mobile&&!this.conversationDropdown&&await this._ensureConversationDropdown(),this.current.unread&&await this.markRead({selectionRevision:t??this.conversationSelectionRevision}),!0)}renderHeader(){if(!this.current)return;const e=document.createElement("span");e.className="font-semibold",e.textContent=this.current.peer.deleted?`${this.current.peer.name} (deleted)`:this.current.peer.name,this.header.replaceChildren(e),this.renderReply()}renderReply(){const e=!!this.current?.peer?.replyable;this.replyForm.classList.toggle("hidden",!e),this.replyTextarea.disabled=!e,this.replySubmit.disabled=!e,this.replySpinner.dataset.visible="false",this.replyError.classList.add("hidden"),this.replyError.textContent=""}async sendReply(e){if(e.preventDefault(),!this.current?.peer?.replyable||this.replySubmit.disabled)return;const t=this.conversationSelectionRevision,i=this.current.id,s=new FormData;s.set("recipient",String(this.current.peer.id)),s.set("conversation",i),s.set("body",this.replyTextarea.value),s.set("operation_id",this.replyOperationId||this.operationId?.()||crypto.randomUUID()),this.replyError.classList.add("hidden"),this.replySubmit.disabled=!0,this.replySpinner.dataset.visible="true";let o;try{o=await h.post(d.messages.send,s)}finally{this.replySubmit.disabled=!1,this.replySpinner.dataset.visible="false"}if(!o?.ok){this.replyError.textContent=o?.error||"Reply could not be sent.",this.replyError.classList.remove("hidden");return}this._boostMessagePolling(),this.replyTextarea.value="",await this.loadConversations();const n=o.conversation?.id;n&&t===this.conversationSelectionRevision&&(await this.openConversation(n,{selectionRevision:t}),this.replyTextarea.focus())}renderMessages(e,{prepend:t=!1}={}){const i=e.map(s=>{const o=document.createElement("article");o.dataset.message=String(s.id),o.className=`group max-w-[85%] rounded-lg p-3 ${s.mine?"self-end bg-user-bg":"self-start bg-base-bg"}`;const n=document.createElement("p");n.className="whitespace-pre-wrap break-words",n.textContent=s.body;const r=document.createElement("div");r.className="mt-1 flex items-center justify-between gap-3 text-xs text-base-medium";const l=document.createElement("time");l.dateTime=s.created||"",l.textContent=s.created?new Date(s.created).toLocaleString():"";const c=document.createElement("button");return c.type="button",c.dataset.action="delete-message",c.dataset.message=String(s.id),c.className="text-delete-default opacity-0 group-hover:opacity-100",c.textContent="Delete",r.append(l,c),o.append(n,r),o});t?this.history.prepend(...i):this.history.replaceChildren(...i),this.loadMessagesButton.classList.toggle("hidden",!this.messageCursor),t||(this.history.scrollTop=this.history.scrollHeight)}async loadHistory({prepend:e=!1}={}){if(!this.current)return;const t=this.current.id,i=this.conversationSelectionRevision,s=e&&this.messageCursor?{cursor:this.messageCursor}:null,o=await h.get(d.messages.history(t),s);o?.ok&&(i!==this.conversationSelectionRevision||this.current?.id!==t||(this.messageCursor=o.cursor||null,this.renderMessages(o.messages||[],{prepend:e})))}async markRead({selectionRevision:e=this.conversationSelectionRevision}={}){const t=this.current;if(!t)return;const i=new FormData;i.set("revision",String(t.revision));const s=await h.post(d.messages.read(t.id),i);if(e!==this.conversationSelectionRevision||this.current?.id!==t.id){m(s?.conversation)&&this.conversations.set(t.id,s.conversation);return}if(!s?.ok){s?.conversation&&await this.openConversation(t.id,{selectionRevision:e});return}m(s.conversation)&&(this.current=s.conversation,this.conversations.set(this.current.id,this.current),this.renderConversations())}async deleteMessage(e){(await h.delete(d.messages.remove(e)))?.ok&&this.history.querySelector(`[data-message="${CSS.escape(e)}"]`)?.remove()}reconcileChange(e={}){if(e.type!=="delete"||!e.key||!this.conversations.has(e.key))return super.reconcileChange(e);this.conversations.delete(e.key);let t=null,i=null;return this.current?.id===e.key&&(this.current=null,this.messageCursor=null,this.history.replaceChildren(),this.header.textContent="Choose a conversation",this.renderReply(),t=this.conversations.values().next().value?.id||null,i=this._beginConversationSelection(t),this.rememberConversation(t)),this.renderConversations(),t?this.openConversation(t,{selectionRevision:i}):Promise.resolve()}destroy(){this._conversationSelectorClick&&this.selector?.removeEventListener("click",this._conversationSelectorClick),this._messagesMobileResize&&this.elt.removeEventListener("mobile-resize",this._messagesMobileResize),this.conversationDropdown?.destroy?.(),this.conversationDropdown=null,super.destroy()}}export{b as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { ensureMessageComposer } from '../messageComposer.js?v=b6ea3fe0';
+import { S as STYLES, c as createIcon } from '../ui-resources.js?v=b6ea3fe0';
+import { r as request, E as ENDPOINTS } from '../foundation.js?v=b6ea3fe0';
+import '../connectivity.js?v=b6ea3fe0';
+import { C as Core } from '../core-foundation.js?v=b6ea3fe0';
+import '../modal.js?v=b6ea3fe0';
+import '../forms.js?v=b6ea3fe0';
+import '../ui-controls.js?v=b6ea3fe0';
+import '../combobox.js?v=b6ea3fe0';
+import '../upstreamUnavailable.js?v=b6ea3fe0';
+
+const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
+function hasConversationId(conversation) {
+  return typeof conversation?.id === "string";
+}
+function requiredControl(root, selector) {
+  const control = root.querySelector(selector);
+  if (!control) throw new Error(`Missing message control: ${selector}`);
+  return control;
+}
+class Messages extends Core {
+  _initPollingSubscription() {
+    if (!this.PollingCoordinator) return;
+    this.PollingCoordinator.subscribe(
+      {
+        id: MESSAGE_POLL_SUBSCRIPTION,
+        type: "channel",
+        channel: "messages",
+        revision: null
+      },
+      {
+        mode: "periodic",
+        initial: "scheduled",
+        onResult: async (result) => {
+          if (result.status !== "changed") return;
+          await this.refresh();
+        }
+      }
+    );
+  }
+  _boostMessagePolling() {
+    this.PollingCoordinator?.boost?.(MESSAGE_POLL_SUBSCRIPTION, {
+      durationMs: 6e4,
+      pollAfterMs: 2e3
+    });
+  }
+  async init() {
+    await super.init();
+    this.list = requiredControl(this.elt, "[data-role='conversation-list']");
+    this.selector = requiredControl(
+      this.elt,
+      "[data-role='conversation-selector']"
+    );
+    this.selectorLabel = requiredControl(
+      this.selector,
+      "[data-role='conversation-selector-label']"
+    );
+    this.mobileClearConversation = requiredControl(
+      this.elt,
+      "[data-role='mobile-clear-conversation']"
+    );
+    this.mobileClearConversationContainer = requiredControl(
+      this.elt,
+      "[data-role='mobile-clear-conversation-container']"
+    );
+    this.history = requiredControl(this.elt, "[data-role='message-history']");
+    this.header = requiredControl(this.elt, "[data-role='message-header']");
+    this.loadConversationsButton = requiredControl(
+      this.elt,
+      "[data-action='load-conversations']"
+    );
+    this.loadMessagesButton = requiredControl(
+      this.elt,
+      "[data-action='load-messages']"
+    );
+    this.replyForm = requiredControl(
+      this.elt,
+      "[data-role='message-reply']"
+    );
+    this.replyTextarea = requiredControl(
+      this.replyForm,
+      "textarea[name='body']"
+    );
+    this.replyError = requiredControl(
+      this.replyForm,
+      "[data-role='message-reply-error']"
+    );
+    this.replySubmit = requiredControl(
+      this.replyForm,
+      "button[type='submit']"
+    );
+    this.replySpinner = requiredControl(this.replySubmit, "[data-role='icon']");
+    this.current = null;
+    this.conversationSelectionRevision = 0;
+    this.conversationListRevision = 0;
+    this.conversationCursor = null;
+    this.messageCursor = null;
+    this.conversations = /* @__PURE__ */ new Map();
+    this.conversationStorageKey = `messages-${this.elt.dataset.currentUser}-active`;
+    const initialConversation = this.elt.dataset.initialConversation;
+    const storedConversation = localStorage.getItem(
+      this.conversationStorageKey
+    );
+    this.preferredConversation = initialConversation || storedConversation || null;
+    const composeButton = this.elt.querySelector(
+      "[data-action='compose-message']"
+    );
+    if (composeButton) {
+      this.composer = ensureMessageComposer(this, {
+        onSent: (response) => this.handleMessageSent(response)
+      });
+      composeButton.addEventListener("click", () => this.composer?.open());
+    }
+    this.list.addEventListener("click", (event) => {
+      const button = event.target?.closest?.("[data-conversation]");
+      const key = button?.dataset.conversation;
+      if (key) {
+        const selectionRevision = this._beginConversationSelection(key);
+        void this.openConversation(key, {
+          selectionRevision
+        });
+      }
+    });
+    this._conversationSelectorClick = (event) => {
+      if (!this.mobile || this.conversationDropdown) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void this.runColdAction(
+        this.selector,
+        () => this._ensureConversationDropdown(),
+        (dropdown) => dropdown?.showPanel?.(),
+        this.selector
+      );
+    };
+    this.selector.addEventListener("click", this._conversationSelectorClick);
+    this._messagesMobileResize = () => {
+      if (this.mobile) {
+        void this._ensureConversationDropdown();
+      } else {
+        this.conversationDropdown?.destroy?.();
+        this.conversationDropdown = null;
+      }
+    };
+    this.elt.addEventListener("mobile-resize", this._messagesMobileResize);
+    this.history.addEventListener("click", (event) => {
+      const target = event.target;
+      if (target?.closest?.(
+        "[data-action='start-conversation']"
+      )) {
+        this.composer?.open();
+        return;
+      }
+      const button = target?.closest?.(
+        "[data-action='delete-message']"
+      );
+      if (button?.dataset.message)
+        void this.deleteMessage(button.dataset.message);
+    });
+    this.loadConversationsButton.addEventListener(
+      "click",
+      () => this.loadConversations({ append: true })
+    );
+    this.loadMessagesButton.addEventListener(
+      "click",
+      () => this.loadHistory({ prepend: true })
+    );
+    this.replyForm.addEventListener(
+      "submit",
+      (event) => void this.sendReply(event)
+    );
+    await this.loadConversations();
+    const candidates = [
+      initialConversation,
+      storedConversation,
+      Array.from(this.conversations.values()).find(
+        (conversation) => conversation.unread
+      )?.id || this.conversations.values().next().value?.id
+    ].filter(
+      (key, index, values) => Boolean(key && values.indexOf(key) === index)
+    );
+    this.preferredConversation = candidates[0] || null;
+    this.renderConversationSelector();
+    if (this.mobile && candidates.length) {
+      await this._ensureConversationDropdown();
+    }
+    let opened = false;
+    for (const candidate of candidates) {
+      this.preferredConversation = candidate;
+      this.renderConversationSelector();
+      if (await this.openConversation(candidate)) {
+        opened = true;
+        break;
+      }
+      if (candidate === storedConversation) {
+        localStorage.removeItem(this.conversationStorageKey);
+      }
+    }
+    if (candidates.length && !opened) {
+      this.rememberConversation(null);
+      this.renderConversationSelector();
+    }
+    if (!opened) {
+      this.renderEmptyHistory();
+    }
+    return this;
+  }
+  async refresh() {
+    if (this._messageRefresh) return this._messageRefresh;
+    const pending = this._refreshMessages().finally(() => {
+      if (this._messageRefresh === pending) this._messageRefresh = null;
+    });
+    this._messageRefresh = pending;
+    return pending;
+  }
+  async _refreshMessages() {
+    const selectionRevision = this.conversationSelectionRevision;
+    const active = this.preferredConversation || this.current?.id;
+    await this.loadConversations();
+    if (selectionRevision !== this.conversationSelectionRevision) return false;
+    if (Array.from(this.conversations.values()).some(
+      (conversation) => conversation.unread
+    )) {
+      this._boostMessagePolling();
+    }
+    const candidate = (active && this.conversations.has(active) ? active : null) || Array.from(this.conversations.values()).find(
+      (conversation) => conversation.unread
+    )?.id || this.conversations.values().next().value?.id || null;
+    if (candidate) {
+      return this.openConversation(candidate, { selectionRevision });
+    }
+    this.current = null;
+    this.messageCursor = null;
+    this.header.textContent = "Choose a conversation";
+    this.renderEmptyHistory();
+    this.renderReply();
+    this.rememberConversation(null);
+    this.renderConversationSelector();
+    return false;
+  }
+  _beginConversationSelection(key) {
+    this.preferredConversation = key || null;
+    return ++this.conversationSelectionRevision;
+  }
+  async handleMessageSent(response) {
+    const conversation = response.conversation?.id;
+    if (!conversation) return false;
+    const active = this.current?.id || null;
+    const selectionRevision = active ? this.conversationSelectionRevision : this._beginConversationSelection(conversation);
+    this._boostMessagePolling();
+    await this.loadConversations();
+    if (selectionRevision !== this.conversationSelectionRevision) return false;
+    if (active && active !== conversation) return true;
+    return this.openConversation(conversation, { selectionRevision });
+  }
+  async _ensureConversationDropdown() {
+    if (this.conversationDropdown || this._conversationDropdownPromise) {
+      return this.conversationDropdown ?? this._conversationDropdownPromise ?? null;
+    }
+    this._conversationDropdownPromise = import('../combobox.js?v=b6ea3fe0').then(function (n) { return n.e; }).then(({ Dropdown }) => {
+      if (this._destroyed || !this.mobile) return null;
+      this.conversationDropdown = new Dropdown(this.selector).init({
+        items: [],
+        matchReferenceWidth: true
+      });
+      this.renderConversationSelector();
+      return this.conversationDropdown;
+    }).catch((error) => {
+      this.reportStartupError(
+        error,
+        this.selector,
+        "messages-conversation-dropdown"
+      );
+      return null;
+    }).finally(() => {
+      this._conversationDropdownPromise = null;
+    });
+    return this._conversationDropdownPromise;
+  }
+  async loadConversations({ append = false } = {}) {
+    const listRevision = ++this.conversationListRevision;
+    const params = append && this.conversationCursor ? { cursor: this.conversationCursor } : null;
+    const response = await request.get(
+      ENDPOINTS.messages.conversations,
+      params
+    );
+    if (!response?.ok) return;
+    if (listRevision !== this.conversationListRevision) return;
+    if (!append) this.conversations.clear();
+    for (const conversation of response.conversations || []) {
+      if (hasConversationId(conversation))
+        this.conversations.set(conversation.id, conversation);
+    }
+    this.conversationCursor = response.cursor || null;
+    this.renderConversations();
+  }
+  renderConversations() {
+    const conversations = Array.from(this.conversations.values());
+    if (conversations.length === 0 && typeof document !== "undefined") {
+      const empty = document.createElement("p");
+      empty.dataset.role = "empty";
+      empty.className = STYLES.messages?.sidebarEmpty || "";
+      empty.textContent = "No conversations yet.";
+      this.list.replaceChildren(empty);
+    } else {
+      this.list.replaceChildren(
+        ...conversations.map((conversation) => {
+          const row = document.createElement("div");
+          row.dataset.conversationRow = conversation.id;
+          row.className = `${STYLES.list.itemHeader} group bg-white hover:bg-user-bg data-[active=true]:bg-user-bg/50`;
+          if (conversation.id === this.current?.id) row.dataset.active = "true";
+          const button = document.createElement("button");
+          button.type = "button";
+          button.dataset.conversation = conversation.id;
+          button.className = "flex min-w-0 grow items-center justify-between gap-2 text-left focus-visible:outline-none focus-visible:underline";
+          const name = document.createElement("span");
+          name.className = "font-medium";
+          name.textContent = conversation.peer.name;
+          button.appendChild(name);
+          if (conversation.unread) {
+            const unread = document.createElement("span");
+            unread.className = "rounded-full bg-user-default px-2 py-0.5 text-xs font-bold text-white";
+            unread.textContent = String(conversation.unread);
+            button.appendChild(unread);
+          }
+          const clear = document.createElement("button");
+          clear.type = "button";
+          clear.className = STYLES.toggle.container;
+          clear.dataset.controls = "delete";
+          clear.dataset.kind = "delete";
+          clear.dataset.active = "false";
+          clear.dataset.deleteKey = conversation.id;
+          clear.dataset.deleteModalRoute = ENDPOINTS.messages.clearModal(
+            conversation.id
+          );
+          clear.setAttribute("lp-control", "delete");
+          clear.setAttribute("lp-delete", "");
+          clear.setAttribute(
+            "aria-label",
+            `Clear conversation with ${conversation.peer.name}`
+          );
+          clear.title = `Clear conversation with ${conversation.peer.name}`;
+          clear.append(
+            createIcon("trash.active", `${STYLES.toggle.icon.active} icon-lg`),
+            createIcon(
+              "trash.inactive",
+              `${STYLES.toggle.icon.inactive} icon-lg`
+            )
+          );
+          row.append(button, clear);
+          return row;
+        })
+      );
+    }
+    this.renderConversationSelector();
+    this.loadConversationsButton.classList.toggle(
+      "hidden",
+      !this.conversationCursor
+    );
+  }
+  renderConversationSelector() {
+    const selected = this.current || this.preferredConversation && this.conversations.get(this.preferredConversation) || null;
+    const selectedName = selected?.peer?.name || "";
+    this.selectorLabel.textContent = selectedName;
+    this.selector.classList.toggle("hidden", !selectedName);
+    this.selector.setAttribute(
+      "aria-label",
+      selectedName ? `Conversation: ${selectedName}` : "Conversation"
+    );
+    const activeConversation = this.current || null;
+    this.mobileClearConversationContainer.dataset.visible = activeConversation ? "true" : "false";
+    this.mobileClearConversation.disabled = !activeConversation;
+    if (activeConversation) {
+      this.mobileClearConversation.dataset.deleteKey = activeConversation.id;
+      this.mobileClearConversation.dataset.deleteModalRoute = ENDPOINTS.messages.clearModal(activeConversation.id);
+      const clearLabel = `Clear conversation with ${activeConversation.peer.name}`;
+      this.mobileClearConversation.setAttribute("aria-label", clearLabel);
+      this.mobileClearConversation.title = clearLabel;
+    } else {
+      delete this.mobileClearConversation.dataset.deleteKey;
+      delete this.mobileClearConversation.dataset.deleteModalRoute;
+      this.mobileClearConversation.setAttribute(
+        "aria-label",
+        "Clear conversation"
+      );
+      this.mobileClearConversation.title = "Clear conversation";
+    }
+    this.conversationDropdown?.updateOptions(
+      Array.from(this.conversations.values()).map((conversation) => ({
+        name: `${conversation.peer.name}${conversation.unread ? ` (${conversation.unread} unread)` : ""}`,
+        onClick: () => {
+          const selectionRevision = this._beginConversationSelection(
+            conversation.id
+          );
+          return this.openConversation(conversation.id, {
+            selectionRevision
+          });
+        }
+      }))
+    );
+  }
+  rememberConversation(key) {
+    this.preferredConversation = key || null;
+    if (!this.conversationStorageKey) return;
+    if (key) localStorage.setItem(this.conversationStorageKey, key);
+    else localStorage.removeItem(this.conversationStorageKey);
+  }
+  async openConversation(key, { selectionRevision = null } = {}) {
+    const response = await request.get(
+      ENDPOINTS.messages.history(key)
+    );
+    if (!response?.ok || !hasConversationId(response.conversation))
+      return false;
+    if (selectionRevision !== null && selectionRevision !== this.conversationSelectionRevision) {
+      return false;
+    }
+    this.current = response.conversation;
+    this.rememberConversation(this.current.id);
+    this.replyOperationId = this.operationId?.() || crypto.randomUUID();
+    this.conversations.set(this.current.id, this.current);
+    this.messageCursor = response.cursor || null;
+    this.renderHeader();
+    this.renderMessages(response.messages || []);
+    this.renderConversations();
+    if (this.mobile && !this.conversationDropdown) {
+      await this._ensureConversationDropdown();
+    }
+    if (this.current.unread) {
+      await this.markRead({
+        selectionRevision: selectionRevision ?? this.conversationSelectionRevision
+      });
+    }
+    return true;
+  }
+  renderHeader() {
+    if (!this.current) return;
+    const title = document.createElement("span");
+    title.className = "font-semibold";
+    title.textContent = this.current.peer.deleted ? `${this.current.peer.name} (deleted)` : this.current.peer.name;
+    this.header.replaceChildren(title);
+    this.renderReply();
+  }
+  renderReply() {
+    const available = Boolean(this.current?.peer?.replyable);
+    this.replyForm.classList.toggle("hidden", !available);
+    this.replyTextarea.disabled = !available;
+    this.replySubmit.disabled = !available;
+    this.replySpinner.dataset.visible = "false";
+    this.replyError.classList.add("hidden");
+    this.replyError.textContent = "";
+  }
+  async sendReply(event) {
+    event.preventDefault();
+    if (!this.current?.peer?.replyable || this.replySubmit.disabled) return;
+    const selectionRevision = this.conversationSelectionRevision;
+    const conversation = this.current.id;
+    const data = new FormData();
+    data.set("recipient", String(this.current.peer.id));
+    data.set("conversation", conversation);
+    data.set("body", this.replyTextarea.value);
+    data.set(
+      "operation_id",
+      this.replyOperationId || this.operationId?.() || crypto.randomUUID()
+    );
+    this.replyError.classList.add("hidden");
+    this.replySubmit.disabled = true;
+    this.replySpinner.dataset.visible = "true";
+    let response;
+    try {
+      response = await request.post(
+        ENDPOINTS.messages.send,
+        data
+      );
+    } finally {
+      this.replySubmit.disabled = false;
+      this.replySpinner.dataset.visible = "false";
+    }
+    if (!response?.ok) {
+      this.replyError.textContent = response?.error || "Reply could not be sent.";
+      this.replyError.classList.remove("hidden");
+      return;
+    }
+    this._boostMessagePolling();
+    this.replyTextarea.value = "";
+    await this.loadConversations();
+    const sentConversation = response.conversation?.id;
+    if (sentConversation && selectionRevision === this.conversationSelectionRevision) {
+      await this.openConversation(sentConversation, {
+        selectionRevision
+      });
+      this.replyTextarea.focus();
+    }
+  }
+  renderEmptyHistory() {
+    if (typeof document === "undefined" || !this.elt) {
+      this.history.replaceChildren();
+      return;
+    }
+    const container = document.createElement("div");
+    container.dataset.role = "empty";
+    container.className = STYLES.messages?.empty?.container || "";
+    const hasConversations = this.conversations.size > 0;
+    const title = document.createElement("p");
+    title.className = STYLES.messages?.empty?.title || "";
+    title.textContent = hasConversations ? "Select a conversation" : "No conversations yet";
+    const body = document.createElement("p");
+    body.className = STYLES.messages?.empty?.body || "";
+    if (hasConversations) {
+      body.textContent = "Choose a conversation from the list to view messages.";
+    } else if (this.composer) {
+      body.textContent = "Start a direct message with someone in your workspace.";
+    } else {
+      body.textContent = "Direct messages from other users will appear here.";
+    }
+    container.append(title, body);
+    if (!hasConversations && this.composer) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.action = "start-conversation";
+      button.className = STYLES.messages?.empty?.action || "";
+      button.append(createIcon("add"), document.createTextNode("New message"));
+      container.append(button);
+    }
+    this.history.replaceChildren(container);
+    this.loadMessagesButton?.classList?.add("hidden");
+  }
+  renderMessages(messages, { prepend = false } = {}) {
+    const nodes = messages.map((message) => {
+      const article = document.createElement("article");
+      article.dataset.message = String(message.id);
+      article.className = `group max-w-[85%] rounded-lg p-3 ${message.mine ? "self-end bg-user-bg" : "self-start bg-base-bg"}`;
+      const body = document.createElement("p");
+      body.className = "whitespace-pre-wrap break-words";
+      body.textContent = message.body;
+      const footer = document.createElement("div");
+      footer.className = "mt-1 flex items-center justify-between gap-3 text-xs text-base-medium";
+      const time = document.createElement("time");
+      time.dateTime = message.created || "";
+      time.textContent = message.created ? new Date(message.created).toLocaleString() : "";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.dataset.action = "delete-message";
+      remove.dataset.message = String(message.id);
+      remove.className = "text-delete-default opacity-0 group-hover:opacity-100";
+      remove.textContent = "Delete";
+      footer.append(time, remove);
+      article.append(body, footer);
+      return article;
+    });
+    if (prepend) this.history.prepend(...nodes);
+    else this.history.replaceChildren(...nodes);
+    this.loadMessagesButton.classList.toggle("hidden", !this.messageCursor);
+    if (!prepend) this.history.scrollTop = this.history.scrollHeight;
+  }
+  async loadHistory({ prepend = false } = {}) {
+    if (!this.current) return;
+    const conversation = this.current.id;
+    const selectionRevision = this.conversationSelectionRevision;
+    const params = prepend && this.messageCursor ? { cursor: this.messageCursor } : null;
+    const response = await request.get(
+      ENDPOINTS.messages.history(conversation),
+      params
+    );
+    if (!response?.ok) return;
+    if (selectionRevision !== this.conversationSelectionRevision || this.current?.id !== conversation) {
+      return;
+    }
+    this.messageCursor = response.cursor || null;
+    this.renderMessages(response.messages || [], { prepend });
+  }
+  async markRead({
+    selectionRevision = this.conversationSelectionRevision
+  } = {}) {
+    const conversation = this.current;
+    if (!conversation) return;
+    const data = new FormData();
+    data.set("revision", String(conversation.revision));
+    const response = await request.post(
+      ENDPOINTS.messages.read(conversation.id),
+      data
+    );
+    if (selectionRevision !== this.conversationSelectionRevision || this.current?.id !== conversation.id) {
+      if (hasConversationId(response?.conversation)) {
+        this.conversations.set(conversation.id, response.conversation);
+      }
+      return;
+    }
+    if (!response?.ok) {
+      if (response?.conversation) {
+        await this.openConversation(conversation.id, { selectionRevision });
+      }
+      return;
+    }
+    if (!hasConversationId(response.conversation)) return;
+    this.current = response.conversation;
+    this.conversations.set(this.current.id, this.current);
+    this.renderConversations();
+  }
+  async deleteMessage(key) {
+    const response = await request.delete(ENDPOINTS.messages.remove(key));
+    if (!response?.ok) return;
+    this.history.querySelector(`[data-message="${CSS.escape(key)}"]`)?.remove();
+  }
+  reconcileChange(change = {}) {
+    if (change.type !== "delete" || !change.key || !this.conversations.has(change.key)) {
+      return super.reconcileChange(change);
+    }
+    this.conversations.delete(change.key);
+    let replacement = null;
+    let selectionRevision = null;
+    if (this.current?.id === change.key) {
+      this.current = null;
+      this.messageCursor = null;
+      this.header.textContent = "Choose a conversation";
+      replacement = this.conversations.values().next().value?.id || null;
+      if (replacement) this.history.replaceChildren();
+      else this.renderEmptyHistory();
+      this.renderReply();
+      selectionRevision = this._beginConversationSelection(replacement);
+      this.rememberConversation(replacement);
+    }
+    this.renderConversations();
+    return replacement ? this.openConversation(replacement, { selectionRevision }) : Promise.resolve();
+  }
+  destroy() {
+    if (this._conversationSelectorClick) {
+      this.selector?.removeEventListener(
+        "click",
+        this._conversationSelectorClick
+      );
+    }
+    if (this._messagesMobileResize) {
+      this.elt.removeEventListener("mobile-resize", this._messagesMobileResize);
+    }
+    this.conversationDropdown?.destroy?.();
+    this.conversationDropdown = null;
+    super.destroy();
+  }
+}
+
+export { Messages as default };

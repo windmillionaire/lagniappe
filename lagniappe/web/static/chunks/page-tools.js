@@ -1,2 +1,918 @@
-import{b as m,I as C,T as q,S as F}from"./forms.js?v=b9ad6d22";import{s as k,S as U}from"./form-sections.js?v=b9ad6d22";import{r as g,c as L,w as u}from"./foundation.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";import{S as z,c as O}from"./ui-resources.js?v=b9ad6d22";import{p as c}from"./ui-controls.js?v=b9ad6d22";import{B as R,u as I,U as P}from"./uploads.js?v=b9ad6d22";class N extends m{constructor(e){super(e),this.messages={submit:"Add Note",submitting:"Adding Note",submitted:"Note Added"},this.photoUrl=null,this._click=this._click.bind(this),this._photoChanged=this._photoChanged.bind(this),this._reset=this._reset.bind(this)}get photoInput(){return this.target.querySelector("[name='note-file']")}get photoSelection(){return this.target.querySelector("[data-role='photo-selection']")}async init(){await super.init(),this.target.addEventListener("click",this._click),this.target.addEventListener("reset",this._reset),this.photoInput?.addEventListener("change",this._photoChanged),this._showPhoto(this.photoInput?.files?.[0])}_click(e){const t=e.target;t instanceof Element&&(t.closest("[data-action='add-photo']")?this.photoInput?.click():t.closest("[data-action='remove-photo']")&&this._clearPhoto())}_photoChanged(){this._showPhoto(this.photoInput?.files?.[0])}_reset(){queueMicrotask(()=>this._clearPhoto())}_showPhoto(e){if(!e){this._clearPhoto(!1);return}this._revokePhotoUrl(),this.photoUrl=URL.createObjectURL(e);const t=this.target.querySelector("[data-role='photo-preview']"),i=this.target.querySelector("[data-role='photo-name']");t&&(t.src=this.photoUrl),i&&(i.textContent=e.name),this.photoSelection&&(this.photoSelection.dataset.visible="true")}_clearPhoto(e=!0){this._revokePhotoUrl(),e&&this.photoInput&&(this.photoInput.value="");const t=this.target.querySelector("[data-role='photo-preview']"),i=this.target.querySelector("[data-role='photo-name']");t&&t.removeAttribute("src"),i&&(i.textContent=""),this.photoSelection&&(this.photoSelection.dataset.visible="false")}_revokePhotoUrl(){this.photoUrl&&URL.revokeObjectURL(this.photoUrl),this.photoUrl=null}created(){super.created(),this.target.reset()}offline(){return{action:"create",kind:"note"}}destroy(){this.target.removeEventListener("click",this._click),this.target.removeEventListener("reset",this._reset),this.photoInput?.removeEventListener("change",this._photoChanged),this._revokePhotoUrl(),super.destroy()}}var T=Object.freeze({__proto__:null,CreateNote:N});class v extends m{constructor(e){super(e),this.formSelect=null}get submitGroup(){return this.target.querySelector("[data-role='submit-group']")}get nameElement(){return this.schema?.find(e=>e.id==="name")?null:new C({kind:"page",readonly:this.readonly},{input:"text",id:"name",title:"Name",placeholder:"name this page..."},this.target.dataset.name||"").elt}get descriptionElement(){return this.schema?.find(e=>e.id==="description")?null:new q({kind:"page",readonly:this.readonly},{input:"textarea",id:"description",title:"Description",placeholder:"describe this page..."},this.target.dataset.description||"").elt}get formSelectElement(){return this._facetElement('[data-action="select-form"]')}get relatedFormsElement(){const e=this.target.querySelector('[data-role="related-forms"]');if(!e||this.readonly)return e;const t=new AbortController,i=t.signal,r=(s=null)=>{e.querySelectorAll("[data-role='related-form']").forEach(a=>{a.dataset.selected=(!!(s&&a.dataset.formId===s)).toString()})};return e.querySelectorAll("[data-role='related-form']").forEach(s=>{s.addEventListener("click",a=>{a.preventDefault(),a.stopPropagation();const o=this._relatedFormDetails(s);!o?.id||!this.formSelect||(this.formSelect.select?.values?.clear(),this.formSelect.addOption(o),r(o.id))},{signal:i})}),this.target.addEventListener("updated",s=>{const a=s.detail;if(a?.name!=="form")return;const o=Object.values(a.options||{})[0];r(o?.id||null)},{signal:i}),this.target.addEventListener("change",s=>{const a=s.target;a?.name==="form"&&r(a.value||null)},{signal:i}),r(this.formSelect?.details?.id||null),this.destroyables.push({destroy:()=>t.abort()}),e}get categoriesElement(){return this._facetElement('[data-role="categories"]')}get autofillElement(){return k.autofill(this)}get prepend(){let e=this.target.querySelector("[data-role='photo-prompt']");return this.revisionPreview?(e?.remove(),e=null):e&&this.view?._syncPhotoControls?.(void 0,e),[e,this.nameElement,this.descriptionElement]}get append(){return[this.formSelectElement,this.categoriesElement,this.autofillElement]}_facetElement(e){const t=this.target.querySelector(e);if(!t)return null;const i=U.facet(this,t);return i.init(),this.destroyables.push(i),t.matches('[data-action="select-form"]')&&(this.formSelect=i),i.elt}_relatedFormDetails(e){try{return JSON.parse(e.dataset.details||"{}")}catch{return{}}}}class D extends v{constructor(e){super(e),this.messages={submit:"Update Page",submitting:"Updating Page",submitted:"Page Updated",queued:"Queued Sync"},this._changeForm=this._changeForm.bind(this)}async init(){await super.init(),this.target.addEventListener("updated",this._changeForm)}async prepareReset(e={}){const t=e.afterInit;await super.prepareReset({...e,afterInit:async i=>{await t?.(i),i.target.addEventListener("updated",i._changeForm)}})}async reset(){await this.prepareReset(),this.commitReset()}offline({data:e,method:t,route:i}){return{id:`update:page:${this.key}`,action:"update",kind:"page",method:t,route:i,target_key:this.key,data:e}}handleOfflineQueue({phase:e,record:t}){if(!(t?.kind!=="page"||t.target_key!==this.key))if(e==="queued")this.form?.queued(),this.setEntityMetadata();else{if(e==="conflict")return this._offlineConflict={record:t,response:t.conflictResponse},this.stageOfflineConflict();e==="replayed"&&(this.form?.success(),this.setEntityMetadata())}}async _changeForm(e){const t=e.target;if(!(t instanceof Element)||!t.closest("[data-role='form-select']"))return;e.stopPropagation();const i=this.initialTarget;if(!i)return;const r=i.querySelector("[data-action='select-form']"),s=JSON.parse(r?.dataset.preload||"{}"),a=Object.values(e.detail?.options||{})[0];if(!a?.id||a.id===s?.id)return;const o=this.target.dataset.route;if(!o)return;this.target.classList.add("opacity-50","pointer-events-none");const l=new URLSearchParams;l.set("form",a.id);const n=await g.get(o,l);if(!this.view.successfulResponse(n,this.component??null)||!n){this.target.classList.remove("opacity-50","pointer-events-none"),L(new Error("Failed to replace form"),this.target,{requestedForm:a});return}this.schema=n.schema??null,this.submission=n.submission??null,i.dataset.formGeneration=String(n.generation||0);const d=i.querySelector('[data-action="select-form"]');d&&(d.dataset.preload=JSON.stringify(a)),await this.prepareReset(),await u(()=>{this.commitReset(),this.target.dataset.visible="true"},{label:"page-info:change-form"})}postreconcile(){super.postreconcile(),this.setEntityMetadata()}}class G extends v{constructor(e){super(e),this.messages={submit:"Create Page",submitting:"Creating Page",submitted:"Page Created"}}async init(){await super.init();const e=this.target.querySelector("input[name='name']");e&&(e.required=!0)}get html(){return[this.nameElement,this.descriptionElement,this.formSelectElement,this.relatedFormsElement,this.categoriesElement,this.autofillElement]}get prepend(){return[]}get append(){return[]}async prereconcile(){await super.prereconcile(),this._created&&await this.prepareReset()}postreconcile(){const e=this._created;e&&this.commitReset(),super.postreconcile(),e&&this.form?.resetSubmitButton();const t=this.target.querySelector("input[name='name']");this.visible&&t&&t.focus()}}var M=Object.freeze({__proto__:null,CreatePage:G,PageForm:v,PageInfo:D});const w="__public_pages__",x={public:"This page is public. It can be viewed at this URL: ",private:"This page is private."};class A extends m{constructor(e){super(e),this.messages={submit:"Update Public Page",submitting:"Updating",submitted:"Updated"}}get publicSettings(){try{return JSON.parse(this.target?.dataset.publicSettings||"{}")}catch{return{}}}get previewImages(){try{return JSON.parse(this.target?.dataset.previewImages||"[]")}catch{return[]}}get directoryCategories(){try{return JSON.parse(this.target?.dataset.directoryCategories||"[]")}catch{return[]}}get url(){return this.target?.dataset.url||null}get formData(){const e=super.formData;return e.get("directory-category")===w&&e.set("directory-category",""),e}set url(e){this.target&&(e?this.target.dataset.url=e:delete this.target.dataset.url)}get statusElement(){const e=document.createElement("p");if(e.className="font-base font-semibold text-base-dark",this.url){const t=document.createElement("a");t.dataset.kind=this.kind,t.className=z.link.default,t.href=this.url,t.textContent=this.url,e.append(`${x.public}`,t,".")}else e.textContent=x.private;return e}get visibilityGroupElement(){const e=document.createElement("fieldset");return e.className="flex flex-row gap-4",[{label:"Public",value:"public",checked:!!this.url},{label:"Private",value:"private",checked:!this.url}].forEach(i=>{e.appendChild(c.radio({label:i.label,name:"visibility",value:i.value,checked:i.checked,required:!0,kind:this.kind}))}),e}get discoveryElement(){const e=this.publicSettings,t=document.createElement("div");t.className="flex flex-col gap-3 border-t border-base-light/60 pt-4";const i=document.createElement("h3");i.className="font-semibold text-base-dark",i.textContent="Public discovery and sharing preview";const r=document.createElement("p");r.className="text-sm text-base-medium",r.textContent=this.target?.dataset.siteIndexing==="true"?"Site discovery is on. This page can opt out or choose how it is grouped in the public directory.":"Site discovery is off. These settings will be ready if it is enabled later.";const s=document.createElement("input");s.type="hidden",s.name="public-settings-present",s.value="true";const a=c.checkbox({label:"Allow this page to appear in search results",name:"allow-indexing",value:"true",checked:e.allow_indexing!==!1,kind:this.kind}),o=c.input({label:"Public title (optional)",name:"public-title",value:e.title||"",placeholder:"Uses the page name when blank",kind:this.kind}),l=o.querySelector("input");l&&(l.maxLength=120);const n=c.textarea({label:"Public description (optional)",name:"public-description",value:e.description||"",placeholder:"Uses an excerpt from the document when blank",rows:3,kind:this.kind}),d=n.querySelector("textarea");d&&(d.maxLength=300);const f=c.select({label:"Public directory category",name:"directory-category",kind:this.kind,data:{preload:JSON.stringify([{id:e.directory_category||w}])},options:[{label:"Public Pages",value:w,selected:!e.directory_category},...this.directoryCategories.map(y=>({label:y.name,value:y.id,selected:y.id===e.directory_category}))]});f.dataset.role="directory-category";const _=new F(f);_.init(),this.destroyables.push(_);const b=document.createElement("p");b.className="text-sm text-base-medium",b.textContent="Choosing a category publishes that category name in the directory. Only categories already attached to this page are available.";const S=c.input({label:"Public directory order (optional)",name:"directory-order",type:"number",value:e.directory_order!=null?String(e.directory_order):"",placeholder:"Leave blank to sort alphabetically (1 shows first)",kind:this.kind}),p=S.querySelector("input");p&&(p.min="1",p.max="9999",p.step="1"),t.append(i,r,s,a,o,n,f,b,S);const E=this.previewPickerElement;return E&&t.append(E),t}get previewPickerElement(){const e=this.previewImages;if(!e.length)return null;const t=this.publicSettings.preview_image_asset||"",i=document.createElement("fieldset");i.className="flex flex-col gap-2";const r=document.createElement("legend");r.className="mb-2 font-semibold text-base-dark",r.textContent="Sharing preview image",i.append(r);const s=[{name:"",url:this.target.dataset.siteImage,alt:"Site image"},...e],a=document.createElement("div");a.className="grid grid-cols-2 gap-3 sm:grid-cols-3";for(const o of s){const l=c.radio({label:o.name?o.alt||"Document image":"Site image",name:"preview-image-asset",value:o.name,checked:o.name===t,kind:this.kind});l.classList.add("flex-col","items-start","rounded-md","border","border-base-light/70","p-2");const n=document.createElement("img");n.src=o.url,n.alt=o.alt||"",n.className="aspect-video w-full rounded object-cover",l.prepend(n),a.append(l)}return i.append(a),i}get html(){return[this.statusElement,this.visibilityGroupElement,this.discoveryElement]}updated(e){super.updated(e);const t=(e.html||null)?.querySelector(`[data-widget='${this.name}']`);if(t){this.url=t.dataset.url||null;for(const i of["publicSettings","previewImages","directoryCategories","siteIndexing","siteImage"])t.dataset[i]!==void 0&&(this.target.dataset[i]=t.dataset[i])}}}var B=Object.freeze({__proto__:null,DocumentSettings:A});class j extends m{constructor(e){super(e),this.messages={submit:"Save Restrictions",submitting:"Saving Restrictions",submitted:"Restrictions Saved"}}}var J=Object.freeze({__proto__:null,PagePermissions:j});class $ extends R{constructor(e){super(e),this.dropzone=I.dropzone({element:this.target.querySelector("[data-role='dropzone']")}),this.inputName="page-photo",this.uploadType="image",this.aiCreate=this.target.dataset.aiCreate==="true",this.menuOptions=["remove","replace",...this.aiCreate?["generate"]:[],"paste"],this.uploadMenu=new P(this),this.generateForm=this.aiCreate?k.generateImageForm():null,this.submitGroup=this.generateForm?.submitGroup,this.messages={submit:"Generate",submitting:"Thinking...",submitted:"Done"},this.icon="generate",this._generateImage=this._generateImage.bind(this)}get html(){return[this.dropzone.element,...this.generateForm?[this.generateForm.element]:[]]}get fileAttached(){return super.fileAttached||this.dropzone.containsImage}get feedback(){return this.dropzone.element.querySelector("[data-role='feedback']")}get existingImage(){return this.dropzone.element.querySelector("[data-role='existing-image']")}get newImage(){return this.dropzone.element.querySelector("[data-role='new-image']")}async init(){await super.init(),!this.readonly&&this.aiCreate&&(this.submitGroup?.addEventListener("click",e=>{e.target instanceof Element&&e.target.closest("[data-role='cancel']")&&this.view.cancelPhotoGeneration(this)}),this.target.addEventListener("submit",this._generateImage))}shouldAutoUpload(){return!0}async autoUpload(){await this.uploadImage()}_replaceDropzone(e){this.reset();const t=e.querySelector("[data-role='dropzone']");t&&(t.querySelectorAll("img[src]").forEach(i=>{const r=i.getAttribute("src");if(!r||/^(blob|data):/.test(r))return;const s=new URL(r,window.location.href);s.searchParams.set("v",Date.now().toString());const a=s.origin===window.location.origin?`${s.pathname}${s.search}${s.hash}`:s.href;i.setAttribute("src",a)}),this.dropzone.element.replaceWith(t),this.dropzone=I.dropzone({element:t}),this.uploadMenu.destroy(),this.uploadMenu=new P(this),this.reset(),this._initDropZone(),this.uploadMenu&&this.uploadMenu.create())}async uploadImage(){return this._withImageMutation(async()=>{if(u(()=>{const r=this.existingImage,s=this.newImage;r&&(r.dataset.visible="false"),s&&(s.dataset.visible="true"),this.feedback?.replaceChildren(O("spinner")," Uploading...")}),!await this.prepareSubmit({route:this.endpoints.upload}))return;const t=await g.post(this.endpoints.upload,this.formData);if(!this.view.successfulResponse(t,this.component)||!t?.html)return;const{html:i}=t;await this.view.updatePhotoImage(!0,()=>{this._replaceDropzone(i)})})}async _withImageMutation(e){if(!(this.view.photoBusy||this.readonly)){this.view.setPhotoBusy(!0),this.target.inert=!0;try{return await e()}finally{this.target.inert=!1,this.view.setPhotoBusy(!1)}}}removeFile(){this.reset(),this._removeImage()}async _removeImage(){return this._withImageMutation(async()=>{const e=await g.delete(this.endpoints.remove);if(!this.view.successfulResponse(e,this.component)||!e?.html)return;const{html:t}=e;await this.view.updatePhotoImage(!1,()=>{this._replaceDropzone(t)})})}async _generateImage(){return this._withImageMutation(async()=>{const e=await g.post(this.endpoints.generate,this.formData);if(!this.view.successfulResponse(e,this.component)||!e?.html)return;const{html:t}=e;await this.view.updatePhotoImage(!0,()=>{this._replaceDropzone(t),this.hideGenerateForm({transition:!1})})})}reset(){super.reset(),this.generateForm?.reset(),this.hideError()}showError(e){u(()=>{if(this.generateForm?.visible())this.form.showError(e);else{const t=this.newImage,i=this.existingImage;t&&(t.dataset.visible="true"),i&&(i.dataset.visible=String(this.dropzone.containsImage));const r=document.createElement("span");r.className="text-delete text-base italic",r.textContent=e,this.dropzone.containsImage?(t&&(t.dataset.visible="false"),r.dataset.role="image-error",this.dropzone.element.querySelector("[data-role='image-error']")?.remove(),this.dropzone.element.append(r)):this.feedback?.replaceChildren(r)}})}hideError(){if(this.dropzone.element.querySelector("[data-role='image-error']")?.remove(),this.generateForm?.visible())this.form.hideError();else{const e=this.feedback;e&&(e.innerHTML="drop image here<br>or click to upload")}}showGenerateForm({transition:e=!0}={}){const t=this.generateForm;if(!this.aiCreate||this.readonly||!t)return;if(t.visible()){t.show();return}this.view.photoGenerationReturnOpen??=this.view.photoOpen;const i=()=>{this.reset(),this.dropzone.hide(),t.show(),this.form.showSubmitButton()};if(e&&(this.view.isSecondaryCardVisible?.(this.component.elt)??!0))return u(i);i()}hideGenerateForm({transition:e=!0}={}){const t=()=>{this.reset(),this.generateForm?.hide(),this.dropzone.show(),this.view.photoGenerationReturnOpen=null};if(e&&(this.view.isSecondaryCardVisible?.(this.component.elt)??!0))return u(t);t()}}var V=Object.freeze({__proto__:null,PagePhoto:$});export{J as a,V as b,B as d,T as n,M as p};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { b as FormWidget, I as InputElement, T as TextareaElement, S as SelectBox } from './forms.js?v=b6ea3fe0';
+import { s as sections, S as SectionToggle } from './form-sections.js?v=b6ea3fe0';
+import { r as request, c as captureError, w as withTransition } from './foundation.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+import { S as STYLES, c as createIcon } from './ui-resources.js?v=b6ea3fe0';
+import { p as primitives } from './ui-controls.js?v=b6ea3fe0';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './uploads.js?v=b6ea3fe0';
+
+class CreateNote extends FormWidget {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Add Note",
+      submitting: "Adding Note",
+      submitted: "Note Added"
+    };
+    this.photoUrl = null;
+    this._click = this._click.bind(this);
+    this._photoChanged = this._photoChanged.bind(this);
+    this._reset = this._reset.bind(this);
+  }
+  get photoInput() {
+    return this.target.querySelector("[name='note-file']");
+  }
+  get photoSelection() {
+    return this.target.querySelector(
+      "[data-role='photo-selection']"
+    );
+  }
+  async init() {
+    await super.init();
+    this.target.addEventListener("click", this._click);
+    this.target.addEventListener("reset", this._reset);
+    this.photoInput?.addEventListener("change", this._photoChanged);
+    this._showPhoto(this.photoInput?.files?.[0]);
+  }
+  _click(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest("[data-action='add-photo']")) {
+      this.photoInput?.click();
+    } else if (target.closest("[data-action='remove-photo']")) {
+      this._clearPhoto();
+    }
+  }
+  _photoChanged() {
+    this._showPhoto(this.photoInput?.files?.[0]);
+  }
+  _reset() {
+    queueMicrotask(() => this._clearPhoto());
+  }
+  _showPhoto(file) {
+    if (!file) {
+      this._clearPhoto(false);
+      return;
+    }
+    this._revokePhotoUrl();
+    this.photoUrl = URL.createObjectURL(file);
+    const preview = this.target.querySelector(
+      "[data-role='photo-preview']"
+    );
+    const name = this.target.querySelector("[data-role='photo-name']");
+    if (preview) preview.src = this.photoUrl;
+    if (name) name.textContent = file.name;
+    if (this.photoSelection) this.photoSelection.dataset.visible = "true";
+  }
+  _clearPhoto(clearInput = true) {
+    this._revokePhotoUrl();
+    if (clearInput && this.photoInput) this.photoInput.value = "";
+    const preview = this.target.querySelector("[data-role='photo-preview']");
+    const name = this.target.querySelector("[data-role='photo-name']");
+    if (preview) preview.removeAttribute("src");
+    if (name) name.textContent = "";
+    if (this.photoSelection) this.photoSelection.dataset.visible = "false";
+  }
+  _revokePhotoUrl() {
+    if (this.photoUrl) URL.revokeObjectURL(this.photoUrl);
+    this.photoUrl = null;
+  }
+  created() {
+    super.created();
+    this.target.reset();
+  }
+  offline() {
+    return {
+      action: "create",
+      kind: "note"
+    };
+  }
+  destroy() {
+    this.target.removeEventListener("click", this._click);
+    this.target.removeEventListener("reset", this._reset);
+    this.photoInput?.removeEventListener("change", this._photoChanged);
+    this._revokePhotoUrl();
+    super.destroy();
+  }
+}
+
+var note = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	CreateNote: CreateNote
+});
+
+class PageForm extends FormWidget {
+  constructor(attributes) {
+    super(attributes);
+    this.formSelect = null;
+  }
+  get submitGroup() {
+    return this.target.querySelector("[data-role='submit-group']");
+  }
+  get nameElement() {
+    if (this.schema?.find((elt) => elt.id === "name")) return null;
+    return new InputElement(
+      { kind: "page", readonly: this.readonly },
+      {
+        input: "text",
+        id: "name",
+        title: "Name",
+        placeholder: "name this page..."
+      },
+      this.target.dataset.name || ""
+    ).elt;
+  }
+  get descriptionElement() {
+    if (this.schema?.find((elt) => elt.id === "description")) return null;
+    return new TextareaElement(
+      { kind: "page", readonly: this.readonly },
+      {
+        input: "textarea",
+        id: "description",
+        title: "Description",
+        placeholder: "describe this page..."
+      },
+      this.target.dataset.description || ""
+    ).elt;
+  }
+  get formSelectElement() {
+    return this._facetElement('[data-action="select-form"]');
+  }
+  get relatedFormsElement() {
+    const section = this.target.querySelector('[data-role="related-forms"]');
+    if (!section || this.readonly) return section;
+    const controller = new AbortController();
+    const signal = controller.signal;
+    const setSelected = (formId = null) => {
+      section.querySelectorAll("[data-role='related-form']").forEach((badge) => {
+        badge.dataset.selected = Boolean(
+          formId && badge.dataset.formId === formId
+        ).toString();
+      });
+    };
+    section.querySelectorAll("[data-role='related-form']").forEach((badge) => {
+      badge.addEventListener(
+        "click",
+        (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const details = this._relatedFormDetails(badge);
+          if (!details?.id || !this.formSelect) return;
+          this.formSelect.select?.values?.clear();
+          this.formSelect.addOption(details);
+          setSelected(details.id);
+        },
+        { signal }
+      );
+    });
+    this.target.addEventListener(
+      "updated",
+      (e) => {
+        const detail = e.detail;
+        if (detail?.name !== "form") return;
+        const details = Object.values(detail.options || {})[0];
+        setSelected(details?.id || null);
+      },
+      { signal }
+    );
+    this.target.addEventListener(
+      "change",
+      (e) => {
+        const target = e.target;
+        if (target?.name !== "form") return;
+        setSelected(target.value || null);
+      },
+      { signal }
+    );
+    setSelected(this.formSelect?.details?.id || null);
+    this.destroyables.push({
+      destroy: () => controller.abort()
+    });
+    return section;
+  }
+  get categoriesElement() {
+    return this._facetElement('[data-role="categories"]');
+  }
+  get autofillElement() {
+    return sections.autofill(this);
+  }
+  get prepend() {
+    let imageControls = this.target.querySelector(
+      "[data-role='photo-prompt']"
+    );
+    if (this.revisionPreview) {
+      imageControls?.remove();
+      imageControls = null;
+    } else if (imageControls) {
+      this.view?._syncPhotoControls?.(void 0, imageControls);
+    }
+    return [imageControls, this.nameElement, this.descriptionElement];
+  }
+  get append() {
+    return [
+      this.formSelectElement,
+      this.categoriesElement,
+      this.autofillElement
+    ];
+  }
+  _facetElement(selector) {
+    const target = this.target.querySelector(selector);
+    if (!target) return null;
+    const control = SectionToggle.facet(this, target);
+    control.init();
+    this.destroyables.push(control);
+    if (target.matches('[data-action="select-form"]')) {
+      this.formSelect = control;
+    }
+    return control.elt;
+  }
+  _relatedFormDetails(badge) {
+    try {
+      return JSON.parse(badge.dataset.details || "{}");
+    } catch {
+      return {};
+    }
+  }
+}
+class PageInfo extends PageForm {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: `Update Page`,
+      submitting: `Updating Page`,
+      submitted: `Page Updated`,
+      queued: "Queued Sync"
+    };
+    this._changeForm = this._changeForm.bind(this);
+  }
+  async init() {
+    await super.init();
+    this.target.addEventListener("updated", this._changeForm);
+  }
+  async prepareReset(options = {}) {
+    const afterInit = options.afterInit;
+    await super.prepareReset({
+      ...options,
+      afterInit: async (widget) => {
+        await afterInit?.(widget);
+        widget.target.addEventListener("updated", widget._changeForm);
+      }
+    });
+  }
+  async reset() {
+    await this.prepareReset();
+    this.commitReset();
+  }
+  offline({ data, method, route }) {
+    return {
+      id: `update:page:${this.key}`,
+      action: "update",
+      kind: "page",
+      method,
+      route,
+      target_key: this.key,
+      data
+    };
+  }
+  handleOfflineQueue({ phase, record }) {
+    if (record?.kind !== "page" || record.target_key !== this.key) return;
+    if (phase === "queued") {
+      this.form?.queued();
+      this.setEntityMetadata();
+    } else if (phase === "conflict") {
+      this._offlineConflict = {
+        record,
+        response: record.conflictResponse
+      };
+      return this.stageOfflineConflict();
+    } else if (phase === "replayed") {
+      this.form?.success();
+      this.setEntityMetadata();
+    }
+  }
+  async _changeForm(e) {
+    const target = e.target;
+    if (!(target instanceof Element) || !target.closest("[data-role='form-select']"))
+      return;
+    e.stopPropagation();
+    const initialTarget = this.initialTarget;
+    if (!initialTarget) return;
+    const formSelect = initialTarget.querySelector(
+      "[data-action='select-form']"
+    );
+    const preloadedForm = JSON.parse(
+      formSelect?.dataset.preload || "{}"
+    );
+    const selectedForm = Object.values(
+      e.detail?.options || {}
+    )[0];
+    if (!selectedForm?.id) return;
+    if (selectedForm.id === preloadedForm?.id) return;
+    const route = this.target.dataset.route;
+    if (!route) return;
+    this.target.classList.add("opacity-50", "pointer-events-none");
+    const params = new URLSearchParams();
+    params.set("form", selectedForm.id);
+    const response = await request.get(route, params);
+    if (!this.view.successfulResponse(response, this.component ?? null) || !response) {
+      this.target.classList.remove("opacity-50", "pointer-events-none");
+      captureError(new Error("Failed to replace form"), this.target, {
+        requestedForm: selectedForm
+      });
+      return;
+    }
+    this.schema = response.schema ?? null;
+    this.submission = response.submission ?? null;
+    initialTarget.dataset.formGeneration = String(response.generation || 0);
+    const nextFormSelect = initialTarget.querySelector(
+      '[data-action="select-form"]'
+    );
+    if (nextFormSelect)
+      nextFormSelect.dataset.preload = JSON.stringify(selectedForm);
+    await this.prepareReset();
+    await withTransition(
+      () => {
+        this.commitReset();
+        this.target.dataset.visible = "true";
+      },
+      { label: "page-info:change-form" }
+    );
+  }
+  postreconcile() {
+    super.postreconcile();
+    this.setEntityMetadata();
+  }
+}
+class CreatePage extends PageForm {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Create Page",
+      submitting: "Creating Page",
+      submitted: "Page Created"
+    };
+  }
+  async init() {
+    await super.init();
+    const name = this.target.querySelector("input[name='name']");
+    if (name) name.required = true;
+  }
+  get html() {
+    return [
+      this.nameElement,
+      this.descriptionElement,
+      this.formSelectElement,
+      this.relatedFormsElement,
+      this.categoriesElement,
+      this.autofillElement
+    ];
+  }
+  get prepend() {
+    return [];
+  }
+  get append() {
+    return [];
+  }
+  async prereconcile() {
+    await super.prereconcile();
+    if (this._created) await this.prepareReset();
+  }
+  postreconcile() {
+    const created = this._created;
+    if (created) this.commitReset();
+    super.postreconcile();
+    if (created) {
+      this.form?.resetSubmitButton();
+    }
+    const nameElement = this.target.querySelector("input[name='name']");
+    if (this.visible && nameElement) nameElement.focus();
+  }
+}
+
+var pageInfo = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	CreatePage: CreatePage,
+	PageForm: PageForm,
+	PageInfo: PageInfo
+});
+
+const PUBLIC_DIRECTORY_ROOT = "__public_pages__";
+const VISIBILITY = {
+  public: "This page is public. It can be viewed at this URL: ",
+  private: "This page is private."
+};
+class DocumentSettings extends FormWidget {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Update Public Page",
+      submitting: "Updating",
+      submitted: "Updated"
+    };
+  }
+  get publicSettings() {
+    try {
+      return JSON.parse(this.target?.dataset.publicSettings || "{}");
+    } catch {
+      return {};
+    }
+  }
+  get previewImages() {
+    try {
+      return JSON.parse(this.target?.dataset.previewImages || "[]");
+    } catch {
+      return [];
+    }
+  }
+  get directoryCategories() {
+    try {
+      return JSON.parse(this.target?.dataset.directoryCategories || "[]");
+    } catch {
+      return [];
+    }
+  }
+  get url() {
+    return this.target?.dataset.url || null;
+  }
+  get formData() {
+    const data = super.formData;
+    if (data.get("directory-category") === PUBLIC_DIRECTORY_ROOT) {
+      data.set("directory-category", "");
+    }
+    return data;
+  }
+  set url(value) {
+    if (!this.target) return;
+    if (value) {
+      this.target.dataset.url = value;
+    } else {
+      delete this.target.dataset.url;
+    }
+  }
+  get statusElement() {
+    const status = document.createElement("p");
+    status.className = "font-base font-semibold text-base-dark";
+    if (this.url) {
+      const a = document.createElement("a");
+      a.dataset.kind = this.kind;
+      a.className = STYLES.link.default;
+      a.href = this.url;
+      a.textContent = this.url;
+      status.append(`${VISIBILITY.public}`, a, ".");
+    } else {
+      status.textContent = VISIBILITY.private;
+    }
+    return status;
+  }
+  get visibilityGroupElement() {
+    const visibilityGroup = document.createElement("fieldset");
+    visibilityGroup.className = "flex flex-row gap-4";
+    const options = [
+      { label: "Public", value: "public", checked: !!this.url },
+      { label: "Private", value: "private", checked: !this.url }
+    ];
+    options.forEach((option) => {
+      visibilityGroup.appendChild(
+        primitives.radio({
+          label: option.label,
+          name: "visibility",
+          value: option.value,
+          checked: option.checked,
+          required: true,
+          kind: this.kind
+        })
+      );
+    });
+    return visibilityGroup;
+  }
+  get discoveryElement() {
+    const settings = this.publicSettings;
+    const wrapper = document.createElement("div");
+    wrapper.className = "flex flex-col gap-3 border-t border-base-light/60 pt-4";
+    const heading = document.createElement("h3");
+    heading.className = "font-semibold text-base-dark";
+    heading.textContent = "Public discovery and sharing preview";
+    const siteState = document.createElement("p");
+    siteState.className = "text-sm text-base-medium";
+    siteState.textContent = this.target?.dataset.siteIndexing === "true" ? "Site discovery is on. This page can opt out or choose how it is grouped in the public directory." : "Site discovery is off. These settings will be ready if it is enabled later.";
+    const marker = document.createElement("input");
+    marker.type = "hidden";
+    marker.name = "public-settings-present";
+    marker.value = "true";
+    const indexing = primitives.checkbox({
+      label: "Allow this page to appear in search results",
+      name: "allow-indexing",
+      value: "true",
+      checked: settings.allow_indexing !== false,
+      kind: this.kind
+    });
+    const title = primitives.input({
+      label: "Public title (optional)",
+      name: "public-title",
+      value: settings.title || "",
+      placeholder: "Uses the page name when blank",
+      kind: this.kind
+    });
+    const titleInput = title.querySelector("input");
+    if (titleInput) titleInput.maxLength = 120;
+    const description = primitives.textarea({
+      label: "Public description (optional)",
+      name: "public-description",
+      value: settings.description || "",
+      placeholder: "Uses an excerpt from the document when blank",
+      rows: 3,
+      kind: this.kind
+    });
+    const descriptionInput = description.querySelector("textarea");
+    if (descriptionInput) descriptionInput.maxLength = 300;
+    const directoryCategory = primitives.select({
+      label: "Public directory category",
+      name: "directory-category",
+      kind: this.kind,
+      data: {
+        preload: JSON.stringify([
+          {
+            id: settings.directory_category || PUBLIC_DIRECTORY_ROOT
+          }
+        ])
+      },
+      options: [
+        {
+          label: "Public Pages",
+          value: PUBLIC_DIRECTORY_ROOT,
+          selected: !settings.directory_category
+        },
+        ...this.directoryCategories.map((category) => ({
+          label: category.name,
+          value: category.id,
+          selected: category.id === settings.directory_category
+        }))
+      ]
+    });
+    directoryCategory.dataset.role = "directory-category";
+    const directoryCategorySelect = new SelectBox(directoryCategory);
+    directoryCategorySelect.init();
+    this.destroyables.push(directoryCategorySelect);
+    const categoryGuidance = document.createElement("p");
+    categoryGuidance.className = "text-sm text-base-medium";
+    categoryGuidance.textContent = "Choosing a category publishes that category name in the directory. Only categories already attached to this page are available.";
+    const directoryOrder = primitives.input({
+      label: "Public directory order (optional)",
+      name: "directory-order",
+      type: "number",
+      value: settings.directory_order != null ? String(settings.directory_order) : "",
+      placeholder: "Leave blank to sort alphabetically (1 shows first)",
+      kind: this.kind
+    });
+    const orderInput = directoryOrder.querySelector("input");
+    if (orderInput) {
+      orderInput.min = "1";
+      orderInput.max = "9999";
+      orderInput.step = "1";
+    }
+    wrapper.append(
+      heading,
+      siteState,
+      marker,
+      indexing,
+      title,
+      description,
+      directoryCategory,
+      categoryGuidance,
+      directoryOrder
+    );
+    const previews = this.previewPickerElement;
+    if (previews) wrapper.append(previews);
+    return wrapper;
+  }
+  get previewPickerElement() {
+    const images = this.previewImages;
+    if (!images.length) return null;
+    const selected = this.publicSettings.preview_image_asset || "";
+    const fieldset = document.createElement("fieldset");
+    fieldset.className = "flex flex-col gap-2";
+    const legend = document.createElement("legend");
+    legend.className = "mb-2 font-semibold text-base-dark";
+    legend.textContent = "Sharing preview image";
+    fieldset.append(legend);
+    const options = [
+      {
+        name: "",
+        url: this.target.dataset.siteImage,
+        alt: "Site image"
+      },
+      ...images
+    ];
+    const grid = document.createElement("div");
+    grid.className = "grid grid-cols-2 gap-3 sm:grid-cols-3";
+    for (const option of options) {
+      const choice = primitives.radio({
+        label: option.name ? option.alt || "Document image" : "Site image",
+        name: "preview-image-asset",
+        value: option.name,
+        checked: option.name === selected,
+        kind: this.kind
+      });
+      choice.classList.add(
+        "flex-col",
+        "items-start",
+        "rounded-md",
+        "border",
+        "border-base-light/70",
+        "p-2"
+      );
+      const image = document.createElement("img");
+      image.src = option.url;
+      image.alt = option.alt || "";
+      image.className = "aspect-video w-full rounded object-cover";
+      choice.prepend(image);
+      grid.append(choice);
+    }
+    fieldset.append(grid);
+    return fieldset;
+  }
+  get html() {
+    return [
+      this.statusElement,
+      this.visibilityGroupElement,
+      this.discoveryElement
+    ];
+  }
+  updated(response) {
+    super.updated(response);
+    const updatedTarget = (response.html || null)?.querySelector(
+      `[data-widget='${this.name}']`
+    );
+    if (updatedTarget) {
+      this.url = updatedTarget.dataset.url || null;
+      for (const name of [
+        "publicSettings",
+        "previewImages",
+        "directoryCategories",
+        "siteIndexing",
+        "siteImage"
+      ]) {
+        if (updatedTarget.dataset[name] !== void 0) {
+          this.target.dataset[name] = updatedTarget.dataset[name];
+        }
+      }
+    }
+  }
+}
+
+var documentSettings = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	DocumentSettings: DocumentSettings
+});
+
+class PagePermissions extends FormWidget {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Save Restrictions",
+      submitting: "Saving Restrictions",
+      submitted: "Restrictions Saved"
+    };
+  }
+}
+
+var pagePermissions = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	PagePermissions: PagePermissions
+});
+
+class PagePhoto extends BaseUpload {
+  constructor(attributes) {
+    super(attributes);
+    this.dropzone = uploadElement.dropzone({
+      element: this.target.querySelector("[data-role='dropzone']")
+    });
+    this.inputName = "page-photo";
+    this.uploadType = "image";
+    this.aiCreate = this.target.dataset.aiCreate === "true";
+    this.menuOptions = [
+      "remove",
+      "replace",
+      ...this.aiCreate ? ["generate"] : [],
+      "paste"
+    ];
+    this.uploadMenu = new UploadMenu(this);
+    this.generateForm = this.aiCreate ? sections.generateImageForm() : null;
+    this.submitGroup = this.generateForm?.submitGroup;
+    this.messages = {
+      submit: "Generate",
+      submitting: "Thinking...",
+      submitted: "Done"
+    };
+    this.icon = "generate";
+    this._generateImage = this._generateImage.bind(this);
+  }
+  get html() {
+    return [
+      this.dropzone.element,
+      ...this.generateForm ? [this.generateForm.element] : []
+    ];
+  }
+  get fileAttached() {
+    return super.fileAttached || this.dropzone.containsImage;
+  }
+  get feedback() {
+    return this.dropzone.element.querySelector(
+      "[data-role='feedback']"
+    );
+  }
+  get existingImage() {
+    return this.dropzone.element.querySelector(
+      "[data-role='existing-image']"
+    );
+  }
+  get newImage() {
+    return this.dropzone.element.querySelector(
+      "[data-role='new-image']"
+    );
+  }
+  async init() {
+    await super.init();
+    if (this.readonly) return;
+    if (this.aiCreate) {
+      this.submitGroup?.addEventListener("click", (e) => {
+        if (e.target instanceof Element && e.target.closest("[data-role='cancel']")) {
+          void this.view.cancelPhotoGeneration(this);
+        }
+      });
+      this.target.addEventListener("submit", this._generateImage);
+    }
+  }
+  shouldAutoUpload() {
+    return true;
+  }
+  async autoUpload() {
+    await this.uploadImage();
+  }
+  _replaceDropzone(html) {
+    this.reset();
+    const newDropzone = html.querySelector(
+      "[data-role='dropzone']"
+    );
+    if (!newDropzone) return;
+    newDropzone.querySelectorAll("img[src]").forEach((image) => {
+      const source = image.getAttribute("src");
+      if (!source || /^(blob|data):/.test(source)) return;
+      const url = new URL(source, window.location.href);
+      url.searchParams.set("v", Date.now().toString());
+      const refreshedSource = url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : url.href;
+      image.setAttribute("src", refreshedSource);
+    });
+    this.dropzone.element.replaceWith(newDropzone);
+    this.dropzone = uploadElement.dropzone({
+      element: newDropzone
+    });
+    this.uploadMenu.destroy();
+    this.uploadMenu = new UploadMenu(this);
+    this.reset();
+    this._initDropZone();
+    if (this.uploadMenu) this.uploadMenu.create();
+  }
+  async uploadImage() {
+    return this._withImageMutation(async () => {
+      withTransition(() => {
+        const existingImage = this.existingImage;
+        const newImage = this.newImage;
+        if (existingImage) existingImage.dataset.visible = "false";
+        if (newImage) newImage.dataset.visible = "true";
+        this.feedback?.replaceChildren(createIcon("spinner"), " Uploading...");
+      });
+      const prepared = await this.prepareSubmit({
+        route: this.endpoints.upload
+      });
+      if (!prepared) return;
+      const response = await request.post(this.endpoints.upload, this.formData);
+      if (!this.view.successfulResponse(response, this.component) || !response?.html)
+        return;
+      const { html } = response;
+      await this.view.updatePhotoImage(true, () => {
+        this._replaceDropzone(html);
+      });
+    });
+  }
+  async _withImageMutation(operation) {
+    if (this.view.photoBusy || this.readonly) return;
+    this.view.setPhotoBusy(true);
+    this.target.inert = true;
+    try {
+      return await operation();
+    } finally {
+      this.target.inert = false;
+      this.view.setPhotoBusy(false);
+    }
+  }
+  removeFile() {
+    this.reset();
+    this._removeImage();
+  }
+  async _removeImage() {
+    return this._withImageMutation(async () => {
+      const response = await request.delete(this.endpoints.remove);
+      if (!this.view.successfulResponse(response, this.component) || !response?.html)
+        return;
+      const { html } = response;
+      await this.view.updatePhotoImage(false, () => {
+        this._replaceDropzone(html);
+      });
+    });
+  }
+  async _generateImage() {
+    return this._withImageMutation(async () => {
+      const response = await request.post(
+        this.endpoints.generate,
+        this.formData
+      );
+      if (!this.view.successfulResponse(response, this.component) || !response?.html)
+        return;
+      const { html } = response;
+      await this.view.updatePhotoImage(true, () => {
+        this._replaceDropzone(html);
+        this.hideGenerateForm({ transition: false });
+      });
+    });
+  }
+  reset() {
+    super.reset();
+    this.generateForm?.reset();
+    this.hideError();
+  }
+  showError(message) {
+    withTransition(() => {
+      if (this.generateForm?.visible()) {
+        this.form.showError(message);
+      } else {
+        const newImage = this.newImage;
+        const existingImage = this.existingImage;
+        if (newImage) newImage.dataset.visible = "true";
+        if (existingImage) {
+          existingImage.dataset.visible = String(this.dropzone.containsImage);
+        }
+        const error = document.createElement("span");
+        error.className = "text-delete text-base italic";
+        error.textContent = message;
+        if (this.dropzone.containsImage) {
+          if (newImage) newImage.dataset.visible = "false";
+          error.dataset.role = "image-error";
+          this.dropzone.element.querySelector("[data-role='image-error']")?.remove();
+          this.dropzone.element.append(error);
+        } else this.feedback?.replaceChildren(error);
+      }
+    });
+  }
+  hideError() {
+    this.dropzone.element.querySelector("[data-role='image-error']")?.remove();
+    if (this.generateForm?.visible()) {
+      this.form.hideError();
+    } else {
+      const feedback = this.feedback;
+      if (feedback)
+        feedback.innerHTML = "drop image here<br>or click to upload";
+    }
+  }
+  showGenerateForm({ transition = true } = {}) {
+    const generateForm = this.generateForm;
+    if (!this.aiCreate || this.readonly || !generateForm) return;
+    if (generateForm.visible()) {
+      generateForm.show();
+      return;
+    }
+    this.view.photoGenerationReturnOpen ??= this.view.photoOpen;
+    const show = () => {
+      this.reset();
+      this.dropzone.hide();
+      generateForm.show();
+      this.form.showSubmitButton();
+    };
+    const shouldTransition = transition && (this.view.isSecondaryCardVisible?.(this.component.elt) ?? true);
+    if (shouldTransition) {
+      return withTransition(show);
+    }
+    show();
+  }
+  hideGenerateForm({ transition = true } = {}) {
+    const hide = () => {
+      this.reset();
+      this.generateForm?.hide();
+      this.dropzone.show();
+      this.view.photoGenerationReturnOpen = null;
+    };
+    const shouldTransition = transition && (this.view.isSecondaryCardVisible?.(this.component.elt) ?? true);
+    if (shouldTransition) {
+      return withTransition(hide);
+    }
+    hide();
+  }
+}
+
+var pagePhoto = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	PagePhoto: PagePhoto
+});
+
+export { pagePermissions as a, pagePhoto as b, documentSettings as d, note as n, pageInfo as p };

@@ -408,6 +408,16 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_admin, ge
     empty_view = _go_messages(user)
     expect(empty_view.locator("[data-role='conversation-selector']")).to_be_hidden()
     expect(empty_view.locator("[data-action='compose-message']")).to_be_visible()
+    empty_pane = empty_view.locator("[data-role='message-history'] [data-role='empty']")
+    expect(empty_pane).to_be_visible()
+    expect(empty_pane).to_contain_text("No conversations yet")
+    start_button = empty_pane.locator("[data-action='start-conversation']")
+    expect(start_button).to_be_visible()
+    start_button.click()
+    composer = user.locate("[data-role='message-composer']")
+    expect(composer).to_be_visible()
+    composer.get_by_role("button", name="Close", exact=True).click()
+    expect(composer).to_be_hidden()
 
     peer_body = f"Mobile selector {uuid4().hex}"
     _send_from_modal(user, peer, peer_body)

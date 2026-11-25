@@ -360,6 +360,8 @@ export default class Core extends ShellView {
 		return Promise.resolve();
 	}
 
+	onComponentRendered(_component: ViewComponent): void {}
+
 	_applyStarState({ key, starred, type }: ReconcileChange = {}) {
 		if (!key) return;
 		const active = starred ?? type === "star";
@@ -381,6 +383,10 @@ export default class Core extends ShellView {
 		}
 	}
 
+	_adjustStarredCount(_delta: number): void {}
+
+	_setStarredCount(_count: number): void {}
+
 	async _toggleStar(button: HTMLButtonElement) {
 		if (!this.online) return;
 		const entity =
@@ -392,11 +398,16 @@ export default class Core extends ShellView {
 		const active = button.dataset.active === "true";
 		button.disabled = true;
 		this._applyStarState({ key, starred: !active });
+		this._adjustStarredCount(!active ? 1 : -1);
 		try {
-			const response = await request.patch<{ starred: boolean }>(
-				ENDPOINTS.toggleStar(key),
-			);
+			const response = await request.patch<{
+				starred: boolean;
+				count?: number;
+			}>(ENDPOINTS.toggleStar(key));
 			if (!response?.ok) throw new Error("Unable to update star");
+			if (typeof response.count === "number") {
+				this._setStarredCount(response.count);
+			}
 			button.disabled = false;
 			await this.reconcileChange({
 				type: response.starred ? "star" : "unstar",
@@ -406,6 +417,7 @@ export default class Core extends ShellView {
 		} catch (error) {
 			captureError(error, button);
 			this._applyStarState({ key, starred: active });
+			this._adjustStarredCount(active ? 1 : -1);
 		} finally {
 			button.disabled = false;
 		}

@@ -1,2 +1,70 @@
-import{r}from"./foundation.js?v=b9ad6d22";import"./upstreamUnavailable.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";const n=t=>document.querySelector(`meta[name="${t}"]`)?.getAttribute("content")||"",l=()=>document.querySelector("#token")?.value||"",d=()=>n("analytics")==="true",p=()=>{const t=performance.getEntriesByType?.("navigation")?.[0];return t&&"type"in t&&typeof t.type=="string"?t.type:""},y=()=>n("analytics-title")||document.querySelector("[lp-view] [data-nav='view'] [data-role='title']")?.textContent?.trim()||document.title.trim(),u=t=>{const e=document.querySelector("[lp-view]");return{action:t,path:window.location.pathname,query:window.location.search||"",page_title:y(),view_kind:e?.dataset.kind||"",entity_key:e?.dataset.key||"",entity_hash:e?.dataset.hash||"",index:e?.dataset.index||"",public_id:n("analytics-public-id"),referrer:document.referrer||"",navigation_type:p()}};class m{get enabled(){return d()}get mode(){return n("mode")}async tag(e,a={}){if(!this.enabled)return;const i=a.path||window.location.pathname;if(!/^\/(?:analytics|api|mcp|l)(?:\/|$)/.test(i))try{const c=JSON.stringify({...a,action:e,path:i}),o=()=>fetch("/analytics/track",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":l(),"X-Lagniappe-Request":"true"},credentials:"include",keepalive:!0,body:c}),s=await o();r.csrfFailed(s)&&await r.token()&&await o()}catch{}}view(){const e=n("analytics-action")||"view";this.tag(e,u(e))}}const w=new m;export{w as analytics};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request } from './foundation.js?v=b6ea3fe0';
+import './upstreamUnavailable.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+
+const meta = (name) => document.querySelector(`meta[name="${name}"]`)?.getAttribute("content") || "";
+const token = () => document.querySelector("#token")?.value || "";
+const analyticsEnabled = () => meta("analytics") === "true";
+const navigationType = () => {
+  const navigation = performance.getEntriesByType?.("navigation")?.[0];
+  return navigation && "type" in navigation && typeof navigation.type === "string" ? navigation.type : "";
+};
+const pageTitle = () => meta("analytics-title") || document.querySelector("[lp-view] [data-nav='view'] [data-role='title']")?.textContent?.trim() || document.title.trim();
+const viewData = (action) => {
+  const view = document.querySelector("[lp-view]");
+  return {
+    action,
+    path: window.location.pathname,
+    query: window.location.search || "",
+    page_title: pageTitle(),
+    view_kind: view?.dataset.kind || "",
+    entity_key: view?.dataset.key || "",
+    entity_hash: view?.dataset.hash || "",
+    index: view?.dataset.index || "",
+    public_id: meta("analytics-public-id"),
+    referrer: document.referrer || "",
+    navigation_type: navigationType()
+  };
+};
+class AnalyticsManager {
+  get enabled() {
+    return analyticsEnabled();
+  }
+  get mode() {
+    return meta("mode");
+  }
+  async tag(action, payload = {}) {
+    if (!this.enabled) return;
+    const path = payload.path || window.location.pathname;
+    if (/^\/(?:analytics|api|mcp|l)(?:\/|$)/.test(path)) {
+      return;
+    }
+    try {
+      const body = JSON.stringify({ ...payload, action, path });
+      const send = () => fetch("/analytics/track", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": token(),
+          "X-Lagniappe-Request": "true"
+        },
+        credentials: "include",
+        keepalive: true,
+        body
+      });
+      const response = await send();
+      if (request.csrfFailed(response) && await request.token()) {
+        await send();
+      }
+    } catch {
+    }
+  }
+  view() {
+    const action = meta("analytics-action") || "view";
+    this.tag(action, viewData(action));
+  }
+}
+const analytics = new AnalyticsManager();
+
+export { analytics };

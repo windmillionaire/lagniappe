@@ -1,2 +1,128 @@
-import{S as r,E as l,r as u,w as c}from"../foundation.js?v=b9ad6d22";import"../upstreamUnavailable.js?v=b9ad6d22";import"../connectivity.js?v=b9ad6d22";class h extends r{async init(){if(await super.init(),this.endpoints=l.manual,!this.elt)return;const o=this.elt.querySelector("#manual-nav-button")?.dataset?.sections,t=JSON.parse(o||"[]");return this.sections=new Map(t.map(e=>[e.key,e])),this._manualClick=e=>{const i=e.target,n=i?.closest?.("#manual-nav-button");if(n&&this.mobile&&!this.mobileDropdown){e.preventDefault(),e.stopPropagation(),this.runColdAction(n,()=>this._ensureMobileDropdown(),a=>a?.showPanel?.(),n);return}const s=i?.closest?.("[data-section]");s?.dataset.section&&(e.preventDefault(),this.fetchSection(s.dataset.section,!0))},this.elt.addEventListener("click",this._manualClick),this._onPopState=e=>{const i=e.state;i?.manualSection&&this.fetchSection(i.manualSection,!1)},window.addEventListener("popstate",this._onPopState),this._manualMobileResize=()=>{this.mobile?this._ensureMobileDropdown():this._destroyMobileDropdown()},this.elt.addEventListener("mobile-resize",this._manualMobileResize),this.mobile&&await this._ensureMobileDropdown(),this}_updateMetadata(o){const t=this.sections.get(o)?.metadata;if(!t)return null;document.title=t.title;const e=document.querySelector("meta[name='description']"),i=document.querySelector("meta[name='robots']"),n=document.querySelector("link[rel='canonical']");return e?.setAttribute("content",t.description),i?.setAttribute("content",t.robots),n?.setAttribute("href",t.canonical_url),t}async _ensureMobileDropdown(){if(this.mobileDropdown||this._mobileDropdownPromise)return this.mobileDropdown??this._mobileDropdownPromise??null;const o=this.elt.querySelector("#manual-nav-button");return o?(this._mobileDropdownPromise=import("../combobox.js?v=b9ad6d22").then(function(t){return t.e}).then(({Dropdown:t})=>{if(this._destroyed||!this.mobile)return null;const e={items:Array.from(this.sections.values()).map(i=>({name:i.name,icon:i.icon,kind:i.kind,onClick:()=>this.fetchSection(i.key,!0)}))};return this.mobileDropdown=new t(o).init(e),this.mobileDropdown}).catch(t=>(this.reportStartupError(t,o,"manual-dropdown"),null)).finally(()=>{this._mobileDropdownPromise=null}),this._mobileDropdownPromise):null}_destroyMobileDropdown(){this.mobileDropdown?.destroy?.(),this.mobileDropdown=null}initManual(){return{elt:this.elt}}async fetchSection(o,t){if(this.loading)return;this.loading=!0;const e=await u.get(this.endpoints.section(o));if(e?.html){const i=this.elt.querySelector("[data-role='manual-content']"),n=e.html.querySelector("body");await c(()=>{n&&i?.replaceChildren(n);const s=this._updateMetadata(o);if(t){const a=s?.path||`/manual/${o}`;history.pushState({manualSection:o},"",a)}},{label:"manual:change-section"})}this.loading=!1,window.scrollTo({top:0,behavior:"auto"})}destroy(){this._onPopState&&window.removeEventListener("popstate",this._onPopState),this._manualClick&&this.elt.removeEventListener("click",this._manualClick),this._manualMobileResize&&this.elt.removeEventListener("mobile-resize",this._manualMobileResize),this._destroyMobileDropdown(),super.destroy()}}export{h as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as ShellView, E as ENDPOINTS, r as request, w as withTransition } from '../foundation.js?v=b6ea3fe0';
+import '../upstreamUnavailable.js?v=b6ea3fe0';
+import '../connectivity.js?v=b6ea3fe0';
+
+class Manual extends ShellView {
+  async init() {
+    await super.init();
+    this.endpoints = ENDPOINTS.manual;
+    if (!this.elt) return;
+    const sectionData = this.elt.querySelector("#manual-nav-button")?.dataset?.sections;
+    const sections = JSON.parse(sectionData || "[]");
+    this.sections = new Map(sections.map((section) => [section.key, section]));
+    this._manualClick = (e) => {
+      const target = e.target;
+      const mobileNavButton = target?.closest?.("#manual-nav-button");
+      if (mobileNavButton && this.mobile && !this.mobileDropdown) {
+        e.preventDefault();
+        e.stopPropagation();
+        void this.runColdAction(
+          mobileNavButton,
+          () => this._ensureMobileDropdown(),
+          (dropdown) => dropdown?.showPanel?.(),
+          mobileNavButton
+        );
+        return;
+      }
+      const button = target?.closest?.("[data-section]");
+      if (button?.dataset.section) {
+        e.preventDefault();
+        this.fetchSection(button.dataset.section, true);
+      }
+    };
+    this.elt.addEventListener("click", this._manualClick);
+    this._onPopState = (e) => {
+      const state = e.state;
+      if (state?.manualSection) this.fetchSection(state.manualSection, false);
+    };
+    window.addEventListener("popstate", this._onPopState);
+    this._manualMobileResize = () => {
+      if (this.mobile) void this._ensureMobileDropdown();
+      else this._destroyMobileDropdown();
+    };
+    this.elt.addEventListener("mobile-resize", this._manualMobileResize);
+    if (this.mobile) await this._ensureMobileDropdown();
+    return this;
+  }
+  _updateMetadata(key) {
+    const metadata = this.sections.get(key)?.metadata;
+    if (!metadata) return null;
+    document.title = metadata.title;
+    const description = document.querySelector("meta[name='description']");
+    const robots = document.querySelector("meta[name='robots']");
+    const canonical = document.querySelector("link[rel='canonical']");
+    description?.setAttribute("content", metadata.description);
+    robots?.setAttribute("content", metadata.robots);
+    canonical?.setAttribute("href", metadata.canonical_url);
+    return metadata;
+  }
+  async _ensureMobileDropdown() {
+    if (this.mobileDropdown || this._mobileDropdownPromise) {
+      return this.mobileDropdown ?? this._mobileDropdownPromise ?? null;
+    }
+    const mobileNavButton = this.elt.querySelector("#manual-nav-button");
+    if (!mobileNavButton) return null;
+    this._mobileDropdownPromise = import('../combobox.js?v=b6ea3fe0').then(function (n) { return n.e; }).then(({ Dropdown }) => {
+      if (this._destroyed || !this.mobile) return null;
+      const menu = {
+        items: Array.from(this.sections.values()).map((section) => ({
+          name: section.name,
+          icon: section.icon,
+          kind: section.kind,
+          onClick: () => this.fetchSection(section.key, true)
+        }))
+      };
+      this.mobileDropdown = new Dropdown(mobileNavButton).init(menu);
+      return this.mobileDropdown;
+    }).catch((error) => {
+      this.reportStartupError(error, mobileNavButton, "manual-dropdown");
+      return null;
+    }).finally(() => {
+      this._mobileDropdownPromise = null;
+    });
+    return this._mobileDropdownPromise;
+  }
+  _destroyMobileDropdown() {
+    this.mobileDropdown?.destroy?.();
+    this.mobileDropdown = null;
+  }
+  initManual() {
+    return { elt: this.elt };
+  }
+  async fetchSection(key, pushState) {
+    if (this.loading) return;
+    this.loading = true;
+    const response = await request.get(this.endpoints.section(key));
+    if (response?.html) {
+      const target = this.elt.querySelector("[data-role='manual-content']");
+      const newTarget = response.html.querySelector("body");
+      await withTransition(
+        () => {
+          if (newTarget) target?.replaceChildren(newTarget);
+          const metadata = this._updateMetadata(key);
+          if (pushState) {
+            const url = metadata?.path || `/manual/${key}`;
+            history.pushState({ manualSection: key }, "", url);
+          }
+        },
+        { label: "manual:change-section" }
+      );
+    }
+    this.loading = false;
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
+  destroy() {
+    if (this._onPopState) {
+      window.removeEventListener("popstate", this._onPopState);
+    }
+    if (this._manualClick)
+      this.elt.removeEventListener("click", this._manualClick);
+    if (this._manualMobileResize)
+      this.elt.removeEventListener("mobile-resize", this._manualMobileResize);
+    this._destroyMobileDropdown();
+    super.destroy();
+  }
+}
+
+export { Manual as default };

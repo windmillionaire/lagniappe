@@ -1,2 +1,1010 @@
-import{c as I,r as U,E as j}from"./foundation.js?v=b9ad6d22";import"./upstreamUnavailable.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";const S=1,P=64,g=512,B=g+128,x=128,E=512,A=128,X=Number.MAX_SAFE_INTEGER,H=new Set(["entity","channel","form-lock","document","operation","ingress"]),J=new Set(["categories","projects","pages","tasks","forms","users","ingress","messages","home","home-notes","starred","tool-reports"]),K=new Set(["changed","unchanged","unavailable","error"]);class c extends TypeError{constructor(e,t){super(`${e}: ${t}`),this.name="PollContractError",this.path=e,this.reason=t}}function D(r){return!!(r&&typeof r=="object"&&!Array.isArray(r))}const T=(r,e,t,i=[])=>{if(!D(r))throw new c(e,"type");const n=new Set([...t,...i]);for(const s of t)if(!Object.hasOwn(r,s))throw new c(`${e}.${s}`,"missing");for(const s of Object.keys(r))if(!n.has(s))throw new c(`${e}.${s}`,"unexpected");return r};function d(r,e,t,{nullable:i=!1}={}){if(i&&r===null)return null;if(typeof r!="string")throw new c(e,"type");if(!r.trim())throw new c(e,"blank");if(r.length>t)throw new c(e,"limit");return r}const v=(r,e)=>{if(typeof r!="number"||!Number.isInteger(r))throw new c(e,"type");if(r<0)throw new c(e,"state");if(r>X)throw new c(e,"limit");return r},C=(r,e)=>{const t=d(r,e,g);if(!t.endsWith(":document"))throw new c(e,"unsupported");return t},N=(r,e="descriptor")=>{const t=T(r,e,["id","type","revision"],["key","channel","sync_id","generation","presence_digest"]),i=d(t.id,`${e}.id`,B),n=d(t.type,`${e}.type`,32);if(!H.has(n))throw new c(`${e}.type`,"unsupported");switch(T(t,e,["id","type","revision",...n==="channel"?["channel"]:n==="document"?["key","sync_id","generation","presence_digest"]:["key"]]),n){case"channel":{const l=d(t.revision,`${e}.revision`,E,{nullable:!0}),o=d(t.channel,`${e}.channel`,64);if(!J.has(o))throw new c(`${e}.channel`,"unsupported");return{id:i,type:n,revision:l,channel:o}}case"operation":return{id:i,type:n,revision:v(t.revision,`${e}.revision`),key:d(t.key,`${e}.key`,g)};case"document":return{id:i,type:n,revision:v(t.revision,`${e}.revision`),key:d(t.key,`${e}.key`,g),sync_id:C(t.sync_id,`${e}.sync_id`),generation:d(t.generation,`${e}.generation`,A,{nullable:!0}),presence_digest:d(t.presence_digest,`${e}.presence_digest`,A,{nullable:!0})};case"form-lock":return{id:i,type:n,revision:d(t.revision,`${e}.revision`,E),key:d(t.key,`${e}.key`,g)};default:return{id:i,type:n,revision:d(t.revision,`${e}.revision`,E,{nullable:!0}),key:d(t.key,`${e}.key`,g)}}},V=(r,e="notification_state")=>{const t=T(r,e,["generation","revision","seed"]);if(typeof t.seed!="boolean")throw new c(`${e}.seed`,"type");const i=d(t.generation,`${e}.generation`,A,{nullable:!0}),n=t.revision===null?null:v(t.revision,`${e}.revision`),s=t.seed&&i===null&&n===null,l=!t.seed&&i!==null&&n!==null;if(s)return{generation:i,revision:n,seed:!0};if(l)return{generation:i,revision:n,seed:!1};throw new c(e,"state")},Y=r=>{const e=T(r,"request",["version","client_id","subscriptions","closed_documents"],["notification_state"]);if(e.version!==S)throw new c("request.version","unsupported");const t=d(e.client_id,"request.client_id",x);if(!Array.isArray(e.subscriptions))throw new c("request.subscriptions","type");if(e.subscriptions.length>P)throw new c("request.subscriptions","limit");const i=new Set,n=e.subscriptions.map((w,f)=>{const _=N(w,`request.subscriptions[${f}]`);if(i.has(_.id))throw new c(`request.subscriptions[${f}].id`,"duplicate");return i.add(_.id),_});if(!Array.isArray(e.closed_documents))throw new c("request.closed_documents","type");if(e.closed_documents.length>P)throw new c("request.closed_documents","limit");const s=new Set,l=e.closed_documents.map((w,f)=>{const _=`request.closed_documents[${f}]`,m=C(w,_);if(s.has(m))throw new c(_,"duplicate");return s.add(m),m}),o={version:S,client_id:t,subscriptions:n,closed_documents:l};return Object.hasOwn(e,"notification_state")&&(o.notification_state=V(e.notification_state,"request.notification_state")),o},Q=(r,e,t)=>{const i=T(r,t,["id","type","status","poll_after_ms"],["revision","payload"]);if(i.id!==e.id)throw new c(`${t}.id`,"state");if(i.type!==e.type)throw new c(`${t}.type`,"state");const n=i.status;if(!K.has(n))throw new c(`${t}.status`,"unsupported");if(typeof i.poll_after_ms!="number"||!Number.isSafeInteger(i.poll_after_ms))throw new c(`${t}.poll_after_ms`,"type");if(i.poll_after_ms<=0)throw new c(`${t}.poll_after_ms`,"state");const s=n==="changed"||n==="unchanged";if(s&&!Object.hasOwn(i,"revision"))throw new c(`${t}.revision`,"missing");if(!s&&Object.hasOwn(i,"revision"))throw new c(`${t}.revision`,"unexpected");let l;s&&(l=e.type==="operation"||e.type==="document"?v(i.revision,`${t}.revision`):d(i.revision,`${t}.revision`,E));let o;if(n==="changed"){if(!Object.hasOwn(i,"payload"))throw new c(`${t}.payload`,"missing");if(!D(i.payload))throw new c(`${t}.payload`,"type");o=i.payload}else if(Object.hasOwn(i,"payload"))throw new c(`${t}.payload`,"unexpected");if(o&&e.type==="document"){if(d(o.generation,`${t}.payload.generation`,A),v(o.revision,`${t}.payload.revision`)!==l)throw new c(`${t}.payload.revision`,"state");Object.hasOwn(o,"presence_digest")&&d(o.presence_digest,`${t}.payload.presence_digest`,A)}if(o&&e.type==="operation"&&(v(o.revision,`${t}.payload.revision`)!==l||o.key!==e.key))throw new c(`${t}.payload`,"state");return{id:e.id,type:e.type,status:n,poll_after_ms:i.poll_after_ms,...s?{revision:l}:{},...n==="changed"?{payload:o}:{}}},z="lagniappe-poll-client",W=600*1e3,R=[15e3,15e3,3e4,3e4,6e4],k=Object.freeze({document:2e3,ingress:2500,operation:4e3}),Z=new Set(["periodic","foreground"]),ee=new Set(["immediate","scheduled"]);function te(){let r=null;try{r=sessionStorage.getItem(z)}catch{}if(r!==null&&(!r.trim()||r.length>x)&&(I(new c("client_id","state"),null,{context:"polling-request-contract",path:"client_id",reason:"state"}),r=null),!r){r=globalThis.crypto?.randomUUID?.()||`poll-${Date.now()}-${Math.random().toString(16).slice(2)}`;try{sessionStorage.setItem(z,r)}catch{}}return r}function b(r,e=.9+Math.random()*.2){return Math.max(Math.round(r*e),250)}class ie{constructor(e){this.view=e,this.clientId=te(),this.subscriptions=new Map,this.protocolFailures=new Set,this.timer=null,this.activePoll=null,this.activeIds=new Set,this.inflight=null,this.followup=!1,this.queuedIds=new Set,this.destroyed=!1,this.blurredUntil=null,this.notificationSeedPending=!!window.__NOTIFICATION_STATE__?.miss,this.notificationSeedDueAt=this.notificationSeedPending?Date.now():Number.POSITIVE_INFINITY,this.notificationSeedErrorCount=0,this.notificationSeedActive=!1,this._notificationState=t=>{if(!t?.detail?.miss){this.notificationSeedPending=!1,this.notificationSeedDueAt=Number.POSITIVE_INFINITY,this.notificationSeedErrorCount=0,this.activePoll||(this._clearTimer(),this._schedule());return}const i=this.notificationSeedPending;this.notificationSeedPending=!0,!this.notificationSeedActive&&(i||(this.notificationSeedErrorCount=0,this.notificationSeedDueAt=Date.now()),this.activePoll?this.followup=!0:(this._clearTimer(),this._schedule(this.view.hidden?null:0)))}}init(){return window.addEventListener?.("notification-state",this._notificationState),this.notificationSeedPending&&this._schedule(0),this}_captureContract(e,t,i={}){const n=e,s=n?.path||"polling",l=n?.reason||"state",o=`${t}:${s}:${l}:${i.subscription_type||""}`;this.protocolFailures.has(o)||(this.protocolFailures.add(o),I(e,this.view?.elt,{context:t,path:s,reason:l,...i}))}subscribe(e,{onResult:t=null,beforePoll:i=null,whileBlurred:n=null,mode:s="periodic",initial:l="immediate"}={}){if(this.destroyed)return()=>{};if(!Z.has(s)||!ee.has(l)||n!==null&&typeof n!="function")throw new TypeError("Invalid polling subscription schedule.");const o=this.subscriptions.get(e?.id);let w;try{w=N({...o?.descriptor,...e},"subscription")}catch(m){return this._captureContract(m,"polling-request-contract",{subscription_type:e?.type||"missing"}),()=>{}}const f=Date.now(),_=o?o.dueAt:s==="foreground"?Number.POSITIVE_INFINITY:l==="immediate"?f:f+this._baseInterval(w.type);return this.subscriptions.set(w.id,{...o,descriptor:w,onResult:t??o?.onResult??null,beforePoll:i??o?.beforePoll??null,whileBlurred:n??o?.whileBlurred??null,mode:s,dueAt:_,quiet:o?.quiet??0,errorCount:o?.errorCount??0}),this._clearTimer(),this._schedule(l==="immediate"&&s==="periodic"?0:null),()=>this.unsubscribe(w.id)}unsubscribe(e){this.subscriptions.delete(e),this.queuedIds.delete(e),!this.subscriptions.size&&!this.notificationSeedPending?this._clearTimer():this._schedule()}get(e){const t=this.subscriptions.get(e)?.descriptor;return t?{...t}:null}update(e,t={}){const i=this.subscriptions.get(e);if(i)try{i.descriptor=N({...i.descriptor,...t},"subscription")}catch(n){this._captureContract(n,"polling-request-contract",{subscription_type:i.descriptor.type})}}boost(e,{durationMs:t=6e4,pollAfterMs:i=k.document}={}){const n=this.subscriptions.get(e);if(!n)return!1;if(!Number.isSafeInteger(t)||t<=0||!Number.isSafeInteger(i)||i<250)throw new TypeError("Invalid polling boost schedule.");const s=Date.now();return n.boostedUntil=Math.max(n.boostedUntil||0,s+t),n.boostedInterval=i,n.quiet=0,this.activeIds.has(e)&&n.dueAt<=s||(n.dueAt=Math.min(n.dueAt,s+i),this._clearTimer(),this._schedule()),!0}acknowledge(e,t){const i=this.subscriptions.get(e);if(!i||t===void 0||t===null)return;const n=i.descriptor;try{i.descriptor=N({...n,revision:t},"subscription")}catch(s){this._captureContract(s,"polling-request-contract",{subscription_type:n.type});return}i.quiet=0}enqueue(e=null){const t=e===null?new Set(this.subscriptions.keys()):new Set(Array.isArray(e)?e:[e]),i=Date.now();for(const[n,s]of this.subscriptions)t.has(n)&&(s.dueAt=i,this.activePoll&&this.queuedIds.add(n));if(this.activePoll){this.followup=!0;return}this._schedule(0)}trigger(e=null,{fresh:t=!1}={}){const i=e===null?new Set(this.subscriptions.keys()):new Set(Array.isArray(e)?e:[e]);if(this.activePoll&&!t&&Array.from(i).every(n=>this.activeIds.has(n)))return this.activePoll;if(this.enqueue(e),this.activePoll){const n=this.activePoll,s=()=>Promise.resolve().then(()=>this.activePoll??this._poll());return n.then(s,s)}return this._poll()}_clearTimer(){this.timer&&window.clearTimeout(this.timer),this.timer=null}pause(){this.blurredUntil=null,this._clearTimer()}blur(e=Date.now()){this.destroyed||(this.blurredUntil===null&&(this.blurredUntil=e+W),this._clearTimer(),this._schedule())}reschedule(){this.destroyed||(this._clearTimer(),this._schedule())}resume(){return this.destroyed?Promise.resolve([]):(this.blurredUntil=null,this._schedule(),Promise.resolve([]))}catchUp(){return this.destroyed?Promise.resolve([]):(this.blurredUntil=null,this.trigger())}async closeDocuments(e){if(!Array.isArray(e)){this._captureContract(new c("closed_documents","type"),"polling-request-contract");return}const t=[],i=new Set;for(const[s,l]of e.entries())try{const o=C(l,`closed_documents[${s}]`);i.has(o)||t.push(o),i.add(o)}catch(o){this._captureContract(o,"polling-request-contract")}if(!t.length||!this.view.online)return;this.activePoll&&await this.activePoll;let n=null;for(let s=0;s<t.length;s+=P){const l=Y({version:S,client_id:this.clientId,subscriptions:[],closed_documents:t.slice(s,s+P)});n=await U.post(j.poll,l,{keepalive:!0,replaceErrorPage:!1}),n?.status===422&&this._captureContract(new c(n.path||"request",n.reason||"state"),"polling-request-rejected")}return n}_interval(e,t){if(t?.status==="error")return e.errorCount+=1,Math.min(2**e.errorCount*2e3,6e4);if(e.errorCount=0,t?.status==="changed"?e.quiet=0:e.quiet+=1,e.boostedUntil!==void 0&&e.boostedUntil>Date.now()&&e.boostedInterval)return e.boostedInterval;if(e.descriptor.type==="operation"){const n=[4e3,8e3,16e3,3e4];return n[Math.min(e.quiet,n.length-1)]}const i=k[e.descriptor.type];return i?t?.poll_after_ms??i:R[Math.min(e.quiet,R.length-1)]}_baseInterval(e){return k[e]||R[0]}_eligible(e){return this.destroyed||!this.view.online?!1:this.view.hidden?this.blurredUntil===null||Date.now()>=this.blurredUntil?!1:e?.whileBlurred?.()===!0:!0}_hasEligible(e=this.subscriptions.values()){return Array.from(e).some(t=>this._eligible(t))}_notificationRequest(){const e=window.__NOTIFICATION_STATE__;if(!e||e.miss&&(!this.notificationSeedPending||this.notificationSeedDueAt>Date.now()))return null;try{return V(e.miss?{generation:null,revision:null,seed:!0}:{generation:e.generation,revision:e.revision,seed:!1})}catch(t){return this._captureContract(t,"polling-request-contract"),null}}_notificationSeedFailed(){if(!this.notificationSeedPending)return;this.notificationSeedErrorCount+=1;const e=Math.min(2**this.notificationSeedErrorCount*2e3,6e4);this.notificationSeedDueAt=Date.now()+b(e)}_applyProtocolState(e,t){const i={};if(t.revision!==void 0&&(i.revision=t.revision),e.descriptor.type==="document"&&t.payload){const n=t.payload;i.generation=n.generation,Object.hasOwn(n,"presence_digest")&&(i.presence_digest=n.presence_digest)}e.descriptor=N({...e.descriptor,...i},"subscription")}_due(){const e=Date.now();return Array.from(this.subscriptions.values()).filter(t=>t.dueAt<=e&&this._eligible(t)).slice(0,P)}_poll(){if(this.destroyed||!this.view.online||this.view.hidden&&!this._hasEligible())return Promise.resolve([]);if(this.activePoll)return this.followup=!0,this.activePoll;const e=this._runPoll();this.activePoll=e;const t=()=>{if(this.activePoll!==e)return;this.activePoll=null,this.activeIds.clear();const i=this.followup;this.followup=!1,i?queueMicrotask(()=>this._poll()):this._schedule()};return e.then(t,t),e}async _runPoll(){let e=[];const t=[];let i=!1;try{e=this._due();const n=!this.view.hidden&&this.notificationSeedPending&&this.notificationSeedDueAt<=Date.now();if(!e.length&&!n)return[];this.activeIds=new Set(e.map(({descriptor:a})=>a.id));for(const{descriptor:a}of e)this.queuedIds.delete(a.id);const s=new Set(e.map(({beforePoll:a})=>a));for(const a of s)a&&await a();if(await window.__PING_PENDING__,this.destroyed||!this.view.online)return[];const l=this._notificationRequest();if(e=e.filter(a=>this.subscriptions.get(a.descriptor.id)===a&&this._eligible(a)),!e.length&&(this.view.hidden||!l?.seed))return[];this._clearTimer();const o=new Map(e.map(a=>[a.descriptor.id,a])),w=Y({version:S,client_id:this.clientId,subscriptions:e.map(({descriptor:a})=>({...a})),closed_documents:[],...l?{notification_state:l}:{}});i=l?.seed===!0,i&&(this.notificationSeedActive=!0),this.inflight=U.post(j.poll,w,{replaceErrorPage:!1});const f=await this.inflight;if(!f?.ok){f?.status===422&&f?.code==="invalid_poll_contract"&&this._captureContract(new c(f.path||"request",f.reason||"state"),"polling-request-rejected");const a=.9+Math.random()*.2,u=Date.now();for(const h of e.filter(p=>this._eligible(p)))h.dueAt=h.mode==="foreground"?Number.POSITIVE_INFINITY:u+b(this._interval(h,{status:"error"}),a),await h.onResult?.({id:h.descriptor.id,type:h.descriptor.type,status:"error"});return[]}if(f.version!==S)throw new c("response.version","unsupported");if(!Array.isArray(f.results))throw new c("response.results","type");if(this.destroyed||!this.view.online||this.view.hidden&&!this._hasEligible(o.values()))return[];const _=new Map,m=new Set,L=new Set,G=f.results;for(const[a,u]of G.entries()){const h=`response.results[${a}]`,p=D(u)?u.id:void 0,y=typeof p=="string"?o.get(p):void 0;if(typeof p!="string"||!y){this._captureContract(new c(`${h}.id`,"unsupported"),"polling-response-contract");continue}if(L.has(p)){this._captureContract(new c(`${h}.id`,"duplicate"),"polling-response-contract",{subscription_type:y.descriptor.type}),_.delete(p),m.add(p);continue}L.add(p);try{_.set(p,Q(u,y.descriptor,h))}catch(q){m.add(p),this._captureContract(q,"polling-response-contract",{subscription_type:y.descriptor.type})}}const $=.9+Math.random()*.2,O=Date.now(),M=([a])=>{const u=_.get(a);return u?.type==="operation"&&u.status==="changed"&&u.payload?.terminal?0:1},F=Array.from(o);F.sort((a,u)=>M(a)-M(u));for(const[a,u]of F){if(this.subscriptions.get(a)!==u||!this._eligible(u))continue;const h=_.get(a);if(!h){m.has(a)||this._captureContract(new c("response.results","missing"),"polling-response-contract",{subscription_type:u.descriptor.type});const y={id:a,type:u.descriptor.type,status:"error"};t.push(y),u.dueAt=u.mode==="foreground"?Number.POSITIVE_INFINITY:O+b(this._interval(u,y),$);try{await u.onResult?.(y)}catch(q){I(q,this.view.elt,{context:"polling-subscription",subscription_id:a})}continue}t.push(h);const p={...u.descriptor};try{this._applyProtocolState(u,h),await u.onResult?.(h)===!1&&(u.descriptor=p),u.dueAt=u.mode==="foreground"?Number.POSITIVE_INFINITY:O+b(this._interval(u,h),$)}catch(y){u.descriptor=p,I(y,this.view.elt,{context:"polling-subscription",subscription_id:h.id}),u.dueAt=u.mode==="foreground"?Number.POSITIVE_INFINITY:O+b(this._interval(u,{status:"error"}),$)}}}catch(n){if(this.destroyed||!this.view.online)return[];if(e=e.filter(o=>this._eligible(o)),!e.length&&this.view.hidden)return[];n instanceof c?this._captureContract(n,"polling-response-contract"):I(n,this.view.elt,{context:"polling-coordinator"});const s=.9+Math.random()*.2,l=Date.now();for(const o of e)o.dueAt=o.mode==="foreground"?Number.POSITIVE_INFINITY:l+b(this._interval(o,{status:"error"}),s),await o.onResult?.({id:o.descriptor.id,type:o.descriptor.type,status:"error"})}finally{i&&(this.notificationSeedActive=!1,this._notificationSeedFailed()),this.inflight=null;const n=Date.now();for(const s of this.queuedIds){const l=this.subscriptions.get(s);l&&(l.dueAt=n)}}return t}_schedule(e=null){if(this.destroyed||this.timer||!this.subscriptions.size&&!this.notificationSeedPending||!this.view.online)return;const t=Array.from(this.subscriptions.values()).filter(l=>l.mode==="periodic"&&this._eligible(l)).map(({dueAt:l})=>l),i=!this.view.hidden&&this.notificationSeedPending?this.notificationSeedDueAt:Number.POSITIVE_INFINITY;if(!Number.isFinite(i)&&!t.length)return;const n=Math.min(i,...t);if(this.view.hidden&&this.blurredUntil!==null&&n>=this.blurredUntil)return;const s=e??Math.max(n-Date.now(),0);this.timer=window.setTimeout(()=>{this.timer=null,this._poll()},s)}destroy(){this.destroyed=!0,this.pause(),this.subscriptions.clear(),this.activeIds.clear(),this.queuedIds.clear(),this.protocolFailures.clear(),window.removeEventListener?.("notification-state",this._notificationState)}}export{ie as PollingCoordinator};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { c as captureError, r as request, E as ENDPOINTS } from './foundation.js?v=b6ea3fe0';
+import './upstreamUnavailable.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+
+const POLL_PROTOCOL_VERSION = 1;
+const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
+const MAX_KEY_LENGTH = 512;
+const MAX_IDENTIFIER_LENGTH = MAX_KEY_LENGTH + 128;
+const MAX_CLIENT_ID_LENGTH = 128;
+const MAX_CURSOR_LENGTH = 512;
+const MAX_STATE_TOKEN_LENGTH = 128;
+const MAX_REVISION = Number.MAX_SAFE_INTEGER;
+const POLL_TYPES = /* @__PURE__ */ new Set([
+  "entity",
+  "channel",
+  "form-lock",
+  "document",
+  "operation",
+  "ingress"
+]);
+const POLL_CHANNELS = /* @__PURE__ */ new Set([
+  "categories",
+  "projects",
+  "pages",
+  "tasks",
+  "forms",
+  "users",
+  "ingress",
+  "messages",
+  "home",
+  "home-notes",
+  "starred",
+  "tool-reports"
+]);
+const POLL_STATUSES = /* @__PURE__ */ new Set([
+  "changed",
+  "unchanged",
+  "unavailable",
+  "error"
+]);
+class PollContractError extends TypeError {
+  constructor(path, reason) {
+    super(`${path}: ${reason}`);
+    this.name = "PollContractError";
+    this.path = path;
+    this.reason = reason;
+  }
+}
+function isFieldMap(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+const exactFields = (value, path, required, optional = []) => {
+  if (!isFieldMap(value)) {
+    throw new PollContractError(path, "type");
+  }
+  const allowed = /* @__PURE__ */ new Set([...required, ...optional]);
+  for (const name of required) {
+    if (!Object.hasOwn(value, name)) {
+      throw new PollContractError(`${path}.${name}`, "missing");
+    }
+  }
+  for (const name of Object.keys(value)) {
+    if (!allowed.has(name)) {
+      throw new PollContractError(`${path}.${name}`, "unexpected");
+    }
+  }
+  return value;
+};
+function boundedString(value, path, maximum, { nullable = false } = {}) {
+  if (nullable && value === null) return null;
+  if (typeof value !== "string") throw new PollContractError(path, "type");
+  if (!value.trim()) throw new PollContractError(path, "blank");
+  if (value.length > maximum) throw new PollContractError(path, "limit");
+  return value;
+}
+const integerRevision = (value, path) => {
+  if (typeof value !== "number" || !Number.isInteger(value))
+    throw new PollContractError(path, "type");
+  if (value < 0) throw new PollContractError(path, "state");
+  if (value > MAX_REVISION) throw new PollContractError(path, "limit");
+  return value;
+};
+const documentId = (raw, path) => {
+  const value = boundedString(raw, path, MAX_KEY_LENGTH);
+  if (!value.endsWith(":document")) {
+    throw new PollContractError(path, "unsupported");
+  }
+  return value;
+};
+const normalizedDescriptor = (value, path = "descriptor") => {
+  const raw = exactFields(
+    value,
+    path,
+    ["id", "type", "revision"],
+    ["key", "channel", "sync_id", "generation", "presence_digest"]
+  );
+  const id = boundedString(raw.id, `${path}.id`, MAX_IDENTIFIER_LENGTH);
+  const type = boundedString(raw.type, `${path}.type`, 32);
+  if (!POLL_TYPES.has(type)) {
+    throw new PollContractError(`${path}.type`, "unsupported");
+  }
+  const typedFields = type === "channel" ? ["channel"] : type === "document" ? ["key", "sync_id", "generation", "presence_digest"] : ["key"];
+  exactFields(raw, path, ["id", "type", "revision", ...typedFields]);
+  switch (type) {
+    case "channel": {
+      const revision = boundedString(
+        raw.revision,
+        `${path}.revision`,
+        MAX_CURSOR_LENGTH,
+        { nullable: true }
+      );
+      const channel = boundedString(
+        raw.channel,
+        `${path}.channel`,
+        64
+      );
+      if (!POLL_CHANNELS.has(channel)) {
+        throw new PollContractError(`${path}.channel`, "unsupported");
+      }
+      return { id, type, revision, channel };
+    }
+    case "operation":
+      return {
+        id,
+        type,
+        revision: integerRevision(raw.revision, `${path}.revision`),
+        key: boundedString(raw.key, `${path}.key`, MAX_KEY_LENGTH)
+      };
+    case "document":
+      return {
+        id,
+        type,
+        revision: integerRevision(raw.revision, `${path}.revision`),
+        key: boundedString(raw.key, `${path}.key`, MAX_KEY_LENGTH),
+        sync_id: documentId(raw.sync_id, `${path}.sync_id`),
+        generation: boundedString(
+          raw.generation,
+          `${path}.generation`,
+          MAX_STATE_TOKEN_LENGTH,
+          { nullable: true }
+        ),
+        presence_digest: boundedString(
+          raw.presence_digest,
+          `${path}.presence_digest`,
+          MAX_STATE_TOKEN_LENGTH,
+          { nullable: true }
+        )
+      };
+    case "form-lock":
+      return {
+        id,
+        type,
+        revision: boundedString(
+          raw.revision,
+          `${path}.revision`,
+          MAX_CURSOR_LENGTH
+        ),
+        key: boundedString(raw.key, `${path}.key`, MAX_KEY_LENGTH)
+      };
+    default:
+      return {
+        id,
+        type,
+        revision: boundedString(
+          raw.revision,
+          `${path}.revision`,
+          MAX_CURSOR_LENGTH,
+          { nullable: true }
+        ),
+        key: boundedString(raw.key, `${path}.key`, MAX_KEY_LENGTH)
+      };
+  }
+};
+const normalizedNotificationState = (value, path = "notification_state") => {
+  const raw = exactFields(value, path, ["generation", "revision", "seed"]);
+  if (typeof raw.seed !== "boolean") {
+    throw new PollContractError(`${path}.seed`, "type");
+  }
+  const generation = boundedString(
+    raw.generation,
+    `${path}.generation`,
+    MAX_STATE_TOKEN_LENGTH,
+    { nullable: true }
+  );
+  const revision = raw.revision === null ? null : integerRevision(raw.revision, `${path}.revision`);
+  const cold = raw.seed && generation === null && revision === null;
+  const warm = !raw.seed && generation !== null && revision !== null;
+  if (cold) return { generation, revision, seed: true };
+  if (warm) return { generation, revision, seed: false };
+  throw new PollContractError(path, "state");
+};
+const normalizedRequest = (value) => {
+  const raw = exactFields(
+    value,
+    "request",
+    ["version", "client_id", "subscriptions", "closed_documents"],
+    ["notification_state"]
+  );
+  if (raw.version !== POLL_PROTOCOL_VERSION) {
+    throw new PollContractError("request.version", "unsupported");
+  }
+  const client_id = boundedString(
+    raw.client_id,
+    "request.client_id",
+    MAX_CLIENT_ID_LENGTH
+  );
+  if (!Array.isArray(raw.subscriptions)) {
+    throw new PollContractError("request.subscriptions", "type");
+  }
+  if (raw.subscriptions.length > MAX_SUBSCRIPTIONS_PER_REQUEST) {
+    throw new PollContractError("request.subscriptions", "limit");
+  }
+  const identifiers = /* @__PURE__ */ new Set();
+  const subscriptions = raw.subscriptions.map((descriptor, index) => {
+    const normalized = normalizedDescriptor(
+      descriptor,
+      `request.subscriptions[${index}]`
+    );
+    if (identifiers.has(normalized.id)) {
+      throw new PollContractError(
+        `request.subscriptions[${index}].id`,
+        "duplicate"
+      );
+    }
+    identifiers.add(normalized.id);
+    return normalized;
+  });
+  if (!Array.isArray(raw.closed_documents)) {
+    throw new PollContractError("request.closed_documents", "type");
+  }
+  if (raw.closed_documents.length > MAX_SUBSCRIPTIONS_PER_REQUEST) {
+    throw new PollContractError("request.closed_documents", "limit");
+  }
+  const closedIds = /* @__PURE__ */ new Set();
+  const closed_documents = raw.closed_documents.map((syncId, index) => {
+    const path = `request.closed_documents[${index}]`;
+    const normalized = documentId(syncId, path);
+    if (closedIds.has(normalized)) {
+      throw new PollContractError(path, "duplicate");
+    }
+    closedIds.add(normalized);
+    return normalized;
+  });
+  const requestBody = {
+    version: POLL_PROTOCOL_VERSION,
+    client_id,
+    subscriptions,
+    closed_documents
+  };
+  if (Object.hasOwn(raw, "notification_state")) {
+    requestBody.notification_state = normalizedNotificationState(
+      raw.notification_state,
+      "request.notification_state"
+    );
+  }
+  return requestBody;
+};
+const normalizedResult = (value, descriptor, path) => {
+  const raw = exactFields(
+    value,
+    path,
+    ["id", "type", "status", "poll_after_ms"],
+    ["revision", "payload"]
+  );
+  if (raw.id !== descriptor.id)
+    throw new PollContractError(`${path}.id`, "state");
+  if (raw.type !== descriptor.type) {
+    throw new PollContractError(`${path}.type`, "state");
+  }
+  const status = raw.status;
+  if (!POLL_STATUSES.has(status)) {
+    throw new PollContractError(`${path}.status`, "unsupported");
+  }
+  if (typeof raw.poll_after_ms !== "number" || !Number.isSafeInteger(raw.poll_after_ms)) {
+    throw new PollContractError(`${path}.poll_after_ms`, "type");
+  }
+  if (raw.poll_after_ms <= 0) {
+    throw new PollContractError(`${path}.poll_after_ms`, "state");
+  }
+  const carriesRevision = status === "changed" || status === "unchanged";
+  if (carriesRevision && !Object.hasOwn(raw, "revision")) {
+    throw new PollContractError(`${path}.revision`, "missing");
+  }
+  if (!carriesRevision && Object.hasOwn(raw, "revision")) {
+    throw new PollContractError(`${path}.revision`, "unexpected");
+  }
+  let revision;
+  if (carriesRevision) {
+    revision = descriptor.type === "operation" || descriptor.type === "document" ? integerRevision(raw.revision, `${path}.revision`) : boundedString(raw.revision, `${path}.revision`, MAX_CURSOR_LENGTH);
+  }
+  let payload;
+  if (status === "changed") {
+    if (!Object.hasOwn(raw, "payload")) {
+      throw new PollContractError(`${path}.payload`, "missing");
+    }
+    if (!isFieldMap(raw.payload)) {
+      throw new PollContractError(`${path}.payload`, "type");
+    }
+    payload = raw.payload;
+  } else if (Object.hasOwn(raw, "payload")) {
+    throw new PollContractError(`${path}.payload`, "unexpected");
+  }
+  if (payload && descriptor.type === "document") {
+    boundedString(
+      payload.generation,
+      `${path}.payload.generation`,
+      MAX_STATE_TOKEN_LENGTH
+    );
+    const payloadRevision = integerRevision(
+      payload.revision,
+      `${path}.payload.revision`
+    );
+    if (payloadRevision !== revision) {
+      throw new PollContractError(`${path}.payload.revision`, "state");
+    }
+    if (Object.hasOwn(payload, "presence_digest")) {
+      boundedString(
+        payload.presence_digest,
+        `${path}.payload.presence_digest`,
+        MAX_STATE_TOKEN_LENGTH
+      );
+    }
+  }
+  if (payload && descriptor.type === "operation") {
+    const payloadRevision = integerRevision(
+      payload.revision,
+      `${path}.payload.revision`
+    );
+    if (payloadRevision !== revision || payload.key !== descriptor.key) {
+      throw new PollContractError(`${path}.payload`, "state");
+    }
+  }
+  return {
+    id: descriptor.id,
+    type: descriptor.type,
+    status,
+    poll_after_ms: raw.poll_after_ms,
+    ...carriesRevision ? { revision } : {},
+    ...status === "changed" ? { payload } : {}
+  };
+};
+
+const CLIENT_ID_KEY = "lagniappe-poll-client";
+const VISIBLE_BLUR_POLLING_MS = 10 * 60 * 1e3;
+const ORDINARY_INTERVALS = [15e3, 15e3, 3e4, 3e4, 6e4];
+const TYPE_INTERVALS = Object.freeze({
+  document: 2e3,
+  ingress: 2500,
+  operation: 4e3
+});
+const SUBSCRIPTION_MODES = /* @__PURE__ */ new Set(["periodic", "foreground"]);
+const INITIAL_MODES = /* @__PURE__ */ new Set(["immediate", "scheduled"]);
+function clientId() {
+  let value = null;
+  try {
+    value = sessionStorage.getItem(CLIENT_ID_KEY);
+  } catch {
+  }
+  if (value !== null && (!value.trim() || value.length > MAX_CLIENT_ID_LENGTH)) {
+    captureError(new PollContractError("client_id", "state"), null, {
+      context: "polling-request-contract",
+      path: "client_id",
+      reason: "state"
+    });
+    value = null;
+  }
+  if (!value) {
+    value = globalThis.crypto?.randomUUID?.() || `poll-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    try {
+      sessionStorage.setItem(CLIENT_ID_KEY, value);
+    } catch {
+    }
+  }
+  return value;
+}
+function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
+  return Math.max(Math.round(delay * factor), 250);
+}
+class PollingCoordinator {
+  constructor(view) {
+    this.view = view;
+    this.clientId = clientId();
+    this.subscriptions = /* @__PURE__ */ new Map();
+    this.protocolFailures = /* @__PURE__ */ new Set();
+    this.timer = null;
+    this.activePoll = null;
+    this.activeIds = /* @__PURE__ */ new Set();
+    this.inflight = null;
+    this.followup = false;
+    this.queuedIds = /* @__PURE__ */ new Set();
+    this.destroyed = false;
+    this.blurredUntil = null;
+    this.notificationSeedPending = Boolean(window.__NOTIFICATION_STATE__?.miss);
+    this.notificationSeedDueAt = this.notificationSeedPending ? Date.now() : Number.POSITIVE_INFINITY;
+    this.notificationSeedErrorCount = 0;
+    this.notificationSeedActive = false;
+    this._notificationState = (event) => {
+      if (!event?.detail?.miss) {
+        this.notificationSeedPending = false;
+        this.notificationSeedDueAt = Number.POSITIVE_INFINITY;
+        this.notificationSeedErrorCount = 0;
+        if (!this.activePoll) {
+          this._clearTimer();
+          this._schedule();
+        }
+        return;
+      }
+      const alreadyPending = this.notificationSeedPending;
+      this.notificationSeedPending = true;
+      if (this.notificationSeedActive) return;
+      if (!alreadyPending) {
+        this.notificationSeedErrorCount = 0;
+        this.notificationSeedDueAt = Date.now();
+      }
+      if (this.activePoll) this.followup = true;
+      else {
+        this._clearTimer();
+        this._schedule(this.view.hidden ? null : 0);
+      }
+    };
+  }
+  init() {
+    window.addEventListener?.("notification-state", this._notificationState);
+    if (this.notificationSeedPending) this._schedule(0);
+    return this;
+  }
+  _captureContract(error, context, details = {}) {
+    const contract = error;
+    const path = contract?.path || "polling";
+    const reason = contract?.reason || "state";
+    const signature = `${context}:${path}:${reason}:${details.subscription_type || ""}`;
+    if (this.protocolFailures.has(signature)) return;
+    this.protocolFailures.add(signature);
+    captureError(error, this.view?.elt, {
+      context,
+      path,
+      reason,
+      ...details
+    });
+  }
+  subscribe(descriptor, {
+    onResult = null,
+    beforePoll = null,
+    whileBlurred = null,
+    mode = "periodic",
+    initial = "immediate"
+  } = {}) {
+    if (this.destroyed) return () => {
+    };
+    if (!SUBSCRIPTION_MODES.has(mode) || !INITIAL_MODES.has(initial) || whileBlurred !== null && typeof whileBlurred !== "function") {
+      throw new TypeError("Invalid polling subscription schedule.");
+    }
+    const existing = this.subscriptions.get(descriptor?.id);
+    let normalized;
+    try {
+      normalized = normalizedDescriptor(
+        { ...existing?.descriptor, ...descriptor },
+        "subscription"
+      );
+    } catch (error) {
+      this._captureContract(error, "polling-request-contract", {
+        subscription_type: descriptor?.type || "missing"
+      });
+      return () => {
+      };
+    }
+    const now = Date.now();
+    const schedule = existing ? existing.dueAt : mode === "foreground" ? Number.POSITIVE_INFINITY : initial === "immediate" ? now : now + this._baseInterval(normalized.type);
+    this.subscriptions.set(normalized.id, {
+      ...existing,
+      descriptor: normalized,
+      // A result dispatches to its own ID after its descriptor type is checked.
+      onResult: onResult ?? existing?.onResult ?? null,
+      beforePoll: beforePoll ?? existing?.beforePoll ?? null,
+      whileBlurred: whileBlurred ?? existing?.whileBlurred ?? null,
+      mode,
+      dueAt: schedule,
+      quiet: existing?.quiet ?? 0,
+      errorCount: existing?.errorCount ?? 0
+    });
+    this._clearTimer();
+    this._schedule(initial === "immediate" && mode === "periodic" ? 0 : null);
+    return () => this.unsubscribe(normalized.id);
+  }
+  unsubscribe(id) {
+    this.subscriptions.delete(id);
+    this.queuedIds.delete(id);
+    if (!this.subscriptions.size && !this.notificationSeedPending)
+      this._clearTimer();
+    else this._schedule();
+  }
+  get(id) {
+    const descriptor = this.subscriptions.get(id)?.descriptor;
+    return descriptor ? { ...descriptor } : null;
+  }
+  update(id, patch = {}) {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription) return;
+    try {
+      subscription.descriptor = normalizedDescriptor(
+        { ...subscription.descriptor, ...patch },
+        "subscription"
+      );
+    } catch (error) {
+      this._captureContract(error, "polling-request-contract", {
+        subscription_type: subscription.descriptor.type
+      });
+    }
+  }
+  boost(id, { durationMs = 6e4, pollAfterMs = TYPE_INTERVALS.document } = {}) {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription) return false;
+    if (!Number.isSafeInteger(durationMs) || durationMs <= 0 || !Number.isSafeInteger(pollAfterMs) || pollAfterMs < 250) {
+      throw new TypeError("Invalid polling boost schedule.");
+    }
+    const now = Date.now();
+    subscription.boostedUntil = Math.max(
+      subscription.boostedUntil || 0,
+      now + durationMs
+    );
+    subscription.boostedInterval = pollAfterMs;
+    subscription.quiet = 0;
+    const awaitingActiveResult = this.activeIds.has(id) && subscription.dueAt <= now;
+    if (!awaitingActiveResult) {
+      subscription.dueAt = Math.min(subscription.dueAt, now + pollAfterMs);
+      this._clearTimer();
+      this._schedule();
+    }
+    return true;
+  }
+  acknowledge(id, revision) {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription || revision === void 0 || revision === null) return;
+    const previous = subscription.descriptor;
+    try {
+      subscription.descriptor = normalizedDescriptor(
+        { ...previous, revision },
+        "subscription"
+      );
+    } catch (error) {
+      this._captureContract(error, "polling-request-contract", {
+        subscription_type: previous.type
+      });
+      return;
+    }
+    subscription.quiet = 0;
+  }
+  /**
+   * Mark subscriptions for an immediate cycle without exposing a promise that
+   * a callback in the active cycle could accidentally await.
+   */
+  enqueue(ids = null) {
+    const requested = ids === null ? new Set(this.subscriptions.keys()) : new Set(Array.isArray(ids) ? ids : [ids]);
+    const now = Date.now();
+    for (const [id, subscription] of this.subscriptions) {
+      if (!requested.has(id)) continue;
+      subscription.dueAt = now;
+      if (this.activePoll) this.queuedIds.add(id);
+    }
+    if (this.activePoll) {
+      this.followup = true;
+      return;
+    }
+    this._schedule(0);
+  }
+  trigger(ids = null, { fresh = false } = {}) {
+    const requested = ids === null ? new Set(this.subscriptions.keys()) : new Set(Array.isArray(ids) ? ids : [ids]);
+    if (this.activePoll && !fresh && Array.from(requested).every((id) => this.activeIds.has(id))) {
+      return this.activePoll;
+    }
+    this.enqueue(ids);
+    if (this.activePoll) {
+      const current = this.activePoll;
+      const followup = () => Promise.resolve().then(() => this.activePoll ?? this._poll());
+      return current.then(followup, followup);
+    }
+    return this._poll();
+  }
+  _clearTimer() {
+    if (this.timer) window.clearTimeout(this.timer);
+    this.timer = null;
+  }
+  pause() {
+    this.blurredUntil = null;
+    this._clearTimer();
+  }
+  blur(startedAt = Date.now()) {
+    if (this.destroyed) return;
+    if (this.blurredUntil === null) {
+      this.blurredUntil = startedAt + VISIBLE_BLUR_POLLING_MS;
+    }
+    this._clearTimer();
+    this._schedule();
+  }
+  reschedule() {
+    if (this.destroyed) return;
+    this._clearTimer();
+    this._schedule();
+  }
+  resume() {
+    if (this.destroyed) return Promise.resolve([]);
+    this.blurredUntil = null;
+    this._schedule();
+    return Promise.resolve([]);
+  }
+  catchUp() {
+    if (this.destroyed) return Promise.resolve([]);
+    this.blurredUntil = null;
+    return this.trigger();
+  }
+  async closeDocuments(syncIds) {
+    if (!Array.isArray(syncIds)) {
+      this._captureContract(
+        new PollContractError("closed_documents", "type"),
+        "polling-request-contract"
+      );
+      return;
+    }
+    const closed = [];
+    const identifiers = /* @__PURE__ */ new Set();
+    for (const [index, raw] of syncIds.entries()) {
+      try {
+        const syncId = documentId(raw, `closed_documents[${index}]`);
+        if (!identifiers.has(syncId)) closed.push(syncId);
+        identifiers.add(syncId);
+      } catch (error) {
+        this._captureContract(error, "polling-request-contract");
+      }
+    }
+    if (!closed.length || !this.view.online) return;
+    if (this.activePoll) await this.activePoll;
+    let response = null;
+    for (let offset = 0; offset < closed.length; offset += MAX_SUBSCRIPTIONS_PER_REQUEST) {
+      const body = normalizedRequest({
+        version: POLL_PROTOCOL_VERSION,
+        client_id: this.clientId,
+        subscriptions: [],
+        closed_documents: closed.slice(
+          offset,
+          offset + MAX_SUBSCRIPTIONS_PER_REQUEST
+        )
+      });
+      response = await request.post(ENDPOINTS.poll, body, {
+        keepalive: true,
+        replaceErrorPage: false
+      });
+      if (response?.status === 422) {
+        this._captureContract(
+          new PollContractError(
+            response.path || "request",
+            response.reason || "state"
+          ),
+          "polling-request-rejected"
+        );
+      }
+    }
+    return response;
+  }
+  _interval(subscription, result) {
+    if (result?.status === "error") {
+      subscription.errorCount += 1;
+      return Math.min(2 ** subscription.errorCount * 2e3, 6e4);
+    }
+    subscription.errorCount = 0;
+    if (result?.status === "changed") subscription.quiet = 0;
+    else subscription.quiet += 1;
+    if (subscription.boostedUntil !== void 0 && subscription.boostedUntil > Date.now() && subscription.boostedInterval) {
+      return subscription.boostedInterval;
+    }
+    if (subscription.descriptor.type === "operation") {
+      const steps = [4e3, 8e3, 16e3, 3e4];
+      return steps[Math.min(subscription.quiet, steps.length - 1)];
+    }
+    const interval = TYPE_INTERVALS[subscription.descriptor.type];
+    if (interval) {
+      return result?.poll_after_ms ?? interval;
+    }
+    return ORDINARY_INTERVALS[Math.min(subscription.quiet, ORDINARY_INTERVALS.length - 1)];
+  }
+  _baseInterval(type) {
+    return TYPE_INTERVALS[type] || ORDINARY_INTERVALS[0];
+  }
+  _eligible(subscription) {
+    if (this.destroyed || !this.view.online) return false;
+    if (!this.view.hidden) return true;
+    if (this.blurredUntil === null || Date.now() >= this.blurredUntil) {
+      return false;
+    }
+    return subscription?.whileBlurred?.() === true;
+  }
+  _hasEligible(subscriptions = this.subscriptions.values()) {
+    return Array.from(subscriptions).some(
+      (subscription) => this._eligible(subscription)
+    );
+  }
+  _notificationRequest() {
+    const state = window.__NOTIFICATION_STATE__;
+    if (!state) return null;
+    if (state.miss && (!this.notificationSeedPending || this.notificationSeedDueAt > Date.now())) {
+      return null;
+    }
+    try {
+      return normalizedNotificationState(
+        state.miss ? { generation: null, revision: null, seed: true } : {
+          generation: state.generation,
+          revision: state.revision,
+          seed: false
+        }
+      );
+    } catch (error) {
+      this._captureContract(error, "polling-request-contract");
+      return null;
+    }
+  }
+  _notificationSeedFailed() {
+    if (!this.notificationSeedPending) return;
+    this.notificationSeedErrorCount += 1;
+    const delay = Math.min(
+      2 ** this.notificationSeedErrorCount * 2e3,
+      6e4
+    );
+    this.notificationSeedDueAt = Date.now() + jitter(delay);
+  }
+  _applyProtocolState(subscription, result) {
+    const patch = {};
+    if (result.revision !== void 0) patch.revision = result.revision;
+    if (subscription.descriptor.type === "document" && result.payload) {
+      const document = result.payload;
+      patch.generation = document.generation;
+      if (Object.hasOwn(document, "presence_digest")) {
+        patch.presence_digest = document.presence_digest;
+      }
+    }
+    subscription.descriptor = normalizedDescriptor(
+      { ...subscription.descriptor, ...patch },
+      "subscription"
+    );
+  }
+  _due() {
+    const now = Date.now();
+    return Array.from(this.subscriptions.values()).filter(
+      (subscription) => subscription.dueAt <= now && this._eligible(subscription)
+    ).slice(0, MAX_SUBSCRIPTIONS_PER_REQUEST);
+  }
+  _poll() {
+    if (this.destroyed || !this.view.online || this.view.hidden && !this._hasEligible()) {
+      return Promise.resolve([]);
+    }
+    if (this.activePoll) {
+      this.followup = true;
+      return this.activePoll;
+    }
+    const cycle = this._runPoll();
+    this.activePoll = cycle;
+    const complete = () => {
+      if (this.activePoll !== cycle) return;
+      this.activePoll = null;
+      this.activeIds.clear();
+      const followup = this.followup;
+      this.followup = false;
+      if (followup) {
+        queueMicrotask(() => this._poll());
+      } else {
+        this._schedule();
+      }
+    };
+    void cycle.then(complete, complete);
+    return cycle;
+  }
+  async _runPoll() {
+    let due = [];
+    const results = [];
+    let seededNotification = false;
+    try {
+      due = this._due();
+      const notificationOnly = !this.view.hidden && this.notificationSeedPending && this.notificationSeedDueAt <= Date.now();
+      if (!due.length && !notificationOnly) return [];
+      this.activeIds = new Set(due.map(({ descriptor }) => descriptor.id));
+      for (const { descriptor } of due) {
+        this.queuedIds.delete(descriptor.id);
+      }
+      const hooks = new Set(due.map(({ beforePoll }) => beforePoll));
+      for (const hook of hooks) if (hook) await hook();
+      await window.__PING_PENDING__;
+      if (this.destroyed || !this.view.online) return [];
+      const notificationState = this._notificationRequest();
+      due = due.filter(
+        (subscription) => this.subscriptions.get(subscription.descriptor.id) === subscription && this._eligible(subscription)
+      );
+      if (!due.length && (this.view.hidden || !notificationState?.seed)) {
+        return [];
+      }
+      this._clearTimer();
+      const byId = new Map(
+        due.map((subscription) => [subscription.descriptor.id, subscription])
+      );
+      const body = normalizedRequest({
+        version: POLL_PROTOCOL_VERSION,
+        client_id: this.clientId,
+        subscriptions: due.map(({ descriptor }) => ({ ...descriptor })),
+        closed_documents: [],
+        ...notificationState ? { notification_state: notificationState } : {}
+      });
+      seededNotification = notificationState?.seed === true;
+      if (seededNotification) this.notificationSeedActive = true;
+      this.inflight = request.post(ENDPOINTS.poll, body, {
+        replaceErrorPage: false
+      });
+      const response = await this.inflight;
+      if (!response?.ok) {
+        if (response?.status === 422 && response?.code === "invalid_poll_contract") {
+          this._captureContract(
+            new PollContractError(
+              response.path || "request",
+              response.reason || "state"
+            ),
+            "polling-request-rejected"
+          );
+        }
+        const cycleJitter2 = 0.9 + Math.random() * 0.2;
+        const scheduledAt2 = Date.now();
+        for (const subscription of due.filter((item) => this._eligible(item))) {
+          subscription.dueAt = subscription.mode === "foreground" ? Number.POSITIVE_INFINITY : scheduledAt2 + jitter(
+            this._interval(subscription, { status: "error" }),
+            cycleJitter2
+          );
+          await subscription.onResult?.({
+            id: subscription.descriptor.id,
+            type: subscription.descriptor.type,
+            status: "error"
+          });
+        }
+        return [];
+      }
+      if (response.version !== POLL_PROTOCOL_VERSION) {
+        throw new PollContractError("response.version", "unsupported");
+      }
+      if (!Array.isArray(response.results)) {
+        throw new PollContractError("response.results", "type");
+      }
+      if (this.destroyed || !this.view.online || this.view.hidden && !this._hasEligible(byId.values()))
+        return [];
+      const acceptedResults = /* @__PURE__ */ new Map();
+      const invalidIds = /* @__PURE__ */ new Set();
+      const seenIds = /* @__PURE__ */ new Set();
+      const rawResults = response.results;
+      for (const [index, raw] of rawResults.entries()) {
+        const path = `response.results[${index}]`;
+        const id = isFieldMap(raw) ? raw.id : void 0;
+        const subscription = typeof id === "string" ? byId.get(id) : void 0;
+        if (typeof id !== "string" || !subscription) {
+          this._captureContract(
+            new PollContractError(`${path}.id`, "unsupported"),
+            "polling-response-contract"
+          );
+          continue;
+        }
+        if (seenIds.has(id)) {
+          this._captureContract(
+            new PollContractError(`${path}.id`, "duplicate"),
+            "polling-response-contract",
+            { subscription_type: subscription.descriptor.type }
+          );
+          acceptedResults.delete(id);
+          invalidIds.add(id);
+          continue;
+        }
+        seenIds.add(id);
+        try {
+          acceptedResults.set(
+            id,
+            normalizedResult(raw, subscription.descriptor, path)
+          );
+        } catch (error) {
+          invalidIds.add(id);
+          this._captureContract(error, "polling-response-contract", {
+            subscription_type: subscription.descriptor.type
+          });
+        }
+      }
+      const cycleJitter = 0.9 + Math.random() * 0.2;
+      const scheduledAt = Date.now();
+      const resultPriority = ([id]) => {
+        const result = acceptedResults.get(id);
+        return result?.type === "operation" && result.status === "changed" && result.payload?.terminal ? 0 : 1;
+      };
+      const orderedSubscriptions = Array.from(byId);
+      orderedSubscriptions.sort(
+        (left, right) => resultPriority(left) - resultPriority(right)
+      );
+      for (const [id, subscription] of orderedSubscriptions) {
+        if (this.subscriptions.get(id) !== subscription) continue;
+        if (!this._eligible(subscription)) continue;
+        const result = acceptedResults.get(id);
+        if (!result) {
+          if (!invalidIds.has(id)) {
+            this._captureContract(
+              new PollContractError("response.results", "missing"),
+              "polling-response-contract",
+              { subscription_type: subscription.descriptor.type }
+            );
+          }
+          const synthetic = {
+            id,
+            type: subscription.descriptor.type,
+            status: "error"
+          };
+          results.push(synthetic);
+          subscription.dueAt = subscription.mode === "foreground" ? Number.POSITIVE_INFINITY : scheduledAt + jitter(this._interval(subscription, synthetic), cycleJitter);
+          try {
+            await subscription.onResult?.(synthetic);
+          } catch (error) {
+            captureError(error, this.view.elt, {
+              context: "polling-subscription",
+              subscription_id: id
+            });
+          }
+          continue;
+        }
+        results.push(result);
+        const previousDescriptor = { ...subscription.descriptor };
+        try {
+          this._applyProtocolState(subscription, result);
+          const accepted = await subscription.onResult?.(result);
+          if (accepted === false) {
+            subscription.descriptor = previousDescriptor;
+          }
+          subscription.dueAt = subscription.mode === "foreground" ? Number.POSITIVE_INFINITY : scheduledAt + jitter(this._interval(subscription, result), cycleJitter);
+        } catch (error) {
+          subscription.descriptor = previousDescriptor;
+          captureError(error, this.view.elt, {
+            context: "polling-subscription",
+            subscription_id: result.id
+          });
+          subscription.dueAt = subscription.mode === "foreground" ? Number.POSITIVE_INFINITY : scheduledAt + jitter(
+            this._interval(subscription, {
+              status: "error"
+            }),
+            cycleJitter
+          );
+        }
+      }
+    } catch (error) {
+      if (this.destroyed || !this.view.online) return [];
+      due = due.filter((subscription) => this._eligible(subscription));
+      if (!due.length && this.view.hidden) return [];
+      if (error instanceof PollContractError) {
+        this._captureContract(error, "polling-response-contract");
+      } else {
+        captureError(error, this.view.elt, { context: "polling-coordinator" });
+      }
+      const cycleJitter = 0.9 + Math.random() * 0.2;
+      const scheduledAt = Date.now();
+      for (const subscription of due) {
+        subscription.dueAt = subscription.mode === "foreground" ? Number.POSITIVE_INFINITY : scheduledAt + jitter(
+          this._interval(subscription, {
+            status: "error"
+          }),
+          cycleJitter
+        );
+        await subscription.onResult?.({
+          id: subscription.descriptor.id,
+          type: subscription.descriptor.type,
+          status: "error"
+        });
+      }
+    } finally {
+      if (seededNotification) {
+        this.notificationSeedActive = false;
+        this._notificationSeedFailed();
+      }
+      this.inflight = null;
+      const now = Date.now();
+      for (const id of this.queuedIds) {
+        const subscription = this.subscriptions.get(id);
+        if (subscription) subscription.dueAt = now;
+      }
+    }
+    return results;
+  }
+  _schedule(delay = null) {
+    if (this.destroyed || this.timer || !this.subscriptions.size && !this.notificationSeedPending || !this.view.online)
+      return;
+    const periodicDue = Array.from(this.subscriptions.values()).filter(
+      (subscription) => subscription.mode === "periodic" && this._eligible(subscription)
+    ).map(({ dueAt }) => dueAt);
+    const notificationDueAt = !this.view.hidden && this.notificationSeedPending ? this.notificationSeedDueAt : Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(notificationDueAt) && !periodicDue.length) return;
+    const nextDue = Math.min(notificationDueAt, ...periodicDue);
+    if (this.view.hidden && this.blurredUntil !== null && nextDue >= this.blurredUntil)
+      return;
+    const wait = delay ?? Math.max(nextDue - Date.now(), 0);
+    this.timer = window.setTimeout(() => {
+      this.timer = null;
+      void this._poll();
+    }, wait);
+  }
+  destroy() {
+    this.destroyed = true;
+    this.pause();
+    this.subscriptions.clear();
+    this.activeIds.clear();
+    this.queuedIds.clear();
+    this.protocolFailures.clear();
+    window.removeEventListener?.("notification-state", this._notificationState);
+  }
+}
+
+export { PollingCoordinator };

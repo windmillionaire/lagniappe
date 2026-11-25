@@ -1,2 +1,205 @@
-const P="offline-db",Y=5,i="sync",a="mutations";function x(){return new Promise((t,e)=>{const r=indexedDB.open(P,5);r.onerror=()=>e(r.error),r.onsuccess=()=>t(r.result),r.onupgradeneeded=o=>{const n=r.result;o.oldVersion<2&&n.objectStoreNames.contains(i)&&n.deleteObjectStore(i),n.objectStoreNames.contains(i)||n.createObjectStore(i,{keyPath:"sync_id"}),n.objectStoreNames.contains("activity")&&n.deleteObjectStore("activity"),n.objectStoreNames.contains("submit")&&n.deleteObjectStore("submit"),n.objectStoreNames.contains(a)||n.createObjectStore(a,{keyPath:"id"})}})}function d(t,e,r){return x().then(o=>new Promise((n,f)=>{let s=null,j=!1,b=null,S=null,m=!1,O=!1;const g=()=>{O||(O=!0,o.onclose=null,o.close())},h=c=>(S||=c||s?.error||new Error("IndexedDB transaction failed"),S),y=c=>{m||(m=!0,g(),f(h(c)))},R=()=>{m||!b||!j||(m=!0,g(),n(b.value))},_=c=>{h(c);try{s?.abort()}catch{}y(S)};o.onversionchange=g,o.onclose=()=>{y(new Error("IndexedDB database closed unexpectedly"))};try{s=o.transaction(t,e)}catch(c){y(c);return}s.oncomplete=()=>{j=!0,R()},s.onerror=c=>{const w=c.target,N=w&&"error"in w?w.error:null;y(N||s?.error)},s.onabort=()=>{y(s?.error||new Error("IndexedDB transaction aborted"))};let A;try{A=r(s)}catch(c){_(c);return}Promise.resolve(A).then(c=>{b={value:c},R()},_)}))}function l(t){return new Promise((e,r)=>{t.onsuccess=()=>e(t.result),t.onerror=()=>r(t.error)})}function p(t){return t!==null&&typeof t=="object"&&!Array.isArray(t)}function E(t){return p(t)&&typeof t.id=="string"}function u(t){return t==null||typeof t=="string"}function B(t){return p(t)&&typeof t.occurrence_id=="string"&&typeof t.recipient=="string"&&typeof t.display_name=="string"}function D(t){return p(t)&&typeof t.sync_id=="string"&&typeof t.key=="string"&&u(t.update)&&u(t.ydoc)&&u(t.html)&&u(t.generation)&&u(t.presence_digest)&&u(t.fingerprint)&&(t.revision===void 0||t.revision===null||typeof t.revision=="number")&&(t.mentions===void 0||t.mentions===null||Array.isArray(t.mentions)&&t.mentions.every(B))&&(t.touch_parent===void 0||typeof t.touch_parent=="boolean")&&(t.save===void 0||typeof t.save=="boolean")&&(t.timestamp===void 0||typeof t.timestamp=="number")}function M(t){const e=Date.now();return d(i,"readwrite",async r=>{const o=r.objectStore(i),n=await l(o.get(t.sync_id)),f=p(n)?n:null,s=f?{...f,...t,save:f.save||t.save,timestamp:e}:{...t,timestamp:e};f&&!Object.hasOwn(t,"html")&&delete s.html,f&&!Object.hasOwn(t,"mentions")&&delete s.mentions,await l(o.put(s))})}function I(t){return d([i],"readonly",async e=>{const r=await l(e.objectStore(i).get(t));return D(r)?r:null})}function T(){return d([i,a],"readonly",async t=>{const e=await l(t.objectStore(i).getAll()),r=await l(t.objectStore(a).getAll());return{sync:e.filter(D),mutations:r.filter(E)}})}function C(t){return d(i,"readwrite",async e=>{await l(e.objectStore(i).delete(t))})}function k(t){return t?.length?d(i,"readwrite",async e=>{const r=e.objectStore(i);await Promise.all(t.map(o=>l(r.delete(o))))}):Promise.resolve()}function V(t){return d(a,"readwrite",async e=>{await l(e.objectStore(a).put(t))})}function U(){return d(a,"readonly",async t=>(await l(t.objectStore(a).getAll())).filter(E))}function W(t){return t?.length?d(a,"readwrite",async e=>{const r=e.objectStore(a);await Promise.all(t.map(o=>l(r.delete(o))))}):Promise.resolve()}export{W as deleteOfflineMutations,C as deleteSyncRecord,k as deleteSyncRecords,T as getAllOfflineRecords,U as getOfflineMutations,I as getSyncRecord,V as setOfflineMutation,M as updateSyncRecord};
 /*! Third-party licenses: /third-party-licenses.txt */
+const DB_NAME = "offline-db";
+const DB_VERSION = 5;
+const SYNC_STORE = "sync";
+const MUTATION_STORE = "mutations";
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = request.result;
+      if (event.oldVersion < 2) {
+        if (db.objectStoreNames.contains(SYNC_STORE)) {
+          db.deleteObjectStore(SYNC_STORE);
+        }
+      }
+      if (!db.objectStoreNames.contains(SYNC_STORE)) {
+        db.createObjectStore(SYNC_STORE, { keyPath: "sync_id" });
+      }
+      if (db.objectStoreNames.contains("activity")) {
+        db.deleteObjectStore("activity");
+      }
+      if (db.objectStoreNames.contains("submit")) {
+        db.deleteObjectStore("submit");
+      }
+      if (!db.objectStoreNames.contains(MUTATION_STORE)) {
+        db.createObjectStore(MUTATION_STORE, { keyPath: "id" });
+      }
+    };
+  });
+}
+function withTransaction(storeNames, mode, executor) {
+  return openDB().then(
+    (db) => new Promise((resolve, reject) => {
+      let tx = null;
+      let transactionComplete = false;
+      let operationResult = null;
+      let firstError = null;
+      let settled = false;
+      let databaseClosed = false;
+      const closeDatabase = () => {
+        if (databaseClosed) return;
+        databaseClosed = true;
+        db.onclose = null;
+        db.close();
+      };
+      const rememberError = (error) => {
+        firstError ||= error || tx?.error || new Error("IndexedDB transaction failed");
+        return firstError;
+      };
+      const rejectOnce = (error) => {
+        if (settled) return;
+        settled = true;
+        closeDatabase();
+        reject(rememberError(error));
+      };
+      const resolveAfterCommit = () => {
+        if (settled || !operationResult || !transactionComplete) return;
+        settled = true;
+        closeDatabase();
+        resolve(operationResult.value);
+      };
+      const abortWithError = (error) => {
+        rememberError(error);
+        try {
+          tx?.abort();
+        } catch {
+        }
+        rejectOnce(firstError);
+      };
+      db.onversionchange = closeDatabase;
+      db.onclose = () => {
+        rejectOnce(new Error("IndexedDB database closed unexpectedly"));
+      };
+      try {
+        tx = db.transaction(storeNames, mode);
+      } catch (e) {
+        rejectOnce(e);
+        return;
+      }
+      tx.oncomplete = () => {
+        transactionComplete = true;
+        resolveAfterCommit();
+      };
+      tx.onerror = (event) => {
+        const target = event.target;
+        const error = target && "error" in target ? target.error : null;
+        rejectOnce(error || tx?.error);
+      };
+      tx.onabort = () => {
+        rejectOnce(tx?.error || new Error("IndexedDB transaction aborted"));
+      };
+      let operation;
+      try {
+        operation = executor(tx);
+      } catch (e) {
+        abortWithError(e);
+        return;
+      }
+      Promise.resolve(operation).then((result) => {
+        operationResult = { value: result };
+        resolveAfterCommit();
+      }, abortWithError);
+    })
+  );
+}
+function promisify(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+function isStoredRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function isStoredMutation(value) {
+  return isStoredRecord(value) && typeof value.id === "string";
+}
+function isOptionalText(value) {
+  return value === void 0 || value === null || typeof value === "string";
+}
+function isStoredMention(value) {
+  return isStoredRecord(value) && typeof value.occurrence_id === "string" && typeof value.recipient === "string" && typeof value.display_name === "string";
+}
+function isStoredSyncRecord(value) {
+  return isStoredRecord(value) && typeof value.sync_id === "string" && typeof value.key === "string" && isOptionalText(value.update) && isOptionalText(value.ydoc) && isOptionalText(value.html) && isOptionalText(value.generation) && isOptionalText(value.presence_digest) && isOptionalText(value.fingerprint) && (value.revision === void 0 || value.revision === null || typeof value.revision === "number") && (value.mentions === void 0 || value.mentions === null || Array.isArray(value.mentions) && value.mentions.every(isStoredMention)) && (value.touch_parent === void 0 || typeof value.touch_parent === "boolean") && (value.save === void 0 || typeof value.save === "boolean") && (value.timestamp === void 0 || typeof value.timestamp === "number");
+}
+function updateSyncRecord(record) {
+  const timestamp = Date.now();
+  return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
+    const store = tx.objectStore(SYNC_STORE);
+    const stored = await promisify(store.get(record.sync_id));
+    const existing = isStoredRecord(stored) ? stored : null;
+    const merged = existing ? {
+      ...existing,
+      ...record,
+      save: existing.save || record.save,
+      timestamp
+    } : { ...record, timestamp };
+    if (existing && !Object.hasOwn(record, "html")) delete merged.html;
+    if (existing && !Object.hasOwn(record, "mentions")) delete merged.mentions;
+    await promisify(store.put(merged));
+  });
+}
+function getSyncRecord(sync_id) {
+  return withTransaction([SYNC_STORE], "readonly", async (tx) => {
+    const record = await promisify(
+      tx.objectStore(SYNC_STORE).get(sync_id)
+    );
+    return isStoredSyncRecord(record) ? record : null;
+  });
+}
+function getAllOfflineRecords() {
+  return withTransaction(
+    [SYNC_STORE, MUTATION_STORE],
+    "readonly",
+    async (tx) => {
+      const sync = await promisify(
+        tx.objectStore(SYNC_STORE).getAll()
+      );
+      const mutations = await promisify(
+        tx.objectStore(MUTATION_STORE).getAll()
+      );
+      return {
+        sync: sync.filter(isStoredSyncRecord),
+        mutations: mutations.filter(isStoredMutation)
+      };
+    }
+  );
+}
+function deleteSyncRecord(sync_id) {
+  return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
+    await promisify(tx.objectStore(SYNC_STORE).delete(sync_id));
+  });
+}
+function deleteSyncRecords(sync_ids) {
+  if (!sync_ids?.length) return Promise.resolve();
+  return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
+    const store = tx.objectStore(SYNC_STORE);
+    await Promise.all(sync_ids.map((id) => promisify(store.delete(id))));
+  });
+}
+function setOfflineMutation(record) {
+  return withTransaction(MUTATION_STORE, "readwrite", async (tx) => {
+    await promisify(tx.objectStore(MUTATION_STORE).put(record));
+  });
+}
+function getOfflineMutations() {
+  return withTransaction(MUTATION_STORE, "readonly", async (tx) => {
+    const records = await promisify(
+      tx.objectStore(MUTATION_STORE).getAll()
+    );
+    return records.filter(isStoredMutation);
+  });
+}
+function deleteOfflineMutations(ids) {
+  if (!ids?.length) return Promise.resolve();
+  return withTransaction(MUTATION_STORE, "readwrite", async (tx) => {
+    const store = tx.objectStore(MUTATION_STORE);
+    await Promise.all(ids.map((id) => promisify(store.delete(id))));
+  });
+}
+
+export { deleteOfflineMutations, deleteSyncRecord, deleteSyncRecords, getAllOfflineRecords, getOfflineMutations, getSyncRecord, setOfflineMutation, updateSyncRecord };

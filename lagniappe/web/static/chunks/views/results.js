@@ -1,2 +1,148 @@
-import{S as c,r,w as l}from"../foundation.js?v=b9ad6d22";import"../upstreamUnavailable.js?v=b9ad6d22";import"../connectivity.js?v=b9ad6d22";class h extends c{async init(){await super.init();const a=new URL(window.location.href);this.selected=new Set(a.searchParams.getAll("kind")),this.facetsContainer=document.querySelector("[data-role='facets']"),this.reset=document.querySelector("[data-role='reset']"),this.facets=document.querySelectorAll("[data-role='attribute']"),this.updateSelectionState(),this.facets.forEach(e=>{e.dataset.kind&&this.selected.has(e.dataset.kind)&&(e.dataset.selected="true")}),this.reset?.addEventListener("click",e=>this.handleResetClick(e)),this.facets.forEach(e=>{e.addEventListener("click",t=>this.handleFacetClick(t,e)),e.addEventListener("keydown",t=>{(t.key==="Enter"||t.key===" ")&&(t.preventDefault(),this.handleFacetClick(t,e))}),e.addEventListener("mouseleave",()=>{e.blur(),delete e.dataset.justSelected})}),this.addPagination()}addPagination(){document.querySelectorAll("[data-role='pagination']").forEach(a=>{a.addEventListener("click",e=>this.handlePaginationClick(e))})}updateSelectionState(){this.facetsContainer&&(this.facetsContainer.dataset.hasSelection=(this.selected.size>0).toString())}updateResults(a){const e=a.querySelector("[data-role='results']");e&&(document.querySelector("[data-role='results']")?.replaceWith(e),this.addPagination())}async handlePaginationClick(a){a.preventDefault(),a.stopPropagation();const e=a.currentTarget?.dataset.page;if(e===void 0)return;const t=new URL(window.location.href);t.searchParams.set("page",e);const i=(await r.get(t.toString()))?.html;i&&await l(()=>{this.updateResults(i),window.history.pushState({},"",t.toString())},{label:"search:paginate"})}async handleResetClick(a){a.preventDefault(),a.stopPropagation(),this.selected.clear();const e=new URL(window.location.href);e.searchParams.delete("kind"),e.searchParams.delete("page");const t=e.toString(),i=(await r.get(t))?.html;i&&await l(()=>{this.facets.forEach(n=>{n.dataset.selected="false",delete n.dataset.justSelected}),this.updateSelectionState(),this.updateResults(i),window.history.pushState({},"",t)},{label:"search:reset-facets"})}async handleFacetClick(a,e){a.preventDefault(),a.stopPropagation();const t=new URL(window.location.href);t.searchParams.delete("page");const s=e.dataset.kind;if(s===void 0)return;const i=e.dataset.selected==="true";this.selected.has(s)?(this.selected.delete(s),t.searchParams.delete("kind",s)):(this.selected.add(s),t.searchParams.append("kind",s));const n=t.toString(),d=(await r.get(n))?.html;d&&await l(()=>{const o=this.selected.has(s);e.dataset.selected=o?"true":"false",o&&!i&&(e.dataset.justSelected="true"),this.updateSelectionState(),this.updateResults(d),window.history.pushState({},"",n)},{label:"search:change-facet"})}}export{h as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as ShellView, r as request, w as withTransition } from '../foundation.js?v=b6ea3fe0';
+import '../upstreamUnavailable.js?v=b6ea3fe0';
+import '../connectivity.js?v=b6ea3fe0';
+
+class Results extends ShellView {
+  /**
+   * @template search/search.html::facet_button
+   */
+  async init() {
+    await super.init();
+    const url = new URL(window.location.href);
+    this.selected = new Set(url.searchParams.getAll("kind"));
+    this.facetsContainer = document.querySelector(
+      "[data-role='facets']"
+    );
+    this.reset = document.querySelector("[data-role='reset']");
+    this.facets = document.querySelectorAll(
+      "[data-role='attribute']"
+    );
+    this.updateSelectionState();
+    this.facets.forEach((facet) => {
+      if (facet.dataset.kind && this.selected.has(facet.dataset.kind)) {
+        facet.dataset.selected = "true";
+      }
+    });
+    this.reset?.addEventListener("click", (e) => this.handleResetClick(e));
+    this.facets.forEach((facet) => {
+      facet.addEventListener("click", (e) => this.handleFacetClick(e, facet));
+      facet.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          this.handleFacetClick(e, facet);
+        }
+      });
+      facet.addEventListener("mouseleave", () => {
+        facet.blur();
+        delete facet.dataset.justSelected;
+      });
+    });
+    this.addPagination();
+  }
+  /**
+   * @template search/results.html::footer
+   */
+  addPagination() {
+    document.querySelectorAll("[data-role='pagination']").forEach((pagination) => {
+      pagination.addEventListener(
+        "click",
+        (e) => this.handlePaginationClick(e)
+      );
+    });
+  }
+  updateSelectionState() {
+    if (!this.facetsContainer) return;
+    this.facetsContainer.dataset.hasSelection = (this.selected.size > 0).toString();
+  }
+  updateResults(html) {
+    const replacement = html.querySelector("[data-role='results']");
+    if (!replacement) return;
+    document.querySelector("[data-role='results']")?.replaceWith(replacement);
+    this.addPagination();
+  }
+  /**
+   * @template search/results.html::footer
+   */
+  async handlePaginationClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const page = e.currentTarget?.dataset.page;
+    if (page === void 0) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("page", page);
+    const response = await request.get(url.toString());
+    const html = response?.html;
+    if (!html) return;
+    await withTransition(
+      () => {
+        this.updateResults(html);
+        window.history.pushState({}, "", url.toString());
+      },
+      { label: "search:paginate" }
+    );
+  }
+  /**
+   * @template search/search.html::main
+   */
+  async handleResetClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.selected.clear();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("kind");
+    url.searchParams.delete("page");
+    const newUrl = url.toString();
+    const response = await request.get(newUrl);
+    const html = response?.html;
+    if (!html) return;
+    await withTransition(
+      () => {
+        this.facets.forEach((facet) => {
+          facet.dataset.selected = "false";
+          delete facet.dataset.justSelected;
+        });
+        this.updateSelectionState();
+        this.updateResults(html);
+        window.history.pushState({}, "", newUrl);
+      },
+      { label: "search:reset-facets" }
+    );
+  }
+  /**
+   * @template search/search.html::facet_button
+   */
+  async handleFacetClick(e, facet) {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("page");
+    const kind = facet.dataset.kind;
+    if (kind === void 0) return;
+    const wasSelected = facet.dataset.selected === "true";
+    if (this.selected.has(kind)) {
+      this.selected.delete(kind);
+      url.searchParams.delete("kind", kind);
+    } else {
+      this.selected.add(kind);
+      url.searchParams.append("kind", kind);
+    }
+    const newUrl = url.toString();
+    const response = await request.get(newUrl);
+    const html = response?.html;
+    if (!html) return;
+    await withTransition(
+      () => {
+        const selected = this.selected.has(kind);
+        facet.dataset.selected = selected ? "true" : "false";
+        if (selected && !wasSelected) facet.dataset.justSelected = "true";
+        this.updateSelectionState();
+        this.updateResults(html);
+        window.history.pushState({}, "", newUrl);
+      },
+      { label: "search:change-facet" }
+    );
+  }
+}
+
+export { Results as default };

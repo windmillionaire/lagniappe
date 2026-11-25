@@ -1,2 +1,291 @@
-import{S as o}from"./ui-resources.js?v=b9ad6d22";import{w as u,r as g,c as a,E as f}from"./foundation.js?v=b9ad6d22";import"./upstreamUnavailable.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";class l{constructor(e,t){this._destroyed=!1,this._listenersAttached=!1,this._modal=null,this.trigger=t,this.view=e,this.keydown=this._keydown.bind(this),this.click=this._click.bind(this),this.key=null}_attachListeners(){this._destroyed||this._listenersAttached||!this.modal||(document.addEventListener("keydown",this.keydown),document.addEventListener("click",this.click),this.modal._lp_modal=this,this._listenersAttached=!0)}_detach(){this._listenersAttached&&(document.removeEventListener("keydown",this.keydown),document.removeEventListener("click",this.click),this._listenersAttached=!1);const e=this._modal;e?._lp_modal===this&&delete e._lp_modal,e?.remove(),this._modal=null,this.trigger&&(this.trigger.disabled=!1)}destroy(){this._destroyed||(this._destroyed=!0,this._detach())}get modal(){return this._modal}_keydown(e){const t=this.modal;if(t){if(e.key==="Escape")this.remove();else if(e.key==="Enter"&&e.target instanceof HTMLElement&&e.target.tagName==="BUTTON")e.target.click();else if(e.key==="Tab"){const i=t.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');if(!i.length)return;const s=i[0],r=i[i.length-1];e.shiftKey?(document.activeElement===s||!t.contains(document.activeElement))&&(e.preventDefault(),r.focus()):(document.activeElement===r||!t.contains(document.activeElement))&&(e.preventDefault(),s.focus())}}}_click(e){const t=this.modal,i=e.target;if(!(i instanceof Node)||this.trigger?.contains(i))return;const s=t?.querySelector("#modal-content");s&&!s.contains(i)?this.remove():i instanceof Element&&i.closest("[lp-control='close']")&&(e.stopPropagation(),this.remove())}async remove(){this.modal&&await u(()=>{this._detach()},{label:"modal:remove"})}async load(e){if(this._destroyed||this.view?._destroyed)return null;this.trigger&&(this.trigger.disabled=!0);try{const t=await g.get(e);if(this._destroyed||this.view?._destroyed)return this.trigger&&(this.trigger.disabled=!1),null;if(!t?.html)return a(new Error("No modal HTML provided"),this.trigger,{view:this.view?.dataset,route:e,modal:t}),this.trigger&&(this.trigger.disabled=!1),null;const i=await this.attach(t.html);return this.trigger&&(this.trigger.disabled=!1),i}catch(t){a(t,this.trigger,this.view?.dataset),this.trigger&&(this.trigger.disabled=!1)}}async attach(e,t){if(this._destroyed||this.view?._destroyed)return null;try{const i=e.querySelector("#modal")||(e instanceof HTMLElement?e:null);return i?(this.trigger&&(this.trigger.disabled=!0),await u(()=>{this._destroyed||this.view?._destroyed||(this._detach(),this._modal=i,document.body.appendChild(i),this._attachListeners())},{label:"modal:attach"}),this.modal):null}catch(i){return a(i,t,this.view?.dataset),null}}}class p extends l{async init(){const e=this.trigger;if(!e)return;const t=e.closest("[lp-entity]")||e.closest("[lp-component]")?._lp_component?.active?.target?.closest("[lp-entity]");if(this.key=e.dataset.deleteKey||t?.dataset?.key||t?.id||null,!this.key||!this.view){a(new Error("No key or view provided"),this.trigger,this.view?.dataset);return}await this.load(e.dataset.deleteModalRoute||f.delete(this.key));const i=this.modal;if(!i){this.trigger&&(this.trigger.disabled=!1);return}if(this.deleteButton=i.querySelector("[data-role='delete']"),!this.deleteButton){this.trigger&&(this.trigger.disabled=!1),a(new Error("Delete modal missing [data-role='delete']"),this.trigger,{view:this.view?.dataset});return}this.deleteButton.addEventListener("click",this.delete.bind(this)),this.deleteButton.focus()}removeEntity(e){document.querySelectorAll(`[data-key='${e}']`).forEach(t=>{t._lp_component&&t._lp_component.destroy(),t.remove()})}async delete(){const{deleteButton:e,modal:t}=this;if(!e||!t)return;const i=e.querySelector("#spinner");try{const s=e.dataset.route;if(!i||!s)throw new Error("Delete action is missing its spinner or route");e.disabled=!0,i.dataset.visible="true";const r=Array.from(t.querySelectorAll("[data-delete-option][name]")),n=r.length?Object.fromEntries(r.map(m=>[m.name,m.checked])):null;if(!(await g.delete(s,n))?.ok){e.disabled=!1,i.dataset.visible="false";return}await this.remove();const h=this.trigger?.dataset.returnUrl;if(h){window.location.assign(h);return}await this.view?.reconcileChange?.({type:"delete",key:this.key})}catch(s){e.disabled=!1,i&&(i.dataset.visible="false"),a(s,e,this.view?.dataset)}}}class y extends l{async init(){const e=this.trigger;if(!e)return;const t=e.closest("[lp-component]")?._lp_component?.help||e.getAttribute("lp-help")||e.closest("nav[lp-help]")?.getAttribute("lp-help");if(!t){a(new Error("No section provided"),this.trigger,this.view?.dataset);return}await this.load(f.help(t))}}class _ extends l{constructor(e,t){super(e,t),this._enabled=!1,this._triggerClick=()=>{this.attach()}}async attach(){if(this._destroyed||this.view?._destroyed||this.modal)return this.modal;const e=document.createElement("div");e.id="modal",e.className=o.modal.wrapper;const t=e.appendChild(document.createElement("div"));t.className=o.modal.content,t.id="modal-content";const i=t.appendChild(document.createElement("div"));i.className=o.modal.header;const s=i.appendChild(document.createElement("h2"));s.textContent="Offline",s.className="text-lg font-bold text-base-dark";const r=i.appendChild(document.createElement("button"));r.textContent="Close",r.className=`${o.button.close}`,r.onclick=()=>{this.remove()};const n=t.appendChild(document.createElement("div"));n.className="p-6 text-slate-600";const c=n.appendChild(document.createElement("p"));c.textContent="You are offline (or the server is starting up). You will be able to view any pages that have been cached, but search, documents and forms will be in read-only mode until you are online again.",await super.attach(e)}enable(){!this.trigger||this._destroyed||this._enabled||(this.trigger.addEventListener("click",this._triggerClick),this._enabled=!0)}disable(){!this.trigger||!this._enabled||(this.trigger.removeEventListener("click",this._triggerClick),this._enabled=!1)}destroy(){this._destroyed||(this.disable(),super.destroy())}}export{p as DeleteModal,y as HelpModal,l as Modal,_ as OfflineModal};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from './ui-resources.js?v=b6ea3fe0';
+import { w as withTransition, r as request, c as captureError, E as ENDPOINTS } from './foundation.js?v=b6ea3fe0';
+import './upstreamUnavailable.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+
+class Modal {
+  constructor(view, trigger) {
+    this._destroyed = false;
+    this._listenersAttached = false;
+    this._modal = null;
+    this.trigger = trigger;
+    this.view = view;
+    this.keydown = this._keydown.bind(this);
+    this.click = this._click.bind(this);
+    this.key = null;
+  }
+  _attachListeners() {
+    if (this._destroyed || this._listenersAttached || !this.modal) return;
+    document.addEventListener("keydown", this.keydown);
+    document.addEventListener("click", this.click);
+    this.modal._lp_modal = this;
+    this._listenersAttached = true;
+  }
+  _detach() {
+    if (this._listenersAttached) {
+      document.removeEventListener("keydown", this.keydown);
+      document.removeEventListener("click", this.click);
+      this._listenersAttached = false;
+    }
+    const modal = this._modal;
+    if (modal?._lp_modal === this) delete modal._lp_modal;
+    modal?.remove();
+    this._modal = null;
+    if (this.trigger) this.trigger.disabled = false;
+  }
+  destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
+    this._detach();
+  }
+  get modal() {
+    return this._modal;
+  }
+  _keydown(event) {
+    const modal = this.modal;
+    if (!modal) return;
+    if (event.key === "Escape") {
+      this.remove();
+    } else if (event.key === "Enter" && event.target instanceof HTMLElement && event.target.tagName === "BUTTON") {
+      event.target.click();
+    } else if (event.key === "Tab") {
+      const focusable = modal.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey) {
+        if (document.activeElement === first || !modal.contains(document.activeElement)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !modal.contains(document.activeElement)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    }
+  }
+  _click(event) {
+    const modal = this.modal;
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    if (this.trigger?.contains(target)) return;
+    const content = modal?.querySelector("#modal-content");
+    if (content && !content.contains(target)) {
+      this.remove();
+    } else if (target instanceof Element && target.closest("[lp-control='close']")) {
+      event.stopPropagation();
+      this.remove();
+    }
+  }
+  async remove() {
+    if (!this.modal) return;
+    await withTransition(
+      () => {
+        this._detach();
+      },
+      { label: "modal:remove" }
+    );
+  }
+  async load(route) {
+    if (this._destroyed || this.view?._destroyed) return null;
+    if (this.trigger) this.trigger.disabled = true;
+    try {
+      const modal = await request.get(route);
+      if (this._destroyed || this.view?._destroyed) {
+        if (this.trigger) this.trigger.disabled = false;
+        return null;
+      }
+      if (!modal?.html) {
+        captureError(new Error("No modal HTML provided"), this.trigger, {
+          view: this.view?.dataset,
+          route,
+          modal
+        });
+        if (this.trigger) this.trigger.disabled = false;
+        return null;
+      }
+      const attached = await this.attach(modal.html);
+      if (this.trigger) this.trigger.disabled = false;
+      return attached;
+    } catch (error) {
+      captureError(error, this.trigger, this.view?.dataset);
+      if (this.trigger) this.trigger.disabled = false;
+    }
+  }
+  async attach(html, component) {
+    if (this._destroyed || this.view?._destroyed) return null;
+    try {
+      const modal = html.querySelector("#modal") || (html instanceof HTMLElement ? html : null);
+      if (!modal) return null;
+      if (this.trigger) this.trigger.disabled = true;
+      await withTransition(
+        () => {
+          if (this._destroyed || this.view?._destroyed) return;
+          this._detach();
+          this._modal = modal;
+          document.body.appendChild(modal);
+          this._attachListeners();
+        },
+        { label: "modal:attach" }
+      );
+      return this.modal;
+    } catch (error) {
+      captureError(error, component, this.view?.dataset);
+      return null;
+    }
+  }
+}
+class DeleteModal extends Modal {
+  async init() {
+    const trigger = this.trigger;
+    if (!trigger) return;
+    const entity = trigger.closest("[lp-entity]") || trigger.closest("[lp-component]")?._lp_component?.active?.target?.closest("[lp-entity]");
+    this.key = trigger.dataset.deleteKey || entity?.dataset?.key || entity?.id || null;
+    if (!this.key || !this.view) {
+      captureError(
+        new Error("No key or view provided"),
+        this.trigger,
+        this.view?.dataset
+      );
+      return;
+    }
+    await this.load(
+      trigger.dataset.deleteModalRoute || ENDPOINTS.delete(this.key)
+    );
+    const modal = this.modal;
+    if (!modal) {
+      if (this.trigger) this.trigger.disabled = false;
+      return;
+    }
+    this.deleteButton = modal.querySelector(
+      "[data-role='delete']"
+    );
+    if (!this.deleteButton) {
+      if (this.trigger) this.trigger.disabled = false;
+      captureError(
+        new Error("Delete modal missing [data-role='delete']"),
+        this.trigger,
+        { view: this.view?.dataset }
+      );
+      return;
+    }
+    this.deleteButton.addEventListener("click", this.delete.bind(this));
+    this.deleteButton.focus();
+  }
+  removeEntity(key) {
+    document.querySelectorAll(`[data-key='${key}']`).forEach((elt) => {
+      if (elt._lp_component) elt._lp_component.destroy();
+      elt.remove();
+    });
+  }
+  async delete() {
+    const { deleteButton, modal } = this;
+    if (!deleteButton || !modal) return;
+    const spinner = deleteButton.querySelector("#spinner");
+    try {
+      const route = deleteButton.dataset.route;
+      if (!spinner || !route)
+        throw new Error("Delete action is missing its spinner or route");
+      deleteButton.disabled = true;
+      spinner.dataset.visible = "true";
+      const options = Array.from(
+        modal.querySelectorAll("[data-delete-option][name]")
+      );
+      const data = options.length ? Object.fromEntries(
+        options.map((option) => [option.name, option.checked])
+      ) : null;
+      const response = await request.delete(route, data);
+      if (!response?.ok) {
+        deleteButton.disabled = false;
+        spinner.dataset.visible = "false";
+        return;
+      }
+      await this.remove();
+      const returnUrl = this.trigger?.dataset.returnUrl;
+      if (returnUrl) {
+        window.location.assign(returnUrl);
+        return;
+      }
+      await this.view?.reconcileChange?.({ type: "delete", key: this.key });
+    } catch (error) {
+      deleteButton.disabled = false;
+      if (spinner) spinner.dataset.visible = "false";
+      captureError(error, deleteButton, this.view?.dataset);
+    }
+  }
+}
+class HelpModal extends Modal {
+  async init() {
+    const trigger = this.trigger;
+    if (!trigger) return;
+    const section = trigger.closest("[lp-component]")?._lp_component?.help || trigger.getAttribute("lp-help") || trigger.closest("nav[lp-help]")?.getAttribute("lp-help");
+    if (!section) {
+      captureError(
+        new Error("No section provided"),
+        this.trigger,
+        this.view?.dataset
+      );
+      return;
+    }
+    await this.load(ENDPOINTS.help(section));
+  }
+}
+class OfflineModal extends Modal {
+  constructor(view, trigger) {
+    super(view, trigger);
+    this._enabled = false;
+    this._triggerClick = () => {
+      void this.attach();
+    };
+  }
+  async attach() {
+    if (this._destroyed || this.view?._destroyed || this.modal) {
+      return this.modal;
+    }
+    const modal = document.createElement("div");
+    modal.id = "modal";
+    modal.className = STYLES.modal.wrapper;
+    const content = modal.appendChild(document.createElement("div"));
+    content.className = STYLES.modal.content;
+    content.id = "modal-content";
+    const header = content.appendChild(document.createElement("div"));
+    header.className = STYLES.modal.header;
+    const headerText = header.appendChild(document.createElement("h2"));
+    headerText.textContent = "Offline";
+    headerText.className = "text-lg font-bold text-base-dark";
+    const close = header.appendChild(document.createElement("button"));
+    close.textContent = "Close";
+    close.className = `${STYLES.button.close}`;
+    close.onclick = () => {
+      void this.remove();
+    };
+    const body = content.appendChild(document.createElement("div"));
+    body.className = "p-6 text-slate-600";
+    const bodyText = body.appendChild(document.createElement("p"));
+    bodyText.textContent = "You are offline (or the server is starting up). You will be able to view any pages that have been cached, but search, documents and forms will be in read-only mode until you are online again.";
+    await super.attach(modal);
+    return void 0;
+  }
+  enable() {
+    if (!this.trigger || this._destroyed || this._enabled) return;
+    this.trigger.addEventListener("click", this._triggerClick);
+    this._enabled = true;
+  }
+  disable() {
+    if (!this.trigger || !this._enabled) return;
+    this.trigger.removeEventListener("click", this._triggerClick);
+    this._enabled = false;
+  }
+  destroy() {
+    if (this._destroyed) return;
+    this.disable();
+    super.destroy();
+  }
+}
+
+export { DeleteModal, HelpModal, Modal, OfflineModal };

@@ -11,6 +11,9 @@ import {
 import Core from "./core.ts";
 import type { ViewRoot } from "./shell.ts";
 
+export const INDEX_LOADING_DELAY_MS = 200;
+const INDEX_SKELETON_ROWS = 4;
+
 function isTableColumn(value: unknown): value is TableColumn {
 	return Boolean(
 		value &&
@@ -29,12 +32,18 @@ export default class EntityIndex extends Core {
 	declare TableVisibilityState?: TableVisibilityState | null;
 	declare _indexMobileResize?: () => Promise<void>;
 	declare _dropdownPromise?: Promise<Dropdown | null> | null;
+	declare _tableLoadingTimer?: ReturnType<typeof setTimeout> | null;
+	declare _tableLoadingTarget?: HTMLTableSectionElement | null;
+	declare _tableLoadingToken: number;
 
 	constructor(node: ViewRoot) {
 		super(node);
 		this.dropdown = null;
 		this.nav = null;
 		this.toolsObserver = null;
+		this._tableLoadingTimer = null;
+		this._tableLoadingTarget = null;
+		this._tableLoadingToken = 0;
 	}
 
 	async init() {
@@ -76,6 +85,10 @@ export default class EntityIndex extends Core {
 			},
 			{ label: "index:initial-table" },
 		);
+
+		if (table.elt.hasAttribute("lp-prefetch")) {
+			this._scheduleTableLoading(table.elt);
+		}
 
 		const continuation =
 			indexTable?.target?.querySelector<HTMLTableRowElement>("tr[lp-load]");
@@ -297,7 +310,123 @@ export default class EntityIndex extends Core {
 		return this._dropdownPromise;
 	}
 
+	async prefetch() {
+		try {
+			await super.prefetch();
+		} finally {
+			const table = this.getComponent(this.elt.querySelector("#table"));
+			const indexTable = table?.widgets?.IndexTable;
+			if (!indexTable?.loading || indexTable.loaded) {
+				this.clearTableLoading();
+			}
+		}
+	}
+
+	_scheduleTableLoading(tableElt: HTMLElement) {
+		const tbody = tableElt.querySelector<HTMLTableSectionElement>(
+			"tbody[data-widget='IndexTable']",
+		);
+		if (
+			!tbody ||
+			tbody.hasAttribute("loaded") ||
+			tbody.querySelector("tr[lp-entity]")
+		) {
+			return;
+		}
+		this.clearTableLoading();
+		this._tableLoadingTarget = tbody;
+		const token = ++this._tableLoadingToken;
+		this._tableLoadingTimer = setTimeout(() => {
+			this._tableLoadingTimer = null;
+			void this._showTableLoading(tableElt, tbody, token);
+		}, INDEX_LOADING_DELAY_MS);
+	}
+
+	async _showTableLoading(
+		tableElt: HTMLElement,
+		tbody: HTMLTableSectionElement,
+		token: number,
+	) {
+		if (
+			this._destroyed ||
+			token !== this._tableLoadingToken ||
+			!tbody.isConnected ||
+			tbody.hasAttribute("loaded") ||
+			tbody.querySelector("tr[lp-entity]") ||
+			tbody.querySelector("tr[data-role='loading']")
+		) {
+			return;
+		}
+		const { STYLES } = await import("../../generated/styles.mjs");
+		if (
+			this._destroyed ||
+			token !== this._tableLoadingToken ||
+			!tbody.isConnected ||
+			tbody.hasAttribute("loaded") ||
+			tbody.querySelector("tr[lp-entity]") ||
+			tbody.querySelector("tr[data-role='loading']")
+		) {
+			return;
+		}
+
+		const columnCount =
+			tableElt.querySelectorAll("thead > tr:first-child > th").length || 1;
+		const row = document.createElement("tr");
+		row.dataset.role = "loading";
+		row.dataset.visible = "true";
+		row.setAttribute("aria-live", "polite");
+
+		const cell = document.createElement("td");
+		cell.colSpan = columnCount;
+		cell.className = STYLES.table.loading.cell;
+
+		const srLabel = document.createElement("span");
+		srLabel.className = "sr-only";
+		srLabel.setAttribute("role", "status");
+		srLabel.textContent = "Loading rows";
+		cell.append(srLabel);
+
+		const list = document.createElement("div");
+		list.className = STYLES.table.loading.list;
+		list.setAttribute("aria-hidden", "true");
+		for (let i = 0; i < INDEX_SKELETON_ROWS; i += 1) {
+			const item = document.createElement("div");
+			item.className = STYLES.table.loading.item;
+			const primary = document.createElement("span");
+			primary.className = STYLES.table.loading.barPrimary;
+			const secondary = document.createElement("span");
+			secondary.className = STYLES.table.loading.barSecondary;
+			item.append(primary, secondary);
+			list.append(item);
+		}
+		cell.append(list);
+		row.append(cell);
+		tbody.setAttribute("aria-busy", "true");
+		tbody.prepend(row);
+	}
+
+	clearTableLoading() {
+		this._tableLoadingToken += 1;
+		if (
+			this._tableLoadingTimer !== null &&
+			this._tableLoadingTimer !== undefined
+		) {
+			clearTimeout(this._tableLoadingTimer);
+			this._tableLoadingTimer = null;
+		}
+		const tbody =
+			this._tableLoadingTarget ||
+			this.elt.querySelector<HTMLTableSectionElement>(
+				"#table tbody[data-widget='IndexTable']",
+			);
+		this._tableLoadingTarget = null;
+		if (!tbody) return;
+		tbody.removeAttribute("aria-busy");
+		tbody.querySelector("tr[data-role='loading']")?.remove();
+	}
+
 	destroy() {
+		this.clearTableLoading();
 		if (this._indexMobileResize)
 			this.elt.removeEventListener("mobile-resize", this._indexMobileResize);
 		super.destroy();

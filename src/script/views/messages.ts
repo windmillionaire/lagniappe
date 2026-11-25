@@ -200,9 +200,18 @@ export default class Messages extends Core {
 		};
 		this.elt.addEventListener("mobile-resize", this._messagesMobileResize);
 		this.history.addEventListener("click", (event) => {
-			const button = (
-				event.target as Element | null
-			)?.closest?.<HTMLButtonElement>("[data-action='delete-message']");
+			const target = event.target as Element | null;
+			if (
+				target?.closest?.<HTMLButtonElement>(
+					"[data-action='start-conversation']",
+				)
+			) {
+				this.composer?.open();
+				return;
+			}
+			const button = target?.closest?.<HTMLButtonElement>(
+				"[data-action='delete-message']",
+			);
 			if (button?.dataset.message)
 				void this.deleteMessage(button.dataset.message);
 		});
@@ -247,6 +256,9 @@ export default class Messages extends Core {
 			this.rememberConversation(null);
 			this.renderConversationSelector();
 		}
+		if (!opened) {
+			this.renderEmptyHistory();
+		}
 		return this;
 	}
 
@@ -284,8 +296,8 @@ export default class Messages extends Core {
 
 		this.current = null;
 		this.messageCursor = null;
-		this.history.replaceChildren();
 		this.header.textContent = "Choose a conversation";
+		this.renderEmptyHistory();
 		this.renderReply();
 		this.rememberConversation(null);
 		this.renderConversationSelector();
@@ -366,60 +378,68 @@ export default class Messages extends Core {
 
 	renderConversations() {
 		const conversations = Array.from(this.conversations.values());
-		this.list.replaceChildren(
-			...conversations.map((conversation) => {
-				const row = document.createElement("div");
-				row.dataset.conversationRow = conversation.id;
-				row.className = `${
-					STYLES.list.itemHeader
-				} group bg-white hover:bg-user-bg data-[active=true]:bg-user-bg/50`;
-				if (conversation.id === this.current?.id) row.dataset.active = "true";
+		if (conversations.length === 0 && typeof document !== "undefined") {
+			const empty = document.createElement("p");
+			empty.dataset.role = "empty";
+			empty.className = STYLES.messages?.sidebarEmpty || "";
+			empty.textContent = "No conversations yet.";
+			this.list.replaceChildren(empty);
+		} else {
+			this.list.replaceChildren(
+				...conversations.map((conversation) => {
+					const row = document.createElement("div");
+					row.dataset.conversationRow = conversation.id;
+					row.className = `${
+						STYLES.list.itemHeader
+					} group bg-white hover:bg-user-bg data-[active=true]:bg-user-bg/50`;
+					if (conversation.id === this.current?.id) row.dataset.active = "true";
 
-				const button = document.createElement("button");
-				button.type = "button";
-				button.dataset.conversation = conversation.id;
-				button.className =
-					"flex min-w-0 grow items-center justify-between gap-2 text-left focus-visible:outline-none focus-visible:underline";
-				const name = document.createElement("span");
-				name.className = "font-medium";
-				name.textContent = conversation.peer.name;
-				button.appendChild(name);
-				if (conversation.unread) {
-					const unread = document.createElement("span");
-					unread.className =
-						"rounded-full bg-user-default px-2 py-0.5 text-xs font-bold text-white";
-					unread.textContent = String(conversation.unread);
-					button.appendChild(unread);
-				}
+					const button = document.createElement("button");
+					button.type = "button";
+					button.dataset.conversation = conversation.id;
+					button.className =
+						"flex min-w-0 grow items-center justify-between gap-2 text-left focus-visible:outline-none focus-visible:underline";
+					const name = document.createElement("span");
+					name.className = "font-medium";
+					name.textContent = conversation.peer.name;
+					button.appendChild(name);
+					if (conversation.unread) {
+						const unread = document.createElement("span");
+						unread.className =
+							"rounded-full bg-user-default px-2 py-0.5 text-xs font-bold text-white";
+						unread.textContent = String(conversation.unread);
+						button.appendChild(unread);
+					}
 
-				const clear = document.createElement("button");
-				clear.type = "button";
-				clear.className = STYLES.toggle.container;
-				clear.dataset.controls = "delete";
-				clear.dataset.kind = "delete";
-				clear.dataset.active = "false";
-				clear.dataset.deleteKey = conversation.id;
-				clear.dataset.deleteModalRoute = ENDPOINTS.messages.clearModal(
-					conversation.id,
-				);
-				clear.setAttribute("lp-control", "delete");
-				clear.setAttribute("lp-delete", "");
-				clear.setAttribute(
-					"aria-label",
-					`Clear conversation with ${conversation.peer.name}`,
-				);
-				clear.title = `Clear conversation with ${conversation.peer.name}`;
-				clear.append(
-					createIcon("trash.active", `${STYLES.toggle.icon.active} icon-lg`),
-					createIcon(
-						"trash.inactive",
-						`${STYLES.toggle.icon.inactive} icon-lg`,
-					),
-				);
-				row.append(button, clear);
-				return row;
-			}),
-		);
+					const clear = document.createElement("button");
+					clear.type = "button";
+					clear.className = STYLES.toggle.container;
+					clear.dataset.controls = "delete";
+					clear.dataset.kind = "delete";
+					clear.dataset.active = "false";
+					clear.dataset.deleteKey = conversation.id;
+					clear.dataset.deleteModalRoute = ENDPOINTS.messages.clearModal(
+						conversation.id,
+					);
+					clear.setAttribute("lp-control", "delete");
+					clear.setAttribute("lp-delete", "");
+					clear.setAttribute(
+						"aria-label",
+						`Clear conversation with ${conversation.peer.name}`,
+					);
+					clear.title = `Clear conversation with ${conversation.peer.name}`;
+					clear.append(
+						createIcon("trash.active", `${STYLES.toggle.icon.active} icon-lg`),
+						createIcon(
+							"trash.inactive",
+							`${STYLES.toggle.icon.inactive} icon-lg`,
+						),
+					);
+					row.append(button, clear);
+					return row;
+				}),
+			);
+		}
 		this.renderConversationSelector();
 		this.loadConversationsButton.classList.toggle(
 			"hidden",
@@ -588,6 +608,49 @@ export default class Messages extends Core {
 		}
 	}
 
+	renderEmptyHistory() {
+		if (typeof document === "undefined" || !this.elt) {
+			this.history.replaceChildren();
+			return;
+		}
+		const container = document.createElement("div");
+		container.dataset.role = "empty";
+		container.className = STYLES.messages?.empty?.container || "";
+
+		const hasConversations = this.conversations.size > 0;
+		const title = document.createElement("p");
+		title.className = STYLES.messages?.empty?.title || "";
+		title.textContent = hasConversations
+			? "Select a conversation"
+			: "No conversations yet";
+
+		const body = document.createElement("p");
+		body.className = STYLES.messages?.empty?.body || "";
+		if (hasConversations) {
+			body.textContent =
+				"Choose a conversation from the list to view messages.";
+		} else if (this.composer) {
+			body.textContent =
+				"Start a direct message with someone in your workspace.";
+		} else {
+			body.textContent = "Direct messages from other users will appear here.";
+		}
+
+		container.append(title, body);
+
+		if (!hasConversations && this.composer) {
+			const button = document.createElement("button");
+			button.type = "button";
+			button.dataset.action = "start-conversation";
+			button.className = STYLES.messages?.empty?.action || "";
+			button.append(createIcon("add"), document.createTextNode("New message"));
+			container.append(button);
+		}
+
+		this.history.replaceChildren(container);
+		this.loadMessagesButton?.classList?.add("hidden");
+	}
+
 	renderMessages(messages: MessageEntry[], { prepend = false } = {}) {
 		const nodes = messages.map((message) => {
 			const article = document.createElement("article");
@@ -696,10 +759,11 @@ export default class Messages extends Core {
 		if (this.current?.id === change.key) {
 			this.current = null;
 			this.messageCursor = null;
-			this.history.replaceChildren();
 			this.header.textContent = "Choose a conversation";
-			this.renderReply();
 			replacement = this.conversations.values().next().value?.id || null;
+			if (replacement) this.history.replaceChildren();
+			else this.renderEmptyHistory();
+			this.renderReply();
 			selectionRevision = this._beginConversationSelection(replacement);
 			this.rememberConversation(replacement);
 		}

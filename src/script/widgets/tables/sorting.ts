@@ -75,7 +75,8 @@ export class TableSorting {
 
 	get rows() {
 		return Array.from(this.body?.querySelectorAll("tr") ?? []).filter(
-			(row) => row.dataset.visible !== "false",
+			(row) =>
+				row.dataset.visible !== "false" && row.dataset.role !== "loading",
 		);
 	}
 

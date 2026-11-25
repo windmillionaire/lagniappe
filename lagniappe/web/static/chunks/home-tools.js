@@ -1,2 +1,1061 @@
-import{BaseList as v,listHtml as q}from"./baseList.js?v=b9ad6d22";import{e as T,w as p,r as x}from"./foundation.js?v=b9ad6d22";import{S as h,s as D}from"./ui-resources.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";import{D as W}from"./combobox.js?v=b9ad6d22";const P=["active","executed","answers"];function C(o){return P.some(e=>e===o)}function S(o){return o.outputKind==="answer"?"answers":o.outputKind==="proposal"&&o.status==="complete"?"executed":"active"}function L(o,e){return o.elt.querySelector(`[lp-show='${o.name}:${e}'][data-toggle]`)}function N(o,e,t){const s=o?.querySelector(`[data-indicator='${e}']`);if(!s)return;const i=s.dataset.empty==="true";s.dataset.empty=t?"true":"false",s.classList.toggle("hidden",!t),s.classList.toggle("font-bold",t),t?s.textContent="0":i&&(s.textContent="")}class b extends v{static unlockToggleWhenPopulated=!1;static disableToggleWhenUnavailable=!1;constructor(e){super(e),this._listToggle=L(this.component,this.name)}_syncUnavailableToggle(){if(!this.constructor.disableToggleWhenUnavailable||!this._listToggle)return;const t=this.itemCount===0&&!this.target.dataset.ifEmpty;this._listToggle.disabled=t,this._listToggle.classList.toggle("opacity-50",t),N(this._listToggle,this.name,t)}postreconcile(){super.postreconcile(),this._syncUnavailableToggle(),this.constructor.unlockToggleWhenPopulated&&this.itemCount>0&&this._listToggle&&this._listToggle.classList.remove("opacity-50","pointer-events-none"),this.target.setAttribute("loaded","")}}class $ extends b{static disableToggleWhenUnavailable=!0}class H extends b{static disableToggleWhenUnavailable=!0}class U extends b{static unlockToggleWhenPopulated=!0;static disableToggleWhenUnavailable=!0}class B extends b{static unlockToggleWhenPopulated=!0}class I extends b{static unlockToggleWhenPopulated=!0}class M extends v{constructor(e){super(e),this._listToggle=L(this.component,this.name),this.storageKey=`home-report-filters:${this.component.elt.dataset.reportUser}`;const t=T.getJSON(this.storageKey);this.filters=new Set(Array.isArray(t)&&t.every(C)?t:["active","answers"]),this._click=this._click.bind(this),this._deleteMessage=""}init(){this.component.elt.addEventListener("click",this._click)}get reportItems(){return Array.from(this.target.querySelectorAll("li[lp-entity][data-kind='report']"))}get itemCount(){return this.reportItems.length}get isPaginated(){return!!this.target.querySelector?.("[lp-control='next'], [lp-control='previous']")}created(e){super.created(e);const t=q(e)?.querySelectorAll("li[lp-entity][data-kind='report']")||[];for(const s of t)this.filters.add(S(s.dataset));t.length&&T.setJSON(this.storageKey,[...this.filters])}_click(e){if(!(e.target instanceof Element))return;const t=e.target.closest("[data-role='report-filter']"),s=t?.dataset.filter;t&&this.target.contains(t)&&C(s)&&(this.filters.has(s)?this.filters.delete(s):this.filters.add(s),T.setJSON(this.storageKey,[...this.filters]),p(()=>this._renderFilters(),{label:"reports:filter"}));const i=e.target.closest("[data-role='delete-executed-reports']");i&&this.target.contains(i)&&this._openDelete(i)}_renderFilters(){const e={active:0,executed:0,answers:0};let t=0;for(const n of this.reportItems){const r=S(n.dataset);e[r]++,n.hidden=!this.filters.has(r),n.hidden||t++}for(const n of this.target.querySelectorAll("[data-role='report-filter']")){const r=n.dataset.filter;if(!C(r))continue;const u=this.filters.has(r).toString();n.dataset.active=u,n.setAttribute("aria-pressed",u);const d=n.querySelector("[data-role='report-count']");d&&(d.textContent=String(e[r]))}const s=this.isPaginated,i=this.target.querySelector("[data-role='report-empty']");if(i){i.hidden=t>0;const n=s?" on this page.":".",[r]=this.filters;i.textContent=r?this.filters.size===1?`${{active:"No active proposals",executed:"No executed proposals",answers:"No answers"}[r]}${n}`:`No reports match the selected types${n}`:"Select a report type to show."}const l=this.target.querySelector("[data-role='delete-executed-reports']");if(l){l.hidden=!(this.filters.size===1&&this.filters.has("executed")&&e.executed>0),l.disabled=!!this._deleting;const n=l.querySelector?.("[data-role='delete-executed-label']");n&&(n.textContent=s?"Delete executed proposals on this page":"Delete all executed proposals")}const a=this.target.querySelector("[data-role='report-delete-result']");a&&(a.textContent=this._deleteMessage,a.hidden=!this._deleteMessage)}postreconcile(){const e=this._created;if(this._created=[],super.postreconcile(),e.length){this.target.querySelector("[data-role='report-items']")?.prepend(...e);for(const t of e)this.view.addFlash(t)}this.target.dataset.visible=(!!(this.visible||this.component.active===this)).toString(),this._renderFilters(),this.view.ensureDeferredOperations?.().then(t=>t?.scan(this.target)),N(this._listToggle,this.name,this.itemCount===0),this.itemCount>0&&this._listToggle&&this._listToggle.classList.remove("opacity-50","pointer-events-none"),this.target.setAttribute("loaded","")}async _openDelete(e){if(this._openingDelete||this._deleting||this._deleteModal?.modal||this.filters.size!==1||!this.filters.has("executed"))return;if(!this.view.online){this._deleteMessage="Connect to the server to delete reports.",this._renderFilters();return}const t=this.reportItems.filter(u=>S(u.dataset)==="executed").map(u=>u.dataset.key).filter(u=>!!u),s=e.dataset.route;if(!t.length||!s)return;const i=this.target.querySelector("[data-role='report-delete-template']")?.content.querySelector("#modal")?.cloneNode(!0);if(!(i instanceof HTMLElement))return;const l=i.querySelector("#modal-content"),a=i.querySelector("[data-role='report-delete-description']"),n=i.querySelector("[data-role='confirm-delete-reports']"),r=n?.querySelector("[data-role='text']");if(!(!l||!a||!n||!r)){this._openingDelete=!0;try{const{Modal:u}=await import("./modal.js?v=b9ad6d22");if(this._destroyed)return;this._deleteModal?.destroy();const d=new u(this.view,e);this._deleteModal=d,l.setAttribute("role","dialog"),l.setAttribute("aria-modal","true"),l.setAttribute("aria-labelledby","report-delete-title");const f=t.length===1?"proposal":"proposals";a.textContent=`Delete ${t.length} executed ${f}? Their reports, undo history, and report-only uploads will be deleted. Pages, tasks, and other workspace changes will remain.`,r.textContent=`Delete ${t.length} ${f}`,n.addEventListener("click",()=>{this._deleteExecuted(t,s,d)}),await d.attach(i),n.focus()}finally{this._openingDelete=!1}}}async _deleteExecuted(e,t,s){if(this._deleting)return;const i=s.modal?.querySelector("[data-role='confirm-delete-reports']"),l=s.modal?.querySelector("[data-role='report-delete-error']"),a=i?.querySelector("#spinner");if(!(!i||!l||!a)){this._deleting=!0,i.disabled=!0,a.dataset.visible="true",l.hidden=!0,this._renderFilters();try{const{request:n}=await import("./foundation.js?v=b9ad6d22").then(function(c){return c.p}),r=await n.delete(t,{keys:e});if(!r?.ok)throw new Error("Reports could not be deleted. Please try again.");const u=new Set(r.deleted||[]),d=r.skipped?.length||0,f=r.failed?.length||0;if(this._deleteMessage=[d?`${d} no longer eligible or already deleted.`:"",f?`${f} could not be deleted. Please try again.`:""].filter(Boolean).join(" "),await s.remove(),this._destroyed)return;await p(()=>{for(const c of this.reportItems){const m=c.dataset.key;m&&u.has(m)&&c.remove()}this.postreconcile()},{label:"reports:delete-executed"}),await this.view._refreshHomeWidget(this.component,this)}catch{this._deleteMessage="Reports could not be deleted. Please try again.",s.modal&&(l.textContent=this._deleteMessage,l.hidden=!1,i.disabled=!1)}finally{a.dataset.visible="false",this._deleting=!1,this._destroyed||this._renderFilters()}}}destroy(){this._destroyed=!0,this.component.elt.removeEventListener("click",this._click),this._deleteModal?.destroy()}}class F extends v{constructor(e){super(e),this._listToggle=L(this.component,this.name)}get countElt(){return this.component.elt.querySelector("[data-role='starred-count']")}postreconcile(){super.postreconcile();const e=this.countElt;e&&(e.textContent=String(this.itemCount)),this._listToggle?.classList.toggle("opacity-50",this.itemCount===0),this._listToggle?.classList.toggle("pointer-events-none",this.itemCount===0),this.target.setAttribute("loaded","")}}var K=Object.freeze({__proto__:null,DirectoryList:B,HomeCategoryList:H,HomePageList:U,HomeProjectList:$,IngressList:I,StarredList:F,ToolReportList:M});class R extends v{constructor(e){super(e),this._click=this._click.bind(this)}init(){this.target.addEventListener("click",this._click)}async _click(e){if(!(e.target instanceof Element))return;const t=e.target.closest("[data-action='delete-activity']");t&&await this.deleteActivity(t)}handleOfflineQueue({phase:e,queue:t,record:s}){if(e==="queued")return this._offlineQueued(s,t);if(e==="cancelled")return this._offlineCancelled(s)}_offlineQueued(e,t){if(e.kind==="note"&&e.action==="create"){const s=e.client_key;if(s)return t.response(this._renderNote(e,t,s))}if(e.action==="delete")return this._removeByKey(e.target_key)}_offlineCancelled(e){if(e.action==="create")return this._removeByKey(e.client_key)}async deleteActivity(e){const t=e.dataset.key,s=e.closest("li[data-key], [lp-entity][data-key]");if(!t||!s)return;if(t.startsWith("offline:")){await(this.view.offlineQueue||await this.view.ensureOfflineQueue?.())?.cancel({action:"create",client_key:t});return}if(s.dataset.kind==="note")return;const i=`/l/activity/${t}`;if(!this.view.online){await(this.view.offlineQueue||await this.view.ensureOfflineQueue?.())?.queue({id:`delete:${t}`,kind:s.dataset.kind||"activity",action:"delete",method:"DELETE",route:i,target_key:t});return}e.disabled=!0;const l=await x.delete(i);e.disabled=!1,l?.ok&&await p(()=>this._commitRemoveItem(s),{label:"home:activity-delete"})}_renderNote(e,t,s){const i=t.field(e,"body"),l=t.field(e,"visibility")||"private",a=e.files?.[0]?.file,n=document.createElement("li");n.dataset.key=s,n.dataset.kind="note",n.dataset.offline="true",n.className=[h.note.item.home,"opacity-80"].join(" ");const r=document.createElement("div");if(r.className=h.note.content,n.append(r),i){const c=document.createElement("span");c.className=h.note.body,c.textContent=i,r.append(c)}if(a){const c=document.createElement("img");c.src=URL.createObjectURL(a),c.className=h.note.photo.home,c.alt="",r.append(c)}const u=document.createElement("span");u.className=h.note.meta,u.textContent=`Pending sync \xB7 ${l==="everyone"?"Everyone":"Private"}`,r.append(u);const d=document.createElement("button");d.className=h.note.discard,d.dataset.action="delete-activity",d.dataset.key=s,d.type="button",d.setAttribute("aria-label","Discard pending note"),d.title="Discard pending note",n.append(d);const f=document.createElement("span");return D(f,"close"),d.append(f),n}_itemByKey(e,t){return!e||!t?null:Array.from(e.querySelectorAll("[data-key]")).find(s=>s.dataset.key===t)}_removeByKey(e){const t=this._itemByKey(this.target,e);if(t)return p(()=>this._commitRemoveItem(t),{label:"home:activity-offline-remove"})}_commitRemoveItem(e){const t=e.closest("ul");e.remove(),t&&t.querySelectorAll("li").length===0&&(t.dataset.visible="false")}postreconcile(){const e=this._updated;super.postreconcile(),e&&(this.destroy(),this.init()),this.target.setAttribute("loaded","")}destroy(){this.target.removeEventListener("click",this._click)}}var Q=Object.freeze({__proto__:null,HomeActivityList:R});const A=["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];function E(o=0){const e=new Date;return e.setDate(e.getDate()+o),e.toLocaleDateString("sv-SE")}function z(o){const e=E();if(o===e)return{label:"Today",due:"today"};if(o===E(1))return{label:"Tomorrow",due:"future"};if(o===E(-1))return{label:"Yesterday",due:"past"};const[t,s,i]=o.split("-").map(Number);return{label:new Date(t,s-1,i).toLocaleDateString(void 0,{day:"numeric",month:"short",year:"numeric"}),due:o<e?"past":"future"}}function j(o){if(!o)return!1;const e=new Date;e.setHours(0,0,0,0);const t=new Date(e);t.setDate(t.getDate()+7);const s=new Date(`${o}T00:00:00`);return s>=e&&s<=t}function O(o,e){const t=e.dataset.dueDate;for(const s of o.querySelectorAll("[lp-entity]")){const i=s.dataset.dueDate;if(i!==void 0&&t!==void 0&&i>t){s.before(e);return}}o.append(e)}const V=(o,e)=>{let t=!1,s=!1,i=0;const l=new Intl.DateTimeFormat(void 0,{weekday:"long"}),a=new Intl.DateTimeFormat(void 0,{day:"numeric",month:"short"}),n=new Date().getDay()!==0,r=[{name:"Tomorrow",icon:"tomorrow",kind:"task",onClick:()=>e("tomorrow")},...n?[{name:"This Week\u2026",icon:"weekend",kind:"task",closeOnClick:!1,onClick:()=>{i=1,d()}}]:[],{name:"Next Week\u2026",icon:"nextWeek",kind:"task",closeOnClick:!1,onClick:()=>{i=r.findIndex(c=>c.name==="Next Week\u2026"),f()}},{name:"No Due Date",icon:"removeDueDate",kind:"task",onClick:()=>e(null)}],u=()=>{s=!1,t=!1,o.updateOptions(r),o.focusOption(i)},d=()=>{const c=new Date;c.setHours(12,0,0,0);const m=7-c.getDay(),k=[{name:"Back",icon:"back",kind:"task",closeOnClick:!1,onClick:u},...Array.from({length:m},(y,w)=>{const g=new Date(c);g.setDate(g.getDate()+w+1);const _=A[g.getDay()];return{name:`${l.format(g)} \xB7 ${a.format(g)}`,icon:"date",kind:"task",onClick:()=>e(`this-week-${_}`)}})];s=!0,o.updateOptions(k),o.focusOption(0)},f=()=>{const c=new Date;c.setHours(12,0,0,0);const m=(8-c.getDay())%7||7;c.setDate(c.getDate()+m);const k=A.slice(1,6),y=[{name:"Back",icon:"back",kind:"task",closeOnClick:!1,onClick:u},...k.map((w,g)=>{const _=new Date(c);return _.setDate(_.getDate()+g),{name:`${l.format(_)} \xB7 ${a.format(_)}`,icon:"date",kind:"task",onClick:()=>e(`next-week-${w}`)}})];t=!0,o.updateOptions(y),o.focusOption(0)};return{placement:"bottom-end",items:r,onHide:()=>{!s&&!t||(s=!1,t=!1,o.updateOptions(r))}}};class J extends v{constructor(e){super(e),this.dropdowns=[],this._change=this._change.bind(this),this._listToggle=this.component.elt.querySelector("[lp-show='tasks:HomeTaskList'][data-toggle]")}init(){this.target.addEventListener("change",this._change)}handleOfflineQueue({phase:e,queue:t,record:s}){if(e==="queued")return this._offlineQueued(s,t);if(e==="cancelled")return this._offlineCancelled(s);if(e==="replayed"&&s.kind==="task")return p(()=>this._syncList(),{label:"home:task-replayed"})}_offlineQueued(e,t){if(e.kind==="task"&&e.action==="create"){const s=e.client_key;return s?(this._updateUserTaskCountOffline(1),this._offlineTaskVisible(e,t)?t.response(this._renderOfflineTask(e,t,s)):{ok:!0,removed:!0}):void 0}if(e.kind==="task"&&e.action==="complete")return p(()=>{this._removeTaskByKey(e.target_key),this._syncList(),this._updateUserTaskCountOffline(-1)},{label:"home:task-complete-offline"})}_offlineCancelled(e){if(!(e.kind!=="task"||e.action!=="create"))return p(()=>{this._removeTaskByKey(e.client_key),this._syncList(),this._updateUserTaskCountOffline(-1)},{label:"home:task-cancel-offline"})}async _change(e){if(!(e.target instanceof Element))return;const t=e.target.closest("[data-role='complete']");if(!t)return;const s=t.closest("[lp-entity]"),i=s?.dataset.key;if(!s||!i)return;s.classList.add("opacity-50","pointer-events-none"),t.disabled=!0;const l=new FormData;l.append("completed",String(t.checked));const a=this.endpoints.completeTask(i);if(!this.view.online){const r=this.view.offlineQueue||await this.view.ensureOfflineQueue?.();if(!r)return;i.startsWith("offline:")?await r.cancel({action:"create",client_key:i}):await r.queue({id:`complete:${i}`,kind:"task",action:"complete",method:"PUT",route:a,target_key:i,data:l});return}const n=await x.put(a,l);if(n){if(n.error){s.classList.remove("opacity-50","pointer-events-none"),t.disabled=!1,t.checked=!t.checked,this._showNotification(s,n.error);return}await p(()=>this._commitTaskResponse(s,n),{label:"home:task-complete"})}}updated(e){const t=q(e);t&&(this._replaceUserTaskCount(t),super.updated(e))}_insertNewTasks(){this._created.forEach(e=>{O(this.target,e),this._initPostponeMenus(e),this.view.addFlash(e)}),this._created=[]}postreconcile(){this.visible=this.target.dataset.visible==="true",this._updated?(this.updateTarget(),this.destroy(),this.init(),this._initPostponeMenus(this.target)):this._created.length>0&&this._insertNewTasks(),this._listToggle&&(this._listToggle.disabled=!1,this._listToggle.removeAttribute("aria-busy")),this._syncList(),this.target.setAttribute("loaded","")}async _postpone(e,t,s){if(!this.view.online){this._showNotification(e,"Connect to postpone this task.");return}const i=e.dataset.key;if(!i)return;e.classList.add("opacity-50","pointer-events-none"),t.disabled=!0;const l=new FormData;l.append("newDueDate",String(s));const a=this.endpoints.changeDueDate(i),n=await x.put(a,l);if(n){if(n.error){e.classList.remove("opacity-50","pointer-events-none"),t.disabled=!1,this._showNotification(e,n.error);return}await p(()=>this._commitTaskResponse(e,n),{label:"home:task-postpone"})}}_commitTaskResponse(e,t){if(t.removed)e.remove();else if(t.html){const s=t.html.querySelector("[lp-entity]");s&&(e.remove(),O(this.target,s),this._initPostponeMenus(s))}this._syncList(),this._updateUserTaskCount(t.count)}_initPostponeMenus(e){for(const t of e.querySelectorAll("[data-role='change-due-date']")){const s=new W(t);s.init(V(s,i=>{const l=t.closest("[lp-entity]");l&&this._postpone(l,t,i)})),this.dropdowns.push(s)}}_syncList(){this._renderDateHeaders(),this._updateTaskCount(),this._updateVisibility()}_renderDateHeaders(){for(const t of this.target.querySelectorAll("[data-role='date-header']"))t.remove();let e=null;for(const t of this.target.querySelectorAll("[lp-entity]")){const s=t.dataset.dueDate;if(s&&s!==e){const{label:i,due:l}=z(s),a=document.createElement("div");a.className=h.task.home.group,a.dataset.role="date-header",a.dataset.date=s,a.dataset.due=l,a.textContent=i,t.before(a),e=s}}}_updateTaskCount(){const e=this.component.elt.querySelector("[data-role='task-count']"),t=this.target.querySelectorAll("[lp-entity]").length;e&&(e.textContent=String(t),e.dataset.kind=t>0?"task":"success",e.dataset.visible="true")}_updateUserTaskCount(e){if(e===void 0)return;const t=document.querySelector("[data-role='user-task-count']");t&&(t.textContent=String(e))}_updateUserTaskCountOffline(e){const t=document.querySelector("[data-role='user-task-count']");if(!t)return;const s=Number.parseInt(t.textContent||"0",10);Number.isNaN(s)||(t.textContent=String(Math.max(0,s+e)))}_offlineTaskVisible(e,t){return j(t.field(e,"due-date"))}_renderOfflineTask(e,t,s){const i=t.field(e,"name")||"Untitled task",l=t.field(e,"due-date"),a=document.createElement("li");a.setAttribute("lp-entity",""),a.setAttribute("lp-link",""),a.dataset.key=s,a.dataset.fingerprint=`offline:${e.id}`,a.dataset.name=i,a.dataset.dueDate=l,a.dataset.offline="true",a.className=[h.task.home.item,"opacity-80"].join(" ");const n=document.createElement("div");n.className=h.task.home.header,n.dataset.role="header",a.append(n);const r=document.createElement("div");r.className=h.task.home.details,r.dataset.role="details",n.append(r);const u=document.createElement("div");u.className=h.task.home.title,r.append(u);const d=document.createElement("div");d.className=h.task.home.complete,u.append(d);const f=document.createElement("input");f.type="checkbox",f.dataset.role="complete",f.className=h.checkbox.default,d.append(f);const c=document.createElement("span");D(c,"check",h.checkbox.icon),d.append(c),u.append(document.createTextNode(i));const m=document.createElement("button");m.type="button",m.disabled=!0,m.dataset.role="change-due-date",m.className=h.task.home.snooze,r.append(m);const k=document.createElement("span");D(k,"snooze"),m.append(k);const y=document.createElement("p");return y.className=h.task.home.notification,y.dataset.role="notification",y.textContent="Pending sync",a.append(y),a}_taskByKey(e,t){return!e||!t?null:Array.from(e.querySelectorAll("[lp-entity][data-key]")).find(s=>s.dataset.key===t)}_removeTaskByKey(e){this._taskByKey(this.target,e)?.remove()}_replaceUserTaskCount(e){const t=e.querySelector("[data-role='user-task-count']"),s=document.querySelector("[data-role='user-task-count']");s&&t&&s.replaceWith(t)}_updateVisibility(){const e=this.target.querySelectorAll("[lp-entity]").length;this.target.dataset.visible=e>0&&this.visible?"true":"false"}_showNotification(e,t){const s=e.querySelector("[data-role='notification']");s&&(s.textContent=t)}destroy(){for(const e of this.dropdowns)e.destroy();this.dropdowns=[]}}var Y=Object.freeze({__proto__:null,HomeTaskList:J});export{Q as a,K as l,Y as t};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { BaseList, listHtml } from './baseList.js?v=b6ea3fe0';
+import { e as localStore, w as withTransition, r as request } from './foundation.js?v=b6ea3fe0';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+import { D as Dropdown } from './combobox.js?v=b6ea3fe0';
+
+const REPORT_FILTERS = ["active", "executed", "answers"];
+function isReportFilter(value) {
+  return REPORT_FILTERS.some((filter) => filter === value);
+}
+function reportCategory(report) {
+  if (report.outputKind === "answer") return "answers";
+  return report.outputKind === "proposal" && report.status === "complete" ? "executed" : "active";
+}
+function _listToggle(component, widgetName) {
+  return component.elt.querySelector(
+    `[lp-show='${component.name}:${widgetName}'][data-toggle]`
+  );
+}
+function _syncEmptyCount(toggle, widgetName, empty) {
+  const indicator = toggle?.querySelector(
+    `[data-indicator='${widgetName}']`
+  );
+  if (!indicator) return;
+  const wasEmpty = indicator.dataset.empty === "true";
+  indicator.dataset.empty = empty ? "true" : "false";
+  indicator.classList.toggle("hidden", !empty);
+  indicator.classList.toggle("font-bold", empty);
+  if (empty) {
+    indicator.textContent = "0";
+  } else if (wasEmpty) {
+    indicator.textContent = "";
+  }
+}
+class LoadedHomeList extends BaseList {
+  static unlockToggleWhenPopulated = false;
+  static disableToggleWhenUnavailable = false;
+  constructor(attributes) {
+    super(attributes);
+    this._listToggle = _listToggle(this.component, this.name);
+  }
+  _syncUnavailableToggle() {
+    const ListClass = this.constructor;
+    if (!ListClass.disableToggleWhenUnavailable || !this._listToggle) {
+      return;
+    }
+    const unavailable = this.itemCount === 0 && !this.target.dataset.ifEmpty;
+    this._listToggle.disabled = unavailable;
+    this._listToggle.classList.toggle("opacity-50", unavailable);
+    _syncEmptyCount(this._listToggle, this.name, unavailable);
+  }
+  postreconcile() {
+    super.postreconcile();
+    this._syncUnavailableToggle();
+    const ListClass = this.constructor;
+    if (ListClass.unlockToggleWhenPopulated && this.itemCount > 0 && this._listToggle) {
+      this._listToggle.classList.remove("opacity-50", "pointer-events-none");
+    }
+    this.target.setAttribute("loaded", "");
+  }
+}
+class HomeProjectList extends LoadedHomeList {
+  static disableToggleWhenUnavailable = true;
+}
+class HomeCategoryList extends LoadedHomeList {
+  static disableToggleWhenUnavailable = true;
+}
+class HomePageList extends LoadedHomeList {
+  static unlockToggleWhenPopulated = true;
+  static disableToggleWhenUnavailable = true;
+}
+class DirectoryList extends LoadedHomeList {
+  static unlockToggleWhenPopulated = true;
+}
+class IngressList extends LoadedHomeList {
+  static unlockToggleWhenPopulated = true;
+}
+class ToolReportList extends BaseList {
+  constructor(attributes) {
+    super(attributes);
+    this._listToggle = _listToggle(this.component, this.name);
+    this.storageKey = `home-report-filters:${this.component.elt.dataset.reportUser}`;
+    const saved = localStore.getJSON(this.storageKey);
+    this.filters = new Set(
+      Array.isArray(saved) && saved.every(isReportFilter) ? saved : ["active", "answers"]
+    );
+    this._click = this._click.bind(this);
+    this._deleteMessage = "";
+  }
+  init() {
+    this.component.elt.addEventListener("click", this._click);
+  }
+  get reportItems() {
+    return Array.from(
+      this.target.querySelectorAll(
+        "li[lp-entity][data-kind='report']"
+      )
+    );
+  }
+  get itemCount() {
+    return this.reportItems.length;
+  }
+  get isPaginated() {
+    return Boolean(
+      this.target.querySelector?.(
+        "[lp-control='next'], [lp-control='previous']"
+      )
+    );
+  }
+  created(response) {
+    super.created(response);
+    const items = listHtml(response)?.querySelectorAll(
+      "li[lp-entity][data-kind='report']"
+    ) || [];
+    for (const item of items) this.filters.add(reportCategory(item.dataset));
+    if (items.length) localStore.setJSON(this.storageKey, [...this.filters]);
+  }
+  _click(event) {
+    if (!(event.target instanceof Element)) return;
+    const filter = event.target.closest(
+      "[data-role='report-filter']"
+    );
+    const value = filter?.dataset.filter;
+    if (filter && this.target.contains(filter) && isReportFilter(value)) {
+      if (this.filters.has(value)) this.filters.delete(value);
+      else this.filters.add(value);
+      localStore.setJSON(this.storageKey, [...this.filters]);
+      void withTransition(() => this._renderFilters(), {
+        label: "reports:filter"
+      });
+    }
+    const clear = event.target.closest(
+      "[data-role='delete-executed-reports']"
+    );
+    if (clear && this.target.contains(clear)) void this._openDelete(clear);
+  }
+  _renderFilters() {
+    const counts = { active: 0, executed: 0, answers: 0 };
+    let visible = 0;
+    for (const item of this.reportItems) {
+      const category = reportCategory(item.dataset);
+      counts[category]++;
+      item.hidden = !this.filters.has(category);
+      if (!item.hidden) visible++;
+    }
+    for (const button of this.target.querySelectorAll(
+      "[data-role='report-filter']"
+    )) {
+      const filter = button.dataset.filter;
+      if (!isReportFilter(filter)) continue;
+      const selected = this.filters.has(filter).toString();
+      button.dataset.active = selected;
+      button.setAttribute("aria-pressed", selected);
+      const count = button.querySelector("[data-role='report-count']");
+      if (count) count.textContent = String(counts[filter]);
+    }
+    const paginated = this.isPaginated;
+    const empty = this.target.querySelector(
+      "[data-role='report-empty']"
+    );
+    if (empty) {
+      empty.hidden = visible > 0;
+      const suffix = paginated ? " on this page." : ".";
+      const [firstFilter] = this.filters;
+      empty.textContent = !firstFilter ? "Select a report type to show." : this.filters.size === 1 ? `${{
+        active: "No active proposals",
+        executed: "No executed proposals",
+        answers: "No answers"
+      }[firstFilter]}${suffix}` : `No reports match the selected types${suffix}`;
+    }
+    const clear = this.target.querySelector(
+      "[data-role='delete-executed-reports']"
+    );
+    if (clear) {
+      clear.hidden = !(this.filters.size === 1 && this.filters.has("executed") && counts.executed > 0);
+      clear.disabled = Boolean(this._deleting);
+      const clearLabel = clear.querySelector?.(
+        "[data-role='delete-executed-label']"
+      );
+      if (clearLabel) {
+        clearLabel.textContent = paginated ? "Delete executed proposals on this page" : "Delete all executed proposals";
+      }
+    }
+    const result = this.target.querySelector(
+      "[data-role='report-delete-result']"
+    );
+    if (result) {
+      result.textContent = this._deleteMessage;
+      result.hidden = !this._deleteMessage;
+    }
+  }
+  postreconcile() {
+    const created = this._created;
+    this._created = [];
+    super.postreconcile();
+    if (created.length) {
+      this.target.querySelector("[data-role='report-items']")?.prepend(...created);
+      for (const item of created) this.view.addFlash(item);
+    }
+    this.target.dataset.visible = Boolean(
+      this.visible || this.component.active === this
+    ).toString();
+    this._renderFilters();
+    void this.view.ensureDeferredOperations?.().then((manager) => manager?.scan(this.target));
+    _syncEmptyCount(this._listToggle, this.name, this.itemCount === 0);
+    if (this.itemCount > 0 && this._listToggle) {
+      this._listToggle.classList.remove("opacity-50", "pointer-events-none");
+    }
+    this.target.setAttribute("loaded", "");
+  }
+  async _openDelete(trigger) {
+    if (this._openingDelete || this._deleting || this._deleteModal?.modal)
+      return;
+    if (this.filters.size !== 1 || !this.filters.has("executed")) return;
+    if (!this.view.online) {
+      this._deleteMessage = "Connect to the server to delete reports.";
+      this._renderFilters();
+      return;
+    }
+    const keys = this.reportItems.filter((item) => reportCategory(item.dataset) === "executed").map((item) => item.dataset.key).filter((key) => Boolean(key));
+    const route = trigger.dataset.route;
+    if (!keys.length || !route) return;
+    const element = this.target.querySelector(
+      "[data-role='report-delete-template']"
+    )?.content.querySelector("#modal")?.cloneNode(true);
+    if (!(element instanceof HTMLElement)) return;
+    const content = element.querySelector("#modal-content");
+    const description = element.querySelector(
+      "[data-role='report-delete-description']"
+    );
+    const confirm = element.querySelector(
+      "[data-role='confirm-delete-reports']"
+    );
+    const confirmLabel = confirm?.querySelector("[data-role='text']");
+    if (!content || !description || !confirm || !confirmLabel) return;
+    this._openingDelete = true;
+    try {
+      const { Modal } = await import('./modal.js?v=b6ea3fe0');
+      if (this._destroyed) return;
+      this._deleteModal?.destroy();
+      const modal = new Modal(this.view, trigger);
+      this._deleteModal = modal;
+      content.setAttribute("role", "dialog");
+      content.setAttribute("aria-modal", "true");
+      content.setAttribute("aria-labelledby", "report-delete-title");
+      const noun = keys.length === 1 ? "proposal" : "proposals";
+      description.textContent = `Delete ${keys.length} executed ${noun}? Their reports, undo history, and report-only uploads will be deleted. Pages, tasks, and other workspace changes will remain.`;
+      confirmLabel.textContent = `Delete ${keys.length} ${noun}`;
+      confirm.addEventListener("click", () => {
+        void this._deleteExecuted(keys, route, modal);
+      });
+      await modal.attach(element);
+      confirm.focus();
+    } finally {
+      this._openingDelete = false;
+    }
+  }
+  async _deleteExecuted(keys, route, modal) {
+    if (this._deleting) return;
+    const confirm = modal.modal?.querySelector(
+      "[data-role='confirm-delete-reports']"
+    );
+    const error = modal.modal?.querySelector(
+      "[data-role='report-delete-error']"
+    );
+    const spinner = confirm?.querySelector("#spinner");
+    if (!confirm || !error || !spinner) return;
+    this._deleting = true;
+    confirm.disabled = true;
+    spinner.dataset.visible = "true";
+    error.hidden = true;
+    this._renderFilters();
+    try {
+      const { request } = await import('./foundation.js?v=b6ea3fe0').then(function (n) { return n.p; });
+      const response = await request.delete(route, {
+        keys
+      });
+      if (!response?.ok)
+        throw new Error("Reports could not be deleted. Please try again.");
+      const deleted = new Set(response.deleted || []);
+      const skipped = response.skipped?.length || 0;
+      const failed = response.failed?.length || 0;
+      this._deleteMessage = [
+        skipped ? `${skipped} no longer eligible or already deleted.` : "",
+        failed ? `${failed} could not be deleted. Please try again.` : ""
+      ].filter(Boolean).join(" ");
+      await modal.remove();
+      if (this._destroyed) return;
+      await withTransition(
+        () => {
+          for (const item of this.reportItems) {
+            const key = item.dataset.key;
+            if (key && deleted.has(key)) item.remove();
+          }
+          this.postreconcile();
+        },
+        { label: "reports:delete-executed" }
+      );
+      await this.view._refreshHomeWidget(this.component, this);
+    } catch {
+      this._deleteMessage = "Reports could not be deleted. Please try again.";
+      if (modal.modal) {
+        error.textContent = this._deleteMessage;
+        error.hidden = false;
+        confirm.disabled = false;
+      }
+    } finally {
+      spinner.dataset.visible = "false";
+      this._deleting = false;
+      if (!this._destroyed) this._renderFilters();
+    }
+  }
+  destroy() {
+    this._destroyed = true;
+    this.component.elt.removeEventListener("click", this._click);
+    this._deleteModal?.destroy();
+  }
+}
+class StarredList extends BaseList {
+  constructor(attributes) {
+    super(attributes);
+    this._listToggle = _listToggle(this.component, this.name);
+  }
+  get countElt() {
+    return this.component.elt.querySelector("[data-role='starred-count']");
+  }
+  postreconcile() {
+    super.postreconcile();
+    const count = this.countElt;
+    if (count) count.textContent = String(this.itemCount);
+    this._listToggle?.classList.toggle("opacity-50", this.itemCount === 0);
+    this._listToggle?.classList.toggle(
+      "pointer-events-none",
+      this.itemCount === 0
+    );
+    this.target.setAttribute("loaded", "");
+  }
+}
+
+var lists = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	DirectoryList: DirectoryList,
+	HomeCategoryList: HomeCategoryList,
+	HomePageList: HomePageList,
+	HomeProjectList: HomeProjectList,
+	IngressList: IngressList,
+	StarredList: StarredList,
+	ToolReportList: ToolReportList
+});
+
+class HomeActivityList extends BaseList {
+  constructor(attributes) {
+    super(attributes);
+    this._click = this._click.bind(this);
+  }
+  init() {
+    this.target.addEventListener("click", this._click);
+  }
+  async _click(e) {
+    if (!(e.target instanceof Element)) return;
+    const button = e.target.closest(
+      "[data-action='delete-activity']"
+    );
+    if (!button) return;
+    await this.deleteActivity(button);
+  }
+  handleOfflineQueue({ phase, queue, record }) {
+    if (phase === "queued") return this._offlineQueued(record, queue);
+    if (phase === "cancelled") return this._offlineCancelled(record);
+  }
+  _offlineQueued(record, queue) {
+    if (record.kind === "note" && record.action === "create") {
+      const key = record.client_key;
+      if (key) return queue.response(this._renderNote(record, queue, key));
+    }
+    if (record.action === "delete") return this._removeByKey(record.target_key);
+  }
+  _offlineCancelled(record) {
+    if (record.action === "create") return this._removeByKey(record.client_key);
+  }
+  async deleteActivity(button) {
+    const key = button.dataset.key;
+    const item = button.closest(
+      "li[data-key], [lp-entity][data-key]"
+    );
+    if (!key || !item) return;
+    if (key.startsWith("offline:")) {
+      const queue = this.view.offlineQueue || await this.view.ensureOfflineQueue?.();
+      await queue?.cancel({
+        action: "create",
+        client_key: key
+      });
+      return;
+    }
+    if (item.dataset.kind === "note") return;
+    const route = `/l/activity/${key}`;
+    if (!this.view.online) {
+      const queue = this.view.offlineQueue || await this.view.ensureOfflineQueue?.();
+      await queue?.queue({
+        id: `delete:${key}`,
+        kind: item.dataset.kind || "activity",
+        action: "delete",
+        method: "DELETE",
+        route,
+        target_key: key
+      });
+      return;
+    }
+    button.disabled = true;
+    const response = await request.delete(route);
+    button.disabled = false;
+    if (response?.ok) {
+      await withTransition(() => this._commitRemoveItem(item), {
+        label: "home:activity-delete"
+      });
+    }
+  }
+  _renderNote(record, queue, key) {
+    const body = queue.field(record, "body");
+    const visibility = queue.field(record, "visibility") || "private";
+    const file = record.files?.[0]?.file;
+    const item = document.createElement("li");
+    item.dataset.key = key;
+    item.dataset.kind = "note";
+    item.dataset.offline = "true";
+    item.className = [STYLES.note.item.home, "opacity-80"].join(" ");
+    const content = document.createElement("div");
+    content.className = STYLES.note.content;
+    item.append(content);
+    if (body) {
+      const bodyElt = document.createElement("span");
+      bodyElt.className = STYLES.note.body;
+      bodyElt.textContent = body;
+      content.append(bodyElt);
+    }
+    if (file) {
+      const image = document.createElement("img");
+      image.src = URL.createObjectURL(file);
+      image.className = STYLES.note.photo.home;
+      image.alt = "";
+      content.append(image);
+    }
+    const meta = document.createElement("span");
+    meta.className = STYLES.note.meta;
+    meta.textContent = `Pending sync \xB7 ${visibility === "everyone" ? "Everyone" : "Private"}`;
+    content.append(meta);
+    const button = document.createElement("button");
+    button.className = STYLES.note.discard;
+    button.dataset.action = "delete-activity";
+    button.dataset.key = key;
+    button.type = "button";
+    button.setAttribute("aria-label", "Discard pending note");
+    button.title = "Discard pending note";
+    item.append(button);
+    const icon = document.createElement("span");
+    setIcon(icon, "close");
+    button.append(icon);
+    return item;
+  }
+  _itemByKey(root, key) {
+    if (!root || !key) return null;
+    return Array.from(root.querySelectorAll("[data-key]")).find(
+      (item) => item.dataset.key === key
+    );
+  }
+  _removeByKey(key) {
+    const item = this._itemByKey(this.target, key);
+    if (!item) return void 0;
+    return withTransition(() => this._commitRemoveItem(item), {
+      label: "home:activity-offline-remove"
+    });
+  }
+  ensureEmptyState(list = this.target) {
+    if (!list) return false;
+    if (list.querySelector("li:not([data-role='empty'])")) return false;
+    if (list.querySelector("li[data-role='empty']")) return false;
+    const empty = document.createElement("li");
+    empty.dataset.role = "empty";
+    empty.className = STYLES.note.empty;
+    empty.textContent = "No notes yet \u2014 use + to add a quick note.";
+    list.append(empty);
+    return true;
+  }
+  _commitRemoveItem(item) {
+    const list = item.closest("ul");
+    item.remove();
+    if (list && list.querySelectorAll("li:not([data-role='empty'])").length === 0) {
+      this.ensureEmptyState(list);
+      this.view.syncHomeSectionState?.(this.component);
+    }
+  }
+  postreconcile() {
+    const updated = this._updated;
+    super.postreconcile();
+    if (this.ensureEmptyState() && (this.visible || this.component.active === this)) {
+      this.target.dataset.visible = "true";
+    }
+    if (updated) {
+      this.destroy();
+      this.init();
+    }
+    this.target.setAttribute("loaded", "");
+  }
+  destroy() {
+    this.target.removeEventListener("click", this._click);
+  }
+}
+
+var activity = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	HomeActivityList: HomeActivityList
+});
+
+const WEEKDAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday"
+];
+function _toDateStr(offset = 0) {
+  const d = /* @__PURE__ */ new Date();
+  d.setDate(d.getDate() + offset);
+  return d.toLocaleDateString("sv-SE");
+}
+function _dateInfo(dateStr) {
+  const today = _toDateStr();
+  if (dateStr === today) return { label: "Today", due: "today" };
+  if (dateStr === _toDateStr(1)) return { label: "Tomorrow", due: "future" };
+  if (dateStr === _toDateStr(-1)) return { label: "Yesterday", due: "past" };
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const label = new Date(year, month - 1, day).toLocaleDateString(void 0, {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+  return { label, due: dateStr < today ? "past" : "future" };
+}
+function _isWithinHomeTaskWindow(dueDate) {
+  if (!dueDate) return false;
+  const today = /* @__PURE__ */ new Date();
+  today.setHours(0, 0, 0, 0);
+  const nextWeek = new Date(today);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const due = /* @__PURE__ */ new Date(`${dueDate}T00:00:00`);
+  return due >= today && due <= nextWeek;
+}
+function _insertSorted(target, task) {
+  const dueDate = task.dataset.dueDate;
+  for (const item of target.querySelectorAll("[lp-entity]")) {
+    const itemDueDate = item.dataset.dueDate;
+    if (itemDueDate !== void 0 && dueDate !== void 0 && itemDueDate > dueDate) {
+      item.before(task);
+      return;
+    }
+  }
+  target.append(task);
+}
+const _postponeMenu = (dropdown, postpone) => {
+  let showingNextWeek = false;
+  let showingThisWeek = false;
+  let returnFocusIndex = 0;
+  const weekdayFormatter = new Intl.DateTimeFormat(void 0, {
+    weekday: "long"
+  });
+  const dateFormatter = new Intl.DateTimeFormat(void 0, {
+    day: "numeric",
+    month: "short"
+  });
+  const hasDaysLeftThisWeek = (/* @__PURE__ */ new Date()).getDay() !== 0;
+  const primaryItems = [
+    {
+      name: "Tomorrow",
+      icon: "tomorrow",
+      kind: "task",
+      onClick: () => postpone("tomorrow")
+    },
+    ...hasDaysLeftThisWeek ? [
+      {
+        name: "This Week\u2026",
+        icon: "weekend",
+        kind: "task",
+        closeOnClick: false,
+        onClick: () => {
+          returnFocusIndex = 1;
+          showThisWeek();
+        }
+      }
+    ] : [],
+    {
+      name: "Next Week\u2026",
+      icon: "nextWeek",
+      kind: "task",
+      closeOnClick: false,
+      onClick: () => {
+        returnFocusIndex = primaryItems.findIndex(
+          (item) => item.name === "Next Week\u2026"
+        );
+        showNextWeek();
+      }
+    },
+    {
+      name: "No Due Date",
+      icon: "removeDueDate",
+      kind: "task",
+      onClick: () => postpone(null)
+    }
+  ];
+  const showPrimary = () => {
+    showingThisWeek = false;
+    showingNextWeek = false;
+    dropdown.updateOptions(primaryItems);
+    dropdown.focusOption(returnFocusIndex);
+  };
+  const showThisWeek = () => {
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(12, 0, 0, 0);
+    const daysUntilSunday = 7 - today.getDay();
+    const items = [
+      {
+        name: "Back",
+        icon: "back",
+        kind: "task",
+        closeOnClick: false,
+        onClick: showPrimary
+      },
+      ...Array.from({ length: daysUntilSunday }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(date.getDate() + index + 1);
+        const weekday = WEEKDAY_NAMES[date.getDay()];
+        return {
+          name: `${weekdayFormatter.format(date)} \xB7 ${dateFormatter.format(date)}`,
+          icon: "date",
+          kind: "task",
+          onClick: () => postpone(`this-week-${weekday}`)
+        };
+      })
+    ];
+    showingThisWeek = true;
+    dropdown.updateOptions(items);
+    dropdown.focusOption(0);
+  };
+  const showNextWeek = () => {
+    const monday = /* @__PURE__ */ new Date();
+    monday.setHours(12, 0, 0, 0);
+    const daysUntilMonday = (8 - monday.getDay()) % 7 || 7;
+    monday.setDate(monday.getDate() + daysUntilMonday);
+    const weekdays = WEEKDAY_NAMES.slice(1, 6);
+    const items = [
+      {
+        name: "Back",
+        icon: "back",
+        kind: "task",
+        closeOnClick: false,
+        onClick: showPrimary
+      },
+      ...weekdays.map((weekday, offset) => {
+        const date = new Date(monday);
+        date.setDate(date.getDate() + offset);
+        return {
+          name: `${weekdayFormatter.format(date)} \xB7 ${dateFormatter.format(date)}`,
+          icon: "date",
+          kind: "task",
+          onClick: () => postpone(`next-week-${weekday}`)
+        };
+      })
+    ];
+    showingNextWeek = true;
+    dropdown.updateOptions(items);
+    dropdown.focusOption(0);
+  };
+  return {
+    placement: "bottom-end",
+    items: primaryItems,
+    onHide: () => {
+      if (!showingThisWeek && !showingNextWeek) return;
+      showingThisWeek = false;
+      showingNextWeek = false;
+      dropdown.updateOptions(primaryItems);
+    }
+  };
+};
+class HomeTaskList extends BaseList {
+  constructor(attributes) {
+    super(attributes);
+    this.dropdowns = [];
+    this._change = this._change.bind(this);
+    this._listToggle = this.component.elt.querySelector(
+      "[lp-show='tasks:HomeTaskList'][data-toggle]"
+    );
+    this._pendingUserTaskCount = null;
+    this._pendingFeedback = null;
+  }
+  init() {
+    this.target.addEventListener("change", this._change);
+  }
+  handleOfflineQueue({ phase, queue, record }) {
+    if (phase === "queued") return this._offlineQueued(record, queue);
+    if (phase === "cancelled") return this._offlineCancelled(record);
+    if (phase === "replayed" && record.kind === "task") {
+      return withTransition(() => this._syncList(), {
+        label: "home:task-replayed"
+      });
+    }
+  }
+  _offlineQueued(record, queue) {
+    if (record.kind === "task" && record.action === "create") {
+      const key = record.client_key;
+      if (!key) return;
+      this._updateUserTaskCountOffline(1);
+      if (!this._offlineTaskVisible(record, queue)) {
+        return {
+          ok: true,
+          removed: true,
+          name: queue.field(record, "name") || "Untitled task",
+          scheduled: Boolean(queue.field(record, "due-date"))
+        };
+      }
+      return queue.response(this._renderOfflineTask(record, queue, key));
+    }
+    if (record.kind === "task" && record.action === "complete") {
+      return withTransition(
+        () => {
+          this._removeTaskByKey(record.target_key);
+          this._syncList();
+          this._updateUserTaskCountOffline(-1);
+        },
+        { label: "home:task-complete-offline" }
+      );
+    }
+  }
+  _offlineCancelled(record) {
+    if (record.kind !== "task" || record.action !== "create") return;
+    return withTransition(
+      () => {
+        this._removeTaskByKey(record.client_key);
+        this._syncList();
+        this._updateUserTaskCountOffline(-1);
+      },
+      { label: "home:task-cancel-offline" }
+    );
+  }
+  async _change(e) {
+    if (!(e.target instanceof Element)) return;
+    const toggle = e.target.closest("[data-role='complete']");
+    if (!toggle) return;
+    const elt = toggle.closest("[lp-entity]");
+    const key = elt?.dataset.key;
+    if (!elt || !key) return;
+    elt.classList.add("opacity-50", "pointer-events-none");
+    toggle.disabled = true;
+    const data = new FormData();
+    data.append("completed", String(toggle.checked));
+    const route = this.endpoints.completeTask(key);
+    if (!this.view.online) {
+      const queue = this.view.offlineQueue || await this.view.ensureOfflineQueue?.();
+      if (!queue) return;
+      if (key.startsWith("offline:")) {
+        await queue.cancel({
+          action: "create",
+          client_key: key
+        });
+      } else {
+        await queue.queue({
+          id: `complete:${key}`,
+          kind: "task",
+          action: "complete",
+          method: "PUT",
+          route,
+          target_key: key,
+          data
+        });
+      }
+      return;
+    }
+    const response = await request.put(route, data);
+    if (!response) return;
+    if (response.error) {
+      elt.classList.remove("opacity-50", "pointer-events-none");
+      toggle.disabled = false;
+      toggle.checked = !toggle.checked;
+      this._showNotification(elt, response.error);
+      return;
+    }
+    await withTransition(() => this._commitTaskResponse(elt, response), {
+      label: "home:task-complete"
+    });
+  }
+  updated(response) {
+    const html = listHtml(response);
+    if (!html) return;
+    this._replaceUserTaskCount(html);
+    super.updated(response);
+  }
+  created(response) {
+    super.created(response);
+    if (!response || typeof response !== "object") return;
+    const result = response;
+    if (typeof result.count === "number") {
+      this._pendingUserTaskCount = result.count;
+    }
+    if (result.removed) {
+      const name = typeof result.name === "string" ? result.name.trim() : "";
+      const qualifier = result.scheduled ? "scheduled beyond this week" : "unscheduled";
+      this._pendingFeedback = name ? `\u201C${name}\u201D saved to My Page (${qualifier}).` : `Task saved to My Page (${qualifier}).`;
+    } else if (this._created.length > 0) {
+      this._pendingFeedback = "";
+    }
+  }
+  _insertNewTasks() {
+    this._created.forEach((item) => {
+      _insertSorted(this.target, item);
+      this._initPostponeMenus(item);
+      this.view.addFlash(item);
+    });
+    this._created = [];
+  }
+  postreconcile() {
+    this.visible = this.target.dataset.visible === "true";
+    if (this._updated) {
+      this.updateTarget();
+      this.destroy();
+      this.init();
+      this._initPostponeMenus(this.target);
+    } else if (this._created.length > 0) {
+      this._insertNewTasks();
+    }
+    if (typeof this._pendingUserTaskCount === "number") {
+      this._updateUserTaskCount(this._pendingUserTaskCount);
+      this._pendingUserTaskCount = null;
+    }
+    if (this._pendingFeedback !== null) {
+      this._setTaskFeedback(this._pendingFeedback);
+      this._pendingFeedback = null;
+    }
+    if (this._listToggle) {
+      this._listToggle.disabled = false;
+      this._listToggle.removeAttribute("aria-busy");
+    }
+    this._syncList();
+    this.target.setAttribute("loaded", "");
+  }
+  async _postpone(elt, button, value) {
+    if (!this.view.online) {
+      this._showNotification(elt, "Connect to postpone this task.");
+      return;
+    }
+    const key = elt.dataset.key;
+    if (!key) return;
+    elt.classList.add("opacity-50", "pointer-events-none");
+    button.disabled = true;
+    const data = new FormData();
+    data.append("newDueDate", String(value));
+    const route = this.endpoints.changeDueDate(key);
+    const response = await request.put(route, data);
+    if (!response) return;
+    if (response.error) {
+      elt.classList.remove("opacity-50", "pointer-events-none");
+      button.disabled = false;
+      this._showNotification(elt, response.error);
+      return;
+    }
+    await withTransition(() => this._commitTaskResponse(elt, response), {
+      label: "home:task-postpone"
+    });
+  }
+  _commitTaskResponse(elt, response) {
+    if (response.removed) {
+      elt.remove();
+    } else if (response.html) {
+      const newTask = response.html.querySelector("[lp-entity]");
+      if (newTask) {
+        elt.remove();
+        _insertSorted(this.target, newTask);
+        this._initPostponeMenus(newTask);
+      }
+    }
+    this._syncList();
+    this._updateUserTaskCount(response.count);
+  }
+  _initPostponeMenus(root) {
+    for (const button of root.querySelectorAll(
+      "[data-role='change-due-date']"
+    )) {
+      const dropdown = new Dropdown(button);
+      dropdown.init(
+        _postponeMenu(dropdown, (value) => {
+          const elt = button.closest("[lp-entity]");
+          if (elt) void this._postpone(elt, button, value);
+        })
+      );
+      this.dropdowns.push(dropdown);
+    }
+  }
+  _syncList() {
+    this._renderDateHeaders();
+    this._updateTaskCount();
+    this._updateVisibility();
+  }
+  _renderDateHeaders() {
+    for (const h of this.target.querySelectorAll("[data-role='date-header']")) {
+      h.remove();
+    }
+    let lastDate = null;
+    for (const item of this.target.querySelectorAll(
+      "[lp-entity]"
+    )) {
+      const dueDate = item.dataset.dueDate;
+      if (dueDate && dueDate !== lastDate) {
+        const { label, due } = _dateInfo(dueDate);
+        const header = document.createElement("div");
+        header.className = STYLES.task.home.group;
+        header.dataset.role = "date-header";
+        header.dataset.date = dueDate;
+        header.dataset.due = due;
+        header.textContent = label;
+        item.before(header);
+        lastDate = dueDate;
+      }
+    }
+  }
+  _updateTaskCount() {
+    const taskCount = this.component.elt.querySelector(
+      "[data-role='task-count']"
+    );
+    const count = this.target.querySelectorAll("[lp-entity]").length;
+    if (!taskCount) return;
+    taskCount.textContent = String(count);
+    taskCount.dataset.kind = count > 0 ? "task" : "success";
+    taskCount.dataset.visible = "true";
+  }
+  _updateUserTaskCount(count) {
+    if (count === void 0) return;
+    const elt = document.querySelector(
+      "[data-role='user-task-count']"
+    );
+    if (!elt) return;
+    const safeCount = Math.max(0, count);
+    elt.textContent = String(safeCount);
+    elt.dataset.visible = "true";
+    elt.classList.add("font-bold", "ml-auto");
+    elt.classList.toggle("text-task-default", safeCount > 0);
+    elt.classList.toggle("text-project-default", safeCount === 0);
+  }
+  _updateUserTaskCountOffline(delta) {
+    const elt = document.querySelector("[data-role='user-task-count']");
+    if (!elt) return;
+    const count = Number.parseInt(elt.textContent || "0", 10);
+    if (Number.isNaN(count)) return;
+    this._updateUserTaskCount(count + delta);
+  }
+  _setTaskFeedback(message) {
+    const banner = this.component.elt.querySelector(
+      "[data-role='task-feedback']"
+    );
+    if (!banner) return;
+    const text = banner.querySelector(
+      "[data-role='task-feedback-text']"
+    );
+    if (!message) {
+      banner.dataset.visible = "false";
+      if (text) text.textContent = "";
+      return;
+    }
+    if (text) text.textContent = message;
+    banner.dataset.visible = "true";
+  }
+  _offlineTaskVisible(record, queue) {
+    return _isWithinHomeTaskWindow(queue.field(record, "due-date"));
+  }
+  _renderOfflineTask(record, queue, key) {
+    const name = queue.field(record, "name") || "Untitled task";
+    const dueDate = queue.field(record, "due-date");
+    const item = document.createElement("li");
+    item.setAttribute("lp-entity", "");
+    item.setAttribute("lp-link", "");
+    item.dataset.key = key;
+    item.dataset.fingerprint = `offline:${record.id}`;
+    item.dataset.name = name;
+    item.dataset.dueDate = dueDate;
+    item.dataset.offline = "true";
+    item.className = [STYLES.task.home.item, "opacity-80"].join(" ");
+    const header = document.createElement("div");
+    header.className = STYLES.task.home.header;
+    header.dataset.role = "header";
+    item.append(header);
+    const details = document.createElement("div");
+    details.className = STYLES.task.home.details;
+    details.dataset.role = "details";
+    header.append(details);
+    const title = document.createElement("div");
+    title.className = STYLES.task.home.title;
+    details.append(title);
+    const complete = document.createElement("div");
+    complete.className = STYLES.task.home.complete;
+    title.append(complete);
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.role = "complete";
+    checkbox.className = STYLES.checkbox.default;
+    complete.append(checkbox);
+    const checkIcon = document.createElement("span");
+    setIcon(checkIcon, "check", STYLES.checkbox.icon);
+    complete.append(checkIcon);
+    title.append(document.createTextNode(name));
+    const snooze = document.createElement("button");
+    snooze.type = "button";
+    snooze.disabled = true;
+    snooze.dataset.role = "change-due-date";
+    snooze.className = STYLES.task.home.snooze;
+    details.append(snooze);
+    const snoozeIcon = document.createElement("span");
+    setIcon(snoozeIcon, "snooze");
+    snooze.append(snoozeIcon);
+    const notification = document.createElement("p");
+    notification.className = STYLES.task.home.notification;
+    notification.dataset.role = "notification";
+    notification.textContent = "Pending sync";
+    item.append(notification);
+    return item;
+  }
+  _taskByKey(root, key) {
+    if (!root || !key) return null;
+    return Array.from(
+      root.querySelectorAll("[lp-entity][data-key]")
+    ).find((item) => item.dataset.key === key);
+  }
+  _removeTaskByKey(key) {
+    this._taskByKey(this.target, key)?.remove();
+  }
+  _replaceUserTaskCount(html) {
+    const fresh = html.querySelector("[data-role='user-task-count']");
+    const current = document.querySelector("[data-role='user-task-count']");
+    if (current && fresh) current.replaceWith(fresh);
+  }
+  _updateVisibility() {
+    const count = this.target.querySelectorAll("[lp-entity]").length;
+    this.target.dataset.visible = count > 0 && this.visible ? "true" : "false";
+    this.view.syncHomeSectionState?.(this.component);
+  }
+  _showNotification(elt, message) {
+    const notification = elt.querySelector("[data-role='notification']");
+    if (notification) notification.textContent = message;
+  }
+  destroy() {
+    for (const d of this.dropdowns) {
+      d.destroy();
+    }
+    this.dropdowns = [];
+  }
+}
+
+var tasks = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	HomeTaskList: HomeTaskList
+});
+
+export { activity as a, lists as l, tasks as t };

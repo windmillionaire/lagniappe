@@ -811,9 +811,13 @@ def home_task(task: models.Task) -> tuple[Response, int]:
     return jsonify({"html": template(task), "count": count}), 200
 
 
-def home_task_removed() -> tuple[Response, int]:
+def home_task_removed(task: models.Task | None = None) -> tuple[Response, int]:
     count = database_get.user_task_count(current_user.page)
-    return jsonify({"removed": True, "count": count}), 200
+    payload: dict[str, object] = {"removed": True, "count": count}
+    if task is not None:
+        payload["name"] = task.name
+        payload["scheduled"] = task.properties.due_date.value is not None
+    return jsonify(payload), 200
 
 
 # --- Filter Responses ---

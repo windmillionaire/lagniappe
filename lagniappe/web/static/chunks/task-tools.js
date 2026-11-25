@@ -1,2 +1,1142 @@
-import{b as f,I as w,T,F as C}from"./forms.js?v=b9ad6d22";import{S as g,s as S}from"./form-sections.js?v=b9ad6d22";import{w as _,r as m,c as y}from"./foundation.js?v=b9ad6d22";import{BaseList as q}from"./baseList.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";import{E as F}from"./baseTable.js?v=b9ad6d22";const k={selectUser:"facet",selectForm:"facet",selectProject:"facet",selectCategory:"facet",schedule:"date",uploadFile:"upload"};class p extends f{constructor(t){super(t),this.buttons={},this._actions=null,this._formUpdatedListener=this._formUpdatedListener.bind(this)}_formUpdatedListener(t){const e=t.detail,s=e.options?Object.values(e.options)[0]:null,i=this.buttons.selectForm;if(e.name==="project"&&s?.form&&i&&!i.readonly)i.details?.id!==s.form.id&&(i.clear(),i.addOption(s.form));else if(e.name==="form"){if(Object.keys(e.options).length===0)return;const a=Object.keys(e.options)[0],o=this.component;if(!o)return;const n=o.elt.querySelector('[data-widget="TaskForm"]')?.dataset.formKey;if(!n||n===a)return;const l=o.widgets.TaskForm;_(()=>{l?.destroy?.(),delete o.widgets.TaskForm,o.elt.querySelector('[data-widget="TaskForm"]')?.remove(),o.elt.querySelector('[lp-control="form"]')?.remove()},{label:"task-settings:replace-attached-form"})}}get html(){return[this.nameElement,this.descriptionElement,this.actions]}get actions(){return this.target.querySelector("[data-role='action-buttons']")}async _initForm(){await super._initForm(),await this._initActions()}async _initActions(){const t=this.actions;if(!t)return;const e=Array.from(t.querySelectorAll("button[data-action]"));if(e.length!==0){this.buttons={};for(const s of e){const i=s.dataset.action;if(!i||!(i in k))continue;const r=k[i],a=r&&g[r]?g[r](this,s):null;a&&(await a.init(),this.buttons[i]=a,"destroy"in a&&typeof a.destroy=="function"&&this.destroyables.push(a))}t.addEventListener("updated",this._formUpdatedListener),this._actions=t}}get pageElement(){return this._facetElement('[data-role="page-select"]')}get nameElement(){return new w({kind:"task",readonly:this.readonly},{id:"name",title:"Name",input:"text",placeholder:"name this task..."},this.target.dataset.name).elt}get descriptionElement(){return new T({kind:"task",readonly:this.readonly},{id:"description",title:"Description",input:"textarea",placeholder:"describe this task..."},this.target.dataset.description).elt}get formData(){const t=super.formData;return["task-file","mimetype"].forEach(e=>{t.delete(e)}),t}_facetElement(t){const e=this.target.querySelector(t);if(!e)return null;const s=g.facet(this,e);return s.init(),this.destroyables.push(s),s.elt}destroy(){this._actions?.removeEventListener("updated",this._formUpdatedListener),this._actions=null,super.destroy(),this.buttons={}}}class A extends p{constructor(t){super(t),this.messages={submit:"Update Task",submitting:"Updating",submitted:"Task Updated"}}}class E extends p{constructor(t){super(t),this.messages={submit:"Move Task",submitting:"Moving",submitted:"Task Moved"}}get html(){return[this.pageElement]}}class x extends f{constructor(t){super(t),this.messages={submit:"Combine Tasks",submitting:"Combining",submitted:"Tasks Combined"}}}class R extends p{constructor(t){super(t),this.messages={submit:"Create Personal Task",submitting:"Creating",submitted:"Task Created"}}postreconcile(){this._resetAfterCreate&&(this.commitReset(),this._resetAfterCreate=!1),super.postreconcile(),this.target.dataset.visible==="true"&&this.target.querySelector("input[name='name']")?.focus()}async created(){await this.prepareReset(),this._resetAfterCreate=!0}offline(){return{action:"create",kind:"task"}}}class O extends p{constructor(t){super(t),this.messages={submit:"Create Task",submitting:"Creating",submitted:"Task Created"},this.component?.widgets.PageTaskList?.itemCount===0&&delete this.target.dataset.close}postreconcile(){this._resetAfterCreate&&(this.commitReset(),this._resetAfterCreate=!1),this._closeAfterCreate&&(this.target.dataset.close=this._closeAfterCreate,this._closeAfterCreate=null),super.postreconcile(),this.target.dataset.visible==="true"&&this.target.querySelector("input[name='name']")?.focus()}async created(){await this.prepareReset(),this._resetAfterCreate=!0,(this.component?.widgets.PageTaskList?.itemCount??0)>0&&(this._closeAfterCreate="tasks:PageTaskList")}}var L=Object.freeze({__proto__:null,BaseTaskSettings:p,CreateTask:O,CreateUserTask:R,TaskCombine:x,TaskMove:E,TaskSettings:A});class H extends q{constructor(t){super(t),this._change=this._change.bind(this),this._click=this._click.bind(this),this._setActiveTask=this._setActiveTask.bind(this),this._scrollOpenedTask=this._scrollOpenedTask.bind(this),this._added=[],this._removed=[],this._replaced=[],this._updated=[]}init(){this.target.addEventListener("change",this._change),this.target.addEventListener("click",this._click),this.target.addEventListener("set-subcomponent",this._setActiveTask),this.target.addEventListener("component-opened",this._scrollOpenedTask)}_change(t){const e=t.target;if(!e?.closest)return;const s=e.closest("[data-widget]")?.dataset.widget;if(s!=="TaskSettings"&&s!=="TaskForm")return;const r=e.closest("li")?.querySelector("[data-saved]");r&&(r.dataset.saved="false",r.dataset.visible="true")}_click(t){const e=t.target;if(!e?.closest)return;const s=e.closest("[data-role='save-toggle'], [data-role='complete-toggle']"),i=s?.dataset?.role;if(s&&this.target.contains(s)){const a=this.view.getComponent(s);if(!a)return;const o=a.elt.dataset.route;if(a.disable(),t.stopPropagation(),t.preventDefault(),i==="complete-toggle"&&(!a.active||a.elt.dataset.completed==="true")){const n=new FormData;if(n.append("role",i),a.elt.dataset.completed==="true"){const l=a.elt.querySelector("[data-role='completion-submission-choice']:checked");n.append("completion_submission",l?.value||"modified")}this.view.update(a,n,o);return}s.dispatchEvent(new CustomEvent("submit",{bubbles:!0,detail:{update:!0,role:i,route:o}}));return}if(this.completedHeader?.contains(e)){const a=this.expandToggle,o=this.completedTasks;if(!a||!o)return;const n=a.dataset.open!=="true";a.dataset.open=n?"true":"false",a.setAttribute("aria-expanded",n?"true":"false"),a.setAttribute("aria-label",n?"Collapse":"Expand"),a.title=n?"Collapse":"Expand",o.dataset.visible=n?"true":"false"}}_setActiveTask(t){const{subcomponent:e}=t.detail;this._moveTaskIfNecessary(e.elt),this._setListVisibility()}_scrollOpenedTask(t){const{component:e,trigger:s}=t.detail||{},i=e?.elt;if(t.target!==i||!i?.matches("li[lp-component][data-kind='task']")||!this.target.contains(i)||s!==i.querySelector(":scope > [lp-nav][lp-show]")||!e?.active||!("target"in e.active)||!e.active.target)return;const{top:r,bottom:a}=i.getBoundingClientRect(),o=80,n=window.innerHeight||document.documentElement.clientHeight,l=n-o,c=a-r,h=Math.min(c,l),u=Math.min(a,n)-Math.max(r,o);h<=0||u>=h/2||(i.classList.add("scroll-mt-20"),i.scrollIntoView({behavior:"auto",block:c<=l?"nearest":"start"}))}_moveTaskIfNecessary(t){if(this._existingTask(t))return;const s=t.dataset.completed==="true"?this.completedTasks:this.activeTasks;if(s&&!s.contains(t)){const i=this.activeTasks?.contains(t)||this.completedTasks?.contains(t);s.prepend(t),i||this.view.addFlash(t)}}_existingTask(t){const e=t?.dataset?.key,s=t?.id;return!e&&!s?null:Array.from(this.target.querySelectorAll("li[lp-component][data-kind='task']")).find(i=>i!==t&&(e&&i.dataset.key===e||s&&i.id===s))}async focusTask(t){const e=this.target.querySelector(`[data-key="${t}"]`);if(!e)return!1;const s=this.view.getComponent(e);if(!s)return!1;const i=this.completedTasks?.contains(e);return await s.activate("default"),await s.prepareRender(!0),await _(()=>{i&&this._openCompletedTasks(),s.render(!0)},{label:"page-tasks:focus"}),e.scrollIntoView({behavior:"auto",block:"start"}),!0}_openCompletedTasks(){const t=this.completedTasks,e=this.expandToggle;!t||!e||(t.dataset.visible="true",e.dataset.open="true",e.setAttribute("aria-expanded","true"),e.setAttribute("aria-label","Collapse"),e.title="Collapse")}_setListVisibility(){if(!this.target.hasAttribute("loaded"))return;const t=this.activeTasks,e=this.completedTasks,s=this.completedHeader;if(!t||!e||!s)return;const i=this.activeCount>0,r=this.completedCount>0,a=t.querySelector("[data-role='empty']"),o=!!a&&!i&&!r&&Object.is(this.component.active,this);a&&(a.dataset.visible=o?"true":"false"),t.dataset.visible=i||o?"true":"false",s.dataset.visible=r?"true":"false"}get ifEmpty(){const t=this.component.widgets.CreateTask,e=t?.visible===!1&&t.target?.dataset.visible==="true";return this._isEmpty&&this._created.length===0&&!e?this.target.dataset.ifEmpty:!1}get activeTasks(){return this.target.querySelector("[data-role='active-tasks']")}get expandToggle(){return this.target.querySelector("[data-role='expand']")}get completedTasks(){return this.target.querySelector("[data-role='completed-tasks']")}get completedHeader(){return this.target.querySelector("[data-role='completed-header']")}get activeCount(){return this.activeTasks?this.activeTasks.querySelectorAll("li[lp-component][data-kind='task']").length:0}get completedCount(){return this.completedTasks?this.completedTasks.querySelectorAll("li[lp-component][data-kind='task']").length:0}refreshDescriptor(){return this.component.name!=="tasks"||!this.view.key||!this.target.hasAttribute("loaded")?null:{rows:Array.from(this.target.querySelectorAll("li[lp-entity][data-kind='task']"),t=>({key:t.dataset.key,hash:t.dataset.hash||"",fingerprint:t.dataset.fingerprint||""}))}}_parseRefreshTask(t){if(!t)return null;const e=document.createElement("template");return e.innerHTML=t.trim(),e.content.querySelector("li[lp-component][data-kind='task']")}async prepareRefreshDelta(t){const e=new Map(Array.from(this.target.querySelectorAll("li[lp-entity][data-kind='task']"),i=>[i.dataset.key,i])),s=new Set(e.keys());for(const i of t.remove||[])s.delete(i);for(const{key:i}of t.upsert||[])s.add(i);if((t.order||[]).some(i=>!s.has(i))){const i=await this.view.load(this.component,this.route);return this.prepareRefresh(i??void 0)}this._removed=(t.remove||[]).map(i=>e.get(i)).filter(i=>i!==void 0),this._replaced=[],this._added=[];for(const i of t.upsert||[]){const r=this._parseRefreshTask(i.html);if(!r||r.dataset.key!==i.key)throw new Error("Invalid page-task refresh row");const a=e.get(i.key);a?this._replaced.push({from:a,to:r}):this._added.push(r)}return await this.prereconcile(),()=>{this.postreconcile();const i=new Map(Array.from(this.target.querySelectorAll("li[lp-entity][data-kind='task']"),l=>[l.dataset.key,l])),r=!!this.activeTasks?.querySelector("li[lp-entity][data-kind='task'][data-open]:not([data-open='false'])"),a=!!this.completedTasks?.querySelector("li[lp-entity][data-kind='task'][data-open]:not([data-open='false'])"),o=[],n=[];for(const l of t.order||[]){const c=i.get(l);if(!c)throw new Error("Page-task refresh order references a missing row");const h=c.dataset.completed==="true"?this.completedTasks:this.activeTasks;(c.dataset.completed==="true"?a:r)?h&&!h.contains(c)&&h.append(c):(c.dataset.completed==="true"?n:o).push(c)}for(const[l,c]of[[this.activeTasks,o],[this.completedTasks,n]]){if(!l||!c.length)continue;const h=Array.from(l.children).filter(u=>u.matches("li[lp-entity][data-kind='task']"));(h.length!==c.length||h.some((u,v)=>u!==c[v]))&&l.append(...c)}if(this.target.querySelectorAll("li[data-role='empty']").forEach(l=>{l.remove()}),this._isEmpty=(t.order||[]).length===0,this._isEmpty&&t.empty){const l=document.createElement("template");l.innerHTML=t.empty.trim();const c=l.content.querySelector("li[data-role='empty']");c&&this.activeTasks?.append(c)}this._setListVisibility()}}async refreshDelta(t){(await this.prepareRefreshDelta(t))?.()}updated(t){if(!t.html)return;const e=[t.html.querySelector("[data-role='active-tasks']"),t.html.querySelector("[data-role='completed-header']"),t.html.querySelector("[data-role='completed-tasks']")];if(e.some(s=>!s)){this._updated=[];return}this._isEmpty=!t.html.querySelector("[data-key]"),this._updated=e.filter(s=>s!==null)}async prepareRefresh(t){if(this._queueRefresh(t))return await this.prereconcile(),()=>this.postreconcile()}async refresh(t){(await this.prepareRefresh(t))?.()}_queueRefresh(t){if(!t?.html)return;const e=new Map(Array.from(this.target.querySelectorAll("li[lp-component][data-kind='task']")).map(i=>[i.id,i])),s=new Map(Array.from(t.html.querySelectorAll("li[lp-component][data-kind='task']")).map(i=>[i.id,i]));return this._added=[],this._removed=[],this._replaced=[],e.forEach((i,r)=>{s.has(r)||this._removed.push(i)}),s.forEach((i,r)=>{const a=e.get(r);a?a.dataset.fingerprint!==i.dataset.fingerprint&&this._replaced.push({from:a,to:i}):this._added.push(i)}),!0}_restorableWidgetName(t,e){if(!e||e==="false")return null;const s=e==="true"?t.dataset.default:e;return s&&t.querySelector(`[data-widget='${s}']`)?s:null}_hasPendingLocalFormState(t,e=null){return Object.values(t?.widgets??{}).some(s=>s.unsavedState===!0||s.form?._queued===!0||s.target?.querySelector?.("[lp-edited-marker][data-visible='true']")?!0:t?.active!==s||s.visible!==!0||!s.name?!1:!!e?.querySelector?.(`[data-widget='${s.name}']`))}async prereconcile(){const t=this.activeCount>0||this.completedCount>0;if(this._updated.length>0)if(t){const s=document.createElement("div");s.append(...this._updated),this._queueRefresh({html:s})}else this._replaceAll=[...this._updated];this._updated=[],this._removed=this._removed.filter(s=>{const i=this.view.getComponent(s);return!this._hasPendingLocalFormState(i)}),this._preparedReplacements=[];for(const{from:s,to:i}of this._replaced){const r=this.view.getComponent(s);if(this._hasPendingLocalFormState(r,i))continue;const a=this._restorableWidgetName(i,r?.open),o=this.view.getComponent(i);r?.key&&(this.view.components[r.key]=r),o&&a&&(await o.activate(a),await o.prepareRender(!0)),this._preparedReplacements.push({current:r,from:s,replacement:o,to:i})}this._replaced=[],this._preparedCreated=[];for(const s of this._created){if(this._added.some(o=>s.dataset.key&&o.dataset.key===s.dataset.key||s.id&&o.id===s.id)||this._existingTask(s))continue;const r=this.view.getComponent(s);if(!r)continue;const a=r.elt.dataset.default==="TaskForm";a&&(await r.activate("TaskForm"),await r.prepareRender(!0)),this._preparedCreated.push({hasForm:a,newTask:r,elt:s})}this._created=[]}postreconcile(){this.component.active?.name==="CreateTask"&&this._closeOpenTasks(),this._replaceAll&&(this.target.replaceChildren(...this._replaceAll),this._replaceAll=null);for(const t of this._removed)this.view.getComponent(t)?.destroy?.(),t.remove();this._removed=[];for(const{current:t,from:e,replacement:s,to:i}of this._preparedReplacements||[])e.replaceWith(i),t?.destroy?.(),s&&(s.key&&(this.view.components[s.key]=s),s.active&&s.render(!0)),this._moveTaskIfNecessary(i);this._preparedReplacements=[];for(const t of this._added)this._moveTaskIfNecessary(t);this._added=[];for(const{hasForm:t,newTask:e,elt:s}of this._preparedCreated||[])this.activeTasks?.prepend(s),this.view.addFlash(s),t&&e.render(!0);this._preparedCreated=[],this.target.setAttribute("loaded",""),this._setListVisibility()}_closeOpenTasks(){this.target.querySelectorAll("li[lp-component][data-kind='task'][data-open]:not([data-open='false'])").forEach(e=>{this.view.getComponent(e)?.closeOpenWidget?.()})}}var P=Object.freeze({__proto__:null,PageTaskList:H});async function b(d,t){const e=document.createElement("div");e.dataset.kind="task";const s=new C({target:e,key:t,readonly:!0,schema:d.schema||[],submission:d.submission||{},htmlFields:d.html_fields||{},showEmptyFields:!1});await s.init();const i=d.schema_error||d.content_error;if(i){const r=document.createElement("p");r.setAttribute("role","status"),r.textContent=i,e.prepend(r)}if(d.raw_submission){const r=document.createElement("pre");r.dataset.role="original-raw-answers",r.className="whitespace-pre-wrap break-words",r.textContent=JSON.stringify(d.raw_submission,null,2),e.append(r)}return{form:s,host:e}}class U extends f{constructor(t){super(t),this.messages={submit:"Update",submitting:"Updating",submitted:"Updated",queued:"Queued Sync"},this._historyFillRequest=null,this._historyFillSubmission=null,this._historyFillGeneration=0,this._originalCompletionForm=null,this._archivedSubmissionForm=null,this._originalCompletionGeneration=0,this._showOriginalCompletion=this._showOriginalCompletion.bind(this),this._showArchivedSubmission=this._showArchivedSubmission.bind(this),this._selectCompletionSubmission=this._selectCompletionSubmission.bind(this)}get autofillElement(){return this.readonly?null:S.autofill(this)}get historyFillRoute(){return this.endpoints?.latestHistorySubmission}get historyFillEnabled(){return!!(!this.revisionPreview&&!this.readonly&&this.hasHistory&&this.historyFillRoute)}get hasHistory(){return!!(this.target?.dataset.history||this.component?.elt?.querySelector("[data-widget='TaskHistory']"))}get prepend(){const t=this.target.querySelector("[data-role='archived-submission-controls']");t?.querySelector("[data-role='load-archived-submission']")?.addEventListener("click",this._showArchivedSubmission);const e=this.target.querySelector("[data-role='original-completion-controls']");return e?.querySelector("[data-role='view-original-completion']")?.addEventListener("click",this._showOriginalCompletion),e?.querySelector("[data-role='completion-submission-options']")?.addEventListener("change",this._selectCompletionSubmission),[t,e,this.target.querySelector("[data-role='empty-completed-submission']")]}get append(){const t=this.target?.dataset.schemaError,e=t?document.createElement("p"):null;e&&(e.textContent=t??null,e.setAttribute("role","status"));let s=null;return t&&this.target?.dataset.rawSubmission&&(s=document.createElement("pre"),s.dataset.role="original-raw-answers",s.className="whitespace-pre-wrap break-words",s.textContent=JSON.stringify(JSON.parse(this.target.dataset.rawSubmission),null,2)),[this.autofillElement,e,s]}_setCompletionView(t){const e=this.target.querySelector("[data-role='original-completion-controls']");if(!e)return;let s=this.target.querySelector("[data-role='current-completion-detail']");s||(s=document.createElement("div"),s.dataset.role="current-completion-detail",s.className="flex flex-col gap-6",s.append(...Array.from(this.target.children).filter(r=>r!==e&&!r.matches("[lp-edited-marker]"))),e.after(s)),s.hidden=t;const i=e.querySelector("[data-role='original-completion-detail']");i&&(i.hidden=!t)}_selectCompletionSubmission(t){t.stopPropagation(),t.target instanceof HTMLInputElement&&this._setCompletionView(t.target.value==="original")}async _showOriginalCompletion(t){t.preventDefault(),t.stopPropagation();const e=t.currentTarget;if(!e)return;const s=e.closest("[data-role='original-completion-controls']"),i=s?.querySelector("[data-role='original-completion-detail']");if(!s||!i||e.disabled||!e.dataset.route)return;const r=this._originalCompletionGeneration;e.disabled=!0;try{if(!this._originalCompletionForm){const o=await m.get(e.dataset.route);if(!o)throw new Error("Submission response is unavailable.");const{form:n,host:l}=await b(o,this.key);if(l.className="flex flex-col gap-6",r!==this._originalCompletionGeneration||!this.target.contains(e)){n.destroy();return}i.replaceChildren(l),this._originalCompletionForm=n}this._setCompletionView(!0);const a=s.querySelector("[data-role='completion-submission-options']");if(!a)return;for(const o of a.querySelectorAll("input"))o.disabled=!1,o.checked=o.value==="original";a.hidden=!1,a.querySelector("input:checked")?.focus()}catch(a){if(r!==this._originalCompletionGeneration)return;i.textContent="Could not load the original submission. Please try again.",i.hidden=!1,y(a,this.target,{route:e.dataset.route})}finally{e.disabled=!1}}async _showArchivedSubmission(t){t.preventDefault(),t.stopPropagation();const e=t.currentTarget;if(!e||e.disabled||!e.dataset.route)return;const s=this._originalCompletionGeneration,i=e.closest("[data-role='archived-submission-controls']")?.querySelector("[data-role='archived-submission-detail']");if(i){e.disabled=!0;try{if(!this._archivedSubmissionForm){const a=await m.get(e.dataset.route);if(!a)throw new Error("Submission response is unavailable.");const{form:o,host:n}=await b(a,this.key);if(s!==this._originalCompletionGeneration||!this.target.contains(e)){o.destroy();return}n.className="flex flex-col gap-6",i.replaceChildren(n),this._archivedSubmissionForm=o}i.hidden=!1;const r=this.target.querySelector("[data-role='original-completion-controls']");r&&(r.hidden=!1)}catch(r){if(s!==this._originalCompletionGeneration)return;i.textContent="Could not load the archived version. Please try again.",i.hidden=!1,y(r,this.target,{route:e.dataset.route})}finally{e.disabled=!1}}}_clearOriginalCompletion(){this._originalCompletionGeneration+=1,this._originalCompletionForm?.destroy(),this._originalCompletionForm=null,this._archivedSubmissionForm?.destroy(),this._archivedSubmissionForm=null}destroy(){this._clearOriginalCompletion(),super.destroy()}offline({data:t,method:e,route:s}){return{id:`update:task:${this.key}`,action:"update",kind:"task",method:e,route:s,target_key:this.key,data:t}}handleOfflineQueue({phase:t,record:e}){if(!(e?.kind!=="task"||e.target_key!==this.key)){if(t==="queued"&&this.form?.queued(),t==="conflict")return this._offlineConflict={record:e,response:e.conflictResponse},this.stageOfflineConflict();t==="replayed"&&this.form?.success()}}_resetHistoryFillCache(){this._historyFillRequest=null,this._historyFillSubmission=null,this._historyFillGeneration+=1}async init(){await super.init(),await this.loadHistoryFill()}async prepareReset(t={}){this._clearOriginalCompletion(),this._resetHistoryFillCache();const e=t.afterInit;await super.prepareReset({...t,afterInit:async s=>{await e?.(s),await s.loadHistoryFill()}})}async reset(){await this.prepareReset(),this.commitReset()}async latestHistorySubmission(){if(this._historyFillSubmission)return this._historyFillSubmission;if(!this._historyFillRequest){const s=this.historyFillRoute;if(!s)return[];const i=m.get(s).then(r=>r?.history_fields||[]).catch(r=>(this._historyFillRequest===i&&(this._historyFillRequest=null,y(r,this.target,{route:this.historyFillRoute})),[]));this._historyFillRequest=i}const t=this._historyFillRequest,e=await t;return this._historyFillRequest===t&&(this._historyFillSubmission=e),e}async historyValue(t){const e=this.form,s=this._historyFillGeneration,i=this.historyFillRoute;if(!e||!i)return null;const r=await m.get(i,{field:t},{replaceErrorPage:!1});return this.form!==e||this._historyFillGeneration!==s?null:r?.ok?(e.hideError(),r.latest_submission?.[t]):(e.showError(r?.error||"Could not fill this value from history. Try again."),null)}async loadHistoryFill(){const t=this.form,e=t?.renderer;if(!this.historyFillEnabled||!e)return;const s=this._historyFillGeneration,i=await this.latestHistorySubmission();this.form!==t||this._historyFillGeneration!==s||e.addHistoryFillButtons(Object.fromEntries(i.map(r=>[r,()=>this.historyValue(r)])))}}var N=Object.freeze({__proto__:null,TaskForm:U});class M extends F{constructor(t){super(t),this._updated=null}get table(){return this.target.querySelector("[data-role='table']")}async updated(t){this._updated=(t.html||null)?.querySelector("[data-role='completion-history']")??null}postreconcile(){if(this._updated){this.visible=!0,this.target.dataset.visible="true",this.table?.replaceChildren(this._updated),this._updated.dataset.visible="true";for(const t of this._updated.querySelectorAll("table"))t.dataset.visible="true",this.initVisibility(t,`columns-${this.component.name}-history`);this._updated=null}}}var G=Object.freeze({__proto__:null,TaskHistory:M});export{N as a,G as b,P as p,L as t};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { b as FormWidget, I as InputElement, T as TextareaElement, F as FormController } from './forms.js?v=b6ea3fe0';
+import { S as SectionToggle, s as sections } from './form-sections.js?v=b6ea3fe0';
+import { w as withTransition, r as request, c as captureError } from './foundation.js?v=b6ea3fe0';
+import { BaseList } from './baseList.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+import { E as EmbeddedTable } from './baseTable.js?v=b6ea3fe0';
+
+const TASK_BUTTONS = {
+  selectUser: "facet",
+  selectForm: "facet",
+  selectProject: "facet",
+  selectCategory: "facet",
+  schedule: "date",
+  uploadFile: "upload"
+};
+class BaseTaskSettings extends FormWidget {
+  constructor(attributes) {
+    super(attributes);
+    this.buttons = {};
+    this._actions = null;
+    this._formUpdatedListener = this._formUpdatedListener.bind(this);
+  }
+  _formUpdatedListener(e) {
+    const detail = e.detail;
+    const project = detail.options ? Object.values(detail.options)[0] : null;
+    const formControl = this.buttons.selectForm;
+    if (detail.name === "project" && project?.form && formControl && !formControl.readonly) {
+      if (formControl.details?.id !== project.form.id) {
+        formControl.clear();
+        formControl.addOption(project.form);
+      }
+    } else if (detail.name === "form") {
+      const options = Object.keys(detail.options);
+      if (options.length === 0) return;
+      const formKey = Object.keys(detail.options)[0];
+      const component = this.component;
+      if (!component) return;
+      const existingForm = component.elt.querySelector(
+        `[data-widget="TaskForm"]`
+      )?.dataset.formKey;
+      if (!existingForm || existingForm === formKey) return;
+      const form = component.widgets.TaskForm;
+      void withTransition(
+        () => {
+          form?.destroy?.();
+          delete component.widgets.TaskForm;
+          component.elt.querySelector(`[data-widget="TaskForm"]`)?.remove();
+          component.elt.querySelector('[lp-control="form"]')?.remove();
+        },
+        { label: "task-settings:replace-attached-form" }
+      );
+    }
+  }
+  get html() {
+    return [this.nameElement, this.descriptionElement, this.actions];
+  }
+  get actions() {
+    return this.target.querySelector(
+      "[data-role='action-buttons']"
+    );
+  }
+  async _initForm() {
+    await super._initForm();
+    await this._initActions();
+  }
+  async _initActions() {
+    const actions = this.actions;
+    if (!actions) return;
+    const buttons = Array.from(
+      actions.querySelectorAll("button[data-action]")
+    );
+    if (buttons.length === 0) return;
+    this.buttons = {};
+    for (const button of buttons) {
+      const action = button.dataset.action;
+      if (!action || !(action in TASK_BUTTONS)) continue;
+      const factory = TASK_BUTTONS[action];
+      const control = factory && SectionToggle[factory] ? SectionToggle[factory](this, button) : null;
+      if (!control) continue;
+      await control.init();
+      this.buttons[action] = control;
+      if ("destroy" in control && typeof control.destroy === "function") {
+        this.destroyables.push(control);
+      }
+    }
+    actions.addEventListener("updated", this._formUpdatedListener);
+    this._actions = actions;
+  }
+  get pageElement() {
+    return this._facetElement('[data-role="page-select"]');
+  }
+  get nameElement() {
+    const nameElement = new InputElement(
+      {
+        kind: "task",
+        readonly: this.readonly
+      },
+      {
+        id: "name",
+        title: "Name",
+        input: "text",
+        placeholder: "name this task..."
+      },
+      this.target.dataset.name
+    ).elt;
+    return nameElement;
+  }
+  get descriptionElement() {
+    return new TextareaElement(
+      {
+        kind: "task",
+        readonly: this.readonly
+      },
+      {
+        id: "description",
+        title: "Description",
+        input: "textarea",
+        placeholder: "describe this task..."
+      },
+      this.target.dataset.description
+    ).elt;
+  }
+  get formData() {
+    const data = super.formData;
+    ["task-file", "mimetype"].forEach((name) => {
+      data.delete(name);
+    });
+    return data;
+  }
+  _facetElement(selector) {
+    const target = this.target.querySelector(selector);
+    if (!target) return null;
+    const control = SectionToggle.facet(this, target);
+    control.init();
+    this.destroyables.push(control);
+    return control.elt;
+  }
+  destroy() {
+    this._actions?.removeEventListener("updated", this._formUpdatedListener);
+    this._actions = null;
+    super.destroy();
+    this.buttons = {};
+  }
+}
+class TaskSettings extends BaseTaskSettings {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Update Task",
+      submitting: "Updating",
+      submitted: "Task Updated"
+    };
+  }
+}
+class TaskMove extends BaseTaskSettings {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Move Task",
+      submitting: "Moving",
+      submitted: "Task Moved"
+    };
+  }
+  get html() {
+    return [this.pageElement];
+  }
+}
+class TaskCombine extends FormWidget {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Combine Tasks",
+      submitting: "Combining",
+      submitted: "Tasks Combined"
+    };
+  }
+}
+class CreateUserTask extends BaseTaskSettings {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Create Personal Task",
+      submitting: "Creating",
+      submitted: "Task Created"
+    };
+  }
+  postreconcile() {
+    if (this._resetAfterCreate) {
+      this.commitReset();
+      this._resetAfterCreate = false;
+    }
+    super.postreconcile();
+    if (this.target.dataset.visible === "true") {
+      this.target.querySelector("input[name='name']")?.focus();
+    }
+  }
+  async created() {
+    await this.prepareReset();
+    this._resetAfterCreate = true;
+  }
+  offline() {
+    return {
+      action: "create",
+      kind: "task"
+    };
+  }
+}
+class CreateTask extends BaseTaskSettings {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Create Task",
+      submitting: "Creating",
+      submitted: "Task Created"
+    };
+    if (this.component?.widgets.PageTaskList?.itemCount === 0) {
+      delete this.target.dataset.close;
+    }
+  }
+  postreconcile() {
+    if (this._resetAfterCreate) {
+      this.commitReset();
+      this._resetAfterCreate = false;
+    }
+    if (this._closeAfterCreate) {
+      this.target.dataset.close = this._closeAfterCreate;
+      this._closeAfterCreate = null;
+    }
+    super.postreconcile();
+    if (this.target.dataset.visible === "true") {
+      this.target.querySelector("input[name='name']")?.focus();
+    }
+  }
+  async created() {
+    await this.prepareReset();
+    this._resetAfterCreate = true;
+    if ((this.component?.widgets.PageTaskList?.itemCount ?? 0) > 0) {
+      this._closeAfterCreate = "tasks:PageTaskList";
+    }
+  }
+}
+
+var taskSettings = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	BaseTaskSettings: BaseTaskSettings,
+	CreateTask: CreateTask,
+	CreateUserTask: CreateUserTask,
+	TaskCombine: TaskCombine,
+	TaskMove: TaskMove,
+	TaskSettings: TaskSettings
+});
+
+class PageTaskList extends BaseList {
+  constructor(attributes) {
+    super(attributes);
+    this._change = this._change.bind(this);
+    this._click = this._click.bind(this);
+    this._setActiveTask = this._setActiveTask.bind(this);
+    this._scrollOpenedTask = this._scrollOpenedTask.bind(this);
+    this._added = [];
+    this._removed = [];
+    this._replaced = [];
+    this._updated = [];
+  }
+  init() {
+    this.target.addEventListener("change", this._change);
+    this.target.addEventListener("click", this._click);
+    this.target.addEventListener("set-subcomponent", this._setActiveTask);
+    this.target.addEventListener("component-opened", this._scrollOpenedTask);
+  }
+  _change(e) {
+    const target = e.target;
+    if (!target?.closest) return;
+    const widget = target.closest("[data-widget]")?.dataset.widget;
+    if (widget !== "TaskSettings" && widget !== "TaskForm") {
+      return;
+    }
+    const task = target.closest("li");
+    const saved = task?.querySelector("[data-saved]");
+    if (saved) {
+      saved.dataset.saved = "false";
+      saved.dataset.visible = "true";
+    }
+  }
+  _click(e) {
+    const target = e.target;
+    if (!target?.closest) return;
+    const submitter = target.closest(
+      "[data-role='save-toggle'], [data-role='complete-toggle']"
+    );
+    const role = submitter?.dataset?.role;
+    if (submitter && this.target.contains(submitter)) {
+      const task = this.view.getComponent(submitter);
+      if (!task) return;
+      const route = task.elt.dataset.route;
+      task.disable();
+      e.stopPropagation();
+      e.preventDefault();
+      if (role === "complete-toggle" && (!task.active || task.elt.dataset.completed === "true")) {
+        const data = new FormData();
+        data.append("role", role);
+        if (task.elt.dataset.completed === "true") {
+          const choice = task.elt.querySelector(
+            "[data-role='completion-submission-choice']:checked"
+          );
+          data.append("completion_submission", choice?.value || "modified");
+        }
+        void this.view.update(task, data, route);
+        return;
+      }
+      submitter.dispatchEvent(
+        new CustomEvent("submit", {
+          bubbles: true,
+          detail: { update: true, role, route }
+        })
+      );
+      return;
+    }
+    const completedHeader = this.completedHeader;
+    if (completedHeader?.contains(target)) {
+      const expandToggle = this.expandToggle;
+      const completedTasks = this.completedTasks;
+      if (!expandToggle || !completedTasks) return;
+      const open = expandToggle.dataset.open !== "true";
+      expandToggle.dataset.open = open ? "true" : "false";
+      expandToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      expandToggle.setAttribute("aria-label", open ? "Collapse" : "Expand");
+      expandToggle.title = open ? "Collapse" : "Expand";
+      completedTasks.dataset.visible = open ? "true" : "false";
+    }
+  }
+  _setActiveTask(e) {
+    const { subcomponent } = e.detail;
+    this._moveTaskIfNecessary(subcomponent.elt);
+    this._setListVisibility();
+  }
+  _scrollOpenedTask(e) {
+    const { component, trigger } = e.detail || {};
+    const task = component?.elt;
+    if (e.target !== task || !task?.matches("li[lp-component][data-kind='task']") || !this.target.contains(task) || trigger !== task.querySelector(":scope > [lp-nav][lp-show]"))
+      return;
+    if (!component?.active || !("target" in component.active) || !component.active.target)
+      return;
+    const { top, bottom } = task.getBoundingClientRect();
+    const viewportTop = 80;
+    const viewportBottom = window.innerHeight || document.documentElement.clientHeight;
+    const viewportHeight = viewportBottom - viewportTop;
+    const taskHeight = bottom - top;
+    const usableHeight = Math.min(taskHeight, viewportHeight);
+    const visibleHeight = Math.min(bottom, viewportBottom) - Math.max(top, viewportTop);
+    if (usableHeight <= 0 || visibleHeight >= usableHeight / 2) return;
+    task.classList.add("scroll-mt-20");
+    task.scrollIntoView({
+      behavior: "auto",
+      block: taskHeight <= viewportHeight ? "nearest" : "start"
+    });
+  }
+  _moveTaskIfNecessary(taskElt) {
+    if (this._existingTask(taskElt)) return;
+    const completed = taskElt.dataset.completed === "true";
+    const list = completed ? this.completedTasks : this.activeTasks;
+    if (list && !list.contains(taskElt)) {
+      const moving = this.activeTasks?.contains(taskElt) || this.completedTasks?.contains(taskElt);
+      list.prepend(taskElt);
+      if (!moving) this.view.addFlash(taskElt);
+    }
+  }
+  _existingTask(taskElt) {
+    const key = taskElt?.dataset?.key;
+    const id = taskElt?.id;
+    if (!key && !id) return null;
+    return Array.from(
+      this.target.querySelectorAll(
+        "li[lp-component][data-kind='task']"
+      )
+    ).find((elt) => {
+      return elt !== taskElt && (key && elt.dataset.key === key || id && elt.id === id);
+    });
+  }
+  async focusTask(taskId) {
+    const taskElt = this.target.querySelector(`[data-key="${taskId}"]`);
+    if (!taskElt) return false;
+    const task = this.view.getComponent(taskElt);
+    if (!task) return false;
+    const revealCompleted = this.completedTasks?.contains(taskElt);
+    await task.activate("default");
+    await task.prepareRender(true);
+    await withTransition(
+      () => {
+        if (revealCompleted) this._openCompletedTasks();
+        task.render(true);
+      },
+      { label: "page-tasks:focus" }
+    );
+    taskElt.scrollIntoView({ behavior: "auto", block: "start" });
+    return true;
+  }
+  _openCompletedTasks() {
+    const completed = this.completedTasks;
+    const toggle = this.expandToggle;
+    if (!completed || !toggle) return;
+    completed.dataset.visible = "true";
+    toggle.dataset.open = "true";
+    toggle.setAttribute("aria-expanded", "true");
+    toggle.setAttribute("aria-label", "Collapse");
+    toggle.title = "Collapse";
+  }
+  _setListVisibility() {
+    if (!this.target.hasAttribute("loaded")) return;
+    const activeTasks = this.activeTasks;
+    const completedTasks = this.completedTasks;
+    const completedHeader = this.completedHeader;
+    if (!activeTasks || !completedTasks || !completedHeader) return;
+    const hasActive = this.activeCount > 0;
+    const hasCompleted = this.completedCount > 0;
+    const empty = activeTasks.querySelector("[data-role='empty']");
+    const showEmpty = Boolean(empty) && !hasActive && !hasCompleted && Object.is(this.component.active, this);
+    if (empty) empty.dataset.visible = showEmpty ? "true" : "false";
+    activeTasks.dataset.visible = hasActive || showEmpty ? "true" : "false";
+    completedHeader.dataset.visible = hasCompleted ? "true" : "false";
+  }
+  get ifEmpty() {
+    const createTask = this.component.widgets.CreateTask;
+    const createTaskClosing = createTask?.visible === false && createTask.target?.dataset.visible === "true";
+    return this._isEmpty && this._created.length === 0 && !createTaskClosing ? this.target.dataset.ifEmpty : false;
+  }
+  get activeTasks() {
+    return this.target.querySelector("[data-role='active-tasks']");
+  }
+  get expandToggle() {
+    return this.target.querySelector("[data-role='expand']");
+  }
+  get completedTasks() {
+    return this.target.querySelector(
+      "[data-role='completed-tasks']"
+    );
+  }
+  get completedHeader() {
+    return this.target.querySelector(
+      "[data-role='completed-header']"
+    );
+  }
+  get activeCount() {
+    if (!this.activeTasks) return 0;
+    return this.activeTasks.querySelectorAll(
+      "li[lp-component][data-kind='task']"
+    ).length;
+  }
+  get completedCount() {
+    if (!this.completedTasks) return 0;
+    return this.completedTasks.querySelectorAll(
+      "li[lp-component][data-kind='task']"
+    ).length;
+  }
+  refreshDescriptor() {
+    if (this.component.name !== "tasks" || !this.view.key || !this.target.hasAttribute("loaded")) {
+      return null;
+    }
+    return {
+      rows: Array.from(
+        this.target.querySelectorAll(
+          "li[lp-entity][data-kind='task']"
+        ),
+        (task) => ({
+          key: task.dataset.key,
+          hash: task.dataset.hash || "",
+          fingerprint: task.dataset.fingerprint || ""
+        })
+      )
+    };
+  }
+  _parseRefreshTask(html) {
+    if (!html) return null;
+    const template = document.createElement("template");
+    template.innerHTML = html.trim();
+    return template.content.querySelector(
+      "li[lp-component][data-kind='task']"
+    );
+  }
+  async prepareRefreshDelta(delta) {
+    const existing = new Map(
+      Array.from(
+        this.target.querySelectorAll(
+          "li[lp-entity][data-kind='task']"
+        ),
+        (task) => [task.dataset.key, task]
+      )
+    );
+    const known = new Set(existing.keys());
+    for (const key of delta.remove || []) known.delete(key);
+    for (const { key } of delta.upsert || []) known.add(key);
+    if ((delta.order || []).some((key) => !known.has(key))) {
+      const response = await this.view.load(this.component, this.route);
+      return this.prepareRefresh(response ?? void 0);
+    }
+    this._removed = (delta.remove || []).map((key) => existing.get(key)).filter((task) => task !== void 0);
+    this._replaced = [];
+    this._added = [];
+    for (const update of delta.upsert || []) {
+      const task = this._parseRefreshTask(update.html);
+      if (!task || task.dataset.key !== update.key) {
+        throw new Error("Invalid page-task refresh row");
+      }
+      const current = existing.get(update.key);
+      if (current) this._replaced.push({ from: current, to: task });
+      else this._added.push(task);
+    }
+    await this.prereconcile();
+    return () => {
+      this.postreconcile();
+      const refreshed = new Map(
+        Array.from(
+          this.target.querySelectorAll(
+            "li[lp-entity][data-kind='task']"
+          ),
+          (task) => [task.dataset.key, task]
+        )
+      );
+      const preserveActiveOrder = Boolean(
+        this.activeTasks?.querySelector(
+          "li[lp-entity][data-kind='task'][data-open]:not([data-open='false'])"
+        )
+      );
+      const preserveCompletedOrder = Boolean(
+        this.completedTasks?.querySelector(
+          "li[lp-entity][data-kind='task'][data-open]:not([data-open='false'])"
+        )
+      );
+      const activeOrder = [];
+      const completedOrder = [];
+      for (const key of delta.order || []) {
+        const task = refreshed.get(key);
+        if (!task) {
+          throw new Error("Page-task refresh order references a missing row");
+        }
+        const list = task.dataset.completed === "true" ? this.completedTasks : this.activeTasks;
+        const preserveOrder = task.dataset.completed === "true" ? preserveCompletedOrder : preserveActiveOrder;
+        if (preserveOrder) {
+          if (list && !list.contains(task)) list.append(task);
+        } else {
+          (task.dataset.completed === "true" ? completedOrder : activeOrder).push(task);
+        }
+      }
+      for (const [list, desired] of [
+        [this.activeTasks, activeOrder],
+        [this.completedTasks, completedOrder]
+      ]) {
+        if (!list || !desired.length) continue;
+        const current = Array.from(list.children).filter(
+          (child) => child.matches("li[lp-entity][data-kind='task']")
+        );
+        if (current.length !== desired.length || current.some((task, index) => task !== desired[index])) {
+          list.append(...desired);
+        }
+      }
+      this.target.querySelectorAll("li[data-role='empty']").forEach((empty) => {
+        empty.remove();
+      });
+      this._isEmpty = (delta.order || []).length === 0;
+      if (this._isEmpty && delta.empty) {
+        const template = document.createElement("template");
+        template.innerHTML = delta.empty.trim();
+        const empty = template.content.querySelector("li[data-role='empty']");
+        if (empty) this.activeTasks?.append(empty);
+      }
+      this._setListVisibility();
+    };
+  }
+  async refreshDelta(delta) {
+    const commit = await this.prepareRefreshDelta(delta);
+    commit?.();
+  }
+  updated(response) {
+    if (!response.html) return;
+    const updated = [
+      response.html.querySelector("[data-role='active-tasks']"),
+      response.html.querySelector(
+        "[data-role='completed-header']"
+      ),
+      response.html.querySelector("[data-role='completed-tasks']")
+    ];
+    if (updated.some((element) => !element)) {
+      this._updated = [];
+      return;
+    }
+    this._isEmpty = !response.html.querySelector("[data-key]");
+    this._updated = updated.filter((element) => element !== null);
+  }
+  async prepareRefresh(response) {
+    if (!this._queueRefresh(response)) return;
+    await this.prereconcile();
+    return () => this.postreconcile();
+  }
+  async refresh(response) {
+    const commit = await this.prepareRefresh(response);
+    commit?.();
+  }
+  _queueRefresh(response) {
+    if (!response?.html) return;
+    const existingTasks = new Map(
+      Array.from(
+        this.target.querySelectorAll(
+          "li[lp-component][data-kind='task']"
+        )
+      ).map((elt) => [elt.id, elt])
+    );
+    const newTasks = new Map(
+      Array.from(
+        response.html.querySelectorAll(
+          "li[lp-component][data-kind='task']"
+        )
+      ).map((elt) => [elt.id, elt])
+    );
+    this._added = [];
+    this._removed = [];
+    this._replaced = [];
+    existingTasks.forEach((elt, id) => {
+      if (!newTasks.has(id)) {
+        this._removed.push(elt);
+      }
+    });
+    newTasks.forEach((elt, id) => {
+      const existing = existingTasks.get(id);
+      if (existing) {
+        if (existing.dataset.fingerprint !== elt.dataset.fingerprint) {
+          this._replaced.push({ from: existing, to: elt });
+        }
+      } else {
+        this._added.push(elt);
+      }
+    });
+    return true;
+  }
+  _restorableWidgetName(taskElt, open) {
+    if (!open || open === "false") return null;
+    const widget = open === "true" ? taskElt.dataset.default : open;
+    if (!widget) return null;
+    return taskElt.querySelector(`[data-widget='${widget}']`) ? widget : null;
+  }
+  _hasPendingLocalFormState(component, replacement = null) {
+    return Object.values(component?.widgets ?? {}).some((widget) => {
+      if (widget.unsavedState === true || widget.form?._queued === true || widget.target?.querySelector?.(
+        "[lp-edited-marker][data-visible='true']"
+      )) {
+        return true;
+      }
+      if (component?.active !== widget || widget.visible !== true || !widget.name) {
+        return false;
+      }
+      return Boolean(
+        replacement?.querySelector?.(`[data-widget='${widget.name}']`)
+      );
+    });
+  }
+  async prereconcile() {
+    const needsRefresh = this.activeCount > 0 || this.completedCount > 0;
+    const hasUpdated = this._updated.length > 0;
+    if (hasUpdated) {
+      if (needsRefresh) {
+        const html = document.createElement("div");
+        html.append(...this._updated);
+        this._queueRefresh({ html });
+      } else {
+        this._replaceAll = [...this._updated];
+      }
+    }
+    this._updated = [];
+    this._removed = this._removed.filter((elt) => {
+      const component = this.view.getComponent(elt);
+      return !this._hasPendingLocalFormState(component);
+    });
+    this._preparedReplacements = [];
+    for (const { from, to } of this._replaced) {
+      const current = this.view.getComponent(from);
+      if (this._hasPendingLocalFormState(current, to)) continue;
+      const open = this._restorableWidgetName(to, current?.open);
+      const replacement = this.view.getComponent(to);
+      if (current?.key) this.view.components[current.key] = current;
+      if (replacement && open) {
+        await replacement.activate(open);
+        await replacement.prepareRender(true);
+      }
+      this._preparedReplacements.push({
+        current,
+        from,
+        replacement,
+        to
+      });
+    }
+    this._replaced = [];
+    this._preparedCreated = [];
+    for (const elt of this._created) {
+      const pendingAdded = this._added.some((added) => {
+        return elt.dataset.key && added.dataset.key === elt.dataset.key || elt.id && added.id === elt.id;
+      });
+      if (pendingAdded || this._existingTask(elt)) continue;
+      const newTask = this.view.getComponent(elt);
+      if (!newTask) continue;
+      const hasForm = newTask.elt.dataset.default === "TaskForm";
+      if (hasForm) {
+        await newTask.activate("TaskForm");
+        await newTask.prepareRender(true);
+      }
+      this._preparedCreated.push({ hasForm, newTask, elt });
+    }
+    this._created = [];
+  }
+  postreconcile() {
+    if (this.component.active?.name === "CreateTask") {
+      this._closeOpenTasks();
+    }
+    if (this._replaceAll) {
+      this.target.replaceChildren(...this._replaceAll);
+      this._replaceAll = null;
+    }
+    for (const elt of this._removed) {
+      const component = this.view.getComponent(elt);
+      component?.destroy?.();
+      elt.remove();
+    }
+    this._removed = [];
+    for (const { current, from, replacement, to } of this._preparedReplacements || []) {
+      from.replaceWith(to);
+      current?.destroy?.();
+      if (replacement) {
+        if (replacement.key)
+          this.view.components[replacement.key] = replacement;
+        if (replacement.active) replacement.render(true);
+      }
+      this._moveTaskIfNecessary(to);
+    }
+    this._preparedReplacements = [];
+    for (const elt of this._added) {
+      this._moveTaskIfNecessary(elt);
+    }
+    this._added = [];
+    for (const { hasForm, newTask, elt } of this._preparedCreated || []) {
+      this.activeTasks?.prepend(elt);
+      this.view.addFlash(elt);
+      if (hasForm) newTask.render(true);
+    }
+    this._preparedCreated = [];
+    this.target.setAttribute("loaded", "");
+    this._setListVisibility();
+  }
+  _closeOpenTasks() {
+    const openTasks = this.target.querySelectorAll(
+      "li[lp-component][data-kind='task'][data-open]:not([data-open='false'])"
+    );
+    openTasks.forEach((elt) => {
+      const task = this.view.getComponent(elt);
+      task?.closeOpenWidget?.();
+    });
+  }
+}
+
+var pageTaskList = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	PageTaskList: PageTaskList
+});
+
+async function renderOriginalSubmission(response, key) {
+  const host = document.createElement("div");
+  host.dataset.kind = "task";
+  const form = new FormController({
+    target: host,
+    key,
+    readonly: true,
+    schema: response.schema || [],
+    submission: response.submission || {},
+    htmlFields: response.html_fields || {},
+    showEmptyFields: false
+  });
+  await form.init();
+  const error = response.schema_error || response.content_error;
+  if (error) {
+    const message = document.createElement("p");
+    message.setAttribute("role", "status");
+    message.textContent = error;
+    host.prepend(message);
+  }
+  if (response.raw_submission) {
+    const raw = document.createElement("pre");
+    raw.dataset.role = "original-raw-answers";
+    raw.className = "whitespace-pre-wrap break-words";
+    raw.textContent = JSON.stringify(response.raw_submission, null, 2);
+    host.append(raw);
+  }
+  return { form, host };
+}
+class TaskForm extends FormWidget {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Update",
+      submitting: "Updating",
+      submitted: "Updated",
+      queued: "Queued Sync"
+    };
+    this._historyFillRequest = null;
+    this._historyFillSubmission = null;
+    this._historyFillGeneration = 0;
+    this._originalCompletionForm = null;
+    this._archivedSubmissionForm = null;
+    this._originalCompletionGeneration = 0;
+    this._showOriginalCompletion = this._showOriginalCompletion.bind(this);
+    this._showArchivedSubmission = this._showArchivedSubmission.bind(this);
+    this._selectCompletionSubmission = this._selectCompletionSubmission.bind(this);
+  }
+  get autofillElement() {
+    if (this.readonly) return null;
+    return sections.autofill(this);
+  }
+  get historyFillRoute() {
+    return this.endpoints?.latestHistorySubmission;
+  }
+  get historyFillEnabled() {
+    return Boolean(
+      !this.revisionPreview && !this.readonly && this.hasHistory && this.historyFillRoute
+    );
+  }
+  get hasHistory() {
+    return Boolean(
+      this.target?.dataset.history || this.component?.elt?.querySelector("[data-widget='TaskHistory']")
+    );
+  }
+  get prepend() {
+    const archived = this.target.querySelector(
+      "[data-role='archived-submission-controls']"
+    );
+    archived?.querySelector("[data-role='load-archived-submission']")?.addEventListener("click", this._showArchivedSubmission);
+    const original = this.target.querySelector(
+      "[data-role='original-completion-controls']"
+    );
+    original?.querySelector("[data-role='view-original-completion']")?.addEventListener("click", this._showOriginalCompletion);
+    original?.querySelector(
+      "[data-role='completion-submission-options']"
+    )?.addEventListener("change", this._selectCompletionSubmission);
+    return [
+      archived,
+      original,
+      this.target.querySelector("[data-role='empty-completed-submission']")
+    ];
+  }
+  get append() {
+    const error = this.target?.dataset.schemaError;
+    const notice = error ? document.createElement("p") : null;
+    if (notice) {
+      notice.textContent = error ?? null;
+      notice.setAttribute("role", "status");
+    }
+    let raw = null;
+    if (error && this.target?.dataset.rawSubmission) {
+      raw = document.createElement("pre");
+      raw.dataset.role = "original-raw-answers";
+      raw.className = "whitespace-pre-wrap break-words";
+      raw.textContent = JSON.stringify(
+        JSON.parse(this.target.dataset.rawSubmission),
+        null,
+        2
+      );
+    }
+    return [this.autofillElement, notice, raw];
+  }
+  _setCompletionView(showOriginal) {
+    const controls = this.target.querySelector(
+      "[data-role='original-completion-controls']"
+    );
+    if (!controls) return;
+    let current = this.target.querySelector(
+      "[data-role='current-completion-detail']"
+    );
+    if (!current) {
+      current = document.createElement("div");
+      current.dataset.role = "current-completion-detail";
+      current.className = "flex flex-col gap-6";
+      current.append(
+        ...Array.from(this.target.children).filter(
+          (child) => child !== controls && !child.matches("[lp-edited-marker]")
+        )
+      );
+      controls.after(current);
+    }
+    current.hidden = showOriginal;
+    const original = controls.querySelector(
+      "[data-role='original-completion-detail']"
+    );
+    if (original) original.hidden = !showOriginal;
+  }
+  _selectCompletionSubmission(event) {
+    event.stopPropagation();
+    if (event.target instanceof HTMLInputElement)
+      this._setCompletionView(event.target.value === "original");
+  }
+  async _showOriginalCompletion(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const button = event.currentTarget;
+    if (!button) return;
+    const controls = button.closest(
+      "[data-role='original-completion-controls']"
+    );
+    const target = controls?.querySelector(
+      "[data-role='original-completion-detail']"
+    );
+    if (!controls || !target) return;
+    if (button.disabled || !button.dataset.route) return;
+    const generation = this._originalCompletionGeneration;
+    button.disabled = true;
+    try {
+      if (!this._originalCompletionForm) {
+        const response = await request.get(
+          button.dataset.route
+        );
+        if (!response) throw new Error("Submission response is unavailable.");
+        const { form, host } = await renderOriginalSubmission(
+          response,
+          this.key
+        );
+        host.className = "flex flex-col gap-6";
+        if (generation !== this._originalCompletionGeneration || !this.target.contains(button)) {
+          form.destroy();
+          return;
+        }
+        target.replaceChildren(host);
+        this._originalCompletionForm = form;
+      }
+      this._setCompletionView(true);
+      const options = controls.querySelector(
+        "[data-role='completion-submission-options']"
+      );
+      if (!options) return;
+      for (const radio of options.querySelectorAll("input")) {
+        radio.disabled = false;
+        radio.checked = radio.value === "original";
+      }
+      options.hidden = false;
+      options.querySelector("input:checked")?.focus();
+    } catch (error) {
+      if (generation !== this._originalCompletionGeneration) return;
+      target.textContent = "Could not load the original submission. Please try again.";
+      target.hidden = false;
+      captureError(error, this.target, { route: button.dataset.route });
+    } finally {
+      button.disabled = false;
+    }
+  }
+  async _showArchivedSubmission(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const button = event.currentTarget;
+    if (!button) return;
+    if (button.disabled || !button.dataset.route) return;
+    const generation = this._originalCompletionGeneration;
+    const target = button.closest("[data-role='archived-submission-controls']")?.querySelector("[data-role='archived-submission-detail']");
+    if (!target) return;
+    button.disabled = true;
+    try {
+      if (!this._archivedSubmissionForm) {
+        const response = await request.get(
+          button.dataset.route
+        );
+        if (!response) throw new Error("Submission response is unavailable.");
+        const { form, host } = await renderOriginalSubmission(
+          response,
+          this.key
+        );
+        if (generation !== this._originalCompletionGeneration || !this.target.contains(button)) {
+          form.destroy();
+          return;
+        }
+        host.className = "flex flex-col gap-6";
+        target.replaceChildren(host);
+        this._archivedSubmissionForm = form;
+      }
+      target.hidden = false;
+      const original = this.target.querySelector(
+        "[data-role='original-completion-controls']"
+      );
+      if (original) original.hidden = false;
+    } catch (error) {
+      if (generation !== this._originalCompletionGeneration) return;
+      target.textContent = "Could not load the archived version. Please try again.";
+      target.hidden = false;
+      captureError(error, this.target, { route: button.dataset.route });
+    } finally {
+      button.disabled = false;
+    }
+  }
+  _clearOriginalCompletion() {
+    this._originalCompletionGeneration += 1;
+    this._originalCompletionForm?.destroy();
+    this._originalCompletionForm = null;
+    this._archivedSubmissionForm?.destroy();
+    this._archivedSubmissionForm = null;
+  }
+  destroy() {
+    this._clearOriginalCompletion();
+    super.destroy();
+  }
+  offline({ data, method, route }) {
+    return {
+      id: `update:task:${this.key}`,
+      action: "update",
+      kind: "task",
+      method,
+      route,
+      target_key: this.key,
+      data
+    };
+  }
+  handleOfflineQueue({ phase, record }) {
+    if (record?.kind !== "task" || record.target_key !== this.key) return;
+    if (phase === "queued") this.form?.queued();
+    if (phase === "conflict") {
+      this._offlineConflict = {
+        record,
+        response: record.conflictResponse
+      };
+      return this.stageOfflineConflict();
+    }
+    if (phase === "replayed") this.form?.success();
+  }
+  _resetHistoryFillCache() {
+    this._historyFillRequest = null;
+    this._historyFillSubmission = null;
+    this._historyFillGeneration += 1;
+  }
+  async init() {
+    await super.init();
+    await this.loadHistoryFill();
+  }
+  async prepareReset(options = {}) {
+    this._clearOriginalCompletion();
+    this._resetHistoryFillCache();
+    const afterInit = options.afterInit;
+    await super.prepareReset({
+      ...options,
+      afterInit: async (widget) => {
+        await afterInit?.(widget);
+        await widget.loadHistoryFill();
+      }
+    });
+  }
+  async reset() {
+    await this.prepareReset();
+    this.commitReset();
+  }
+  async latestHistorySubmission() {
+    if (this._historyFillSubmission) return this._historyFillSubmission;
+    if (!this._historyFillRequest) {
+      const route = this.historyFillRoute;
+      if (!route) return [];
+      const pending2 = request.get(route).then((response) => response?.history_fields || []).catch((error) => {
+        if (this._historyFillRequest === pending2) {
+          this._historyFillRequest = null;
+          captureError(error, this.target, { route: this.historyFillRoute });
+        }
+        return [];
+      });
+      this._historyFillRequest = pending2;
+    }
+    const pending = this._historyFillRequest;
+    const submission = await pending;
+    if (this._historyFillRequest === pending)
+      this._historyFillSubmission = submission;
+    return submission;
+  }
+  async historyValue(fieldId) {
+    const form = this.form;
+    const generation = this._historyFillGeneration;
+    const route = this.historyFillRoute;
+    if (!form || !route) return null;
+    const response = await request.get(
+      route,
+      { field: fieldId },
+      { replaceErrorPage: false }
+    );
+    if (this.form !== form || this._historyFillGeneration !== generation)
+      return null;
+    if (!response?.ok) {
+      form.showError(
+        response?.error || "Could not fill this value from history. Try again."
+      );
+      return null;
+    }
+    form.hideError();
+    return response.latest_submission?.[fieldId];
+  }
+  async loadHistoryFill() {
+    const form = this.form;
+    const renderer = form?.renderer;
+    if (!this.historyFillEnabled || !renderer) return;
+    const generation = this._historyFillGeneration;
+    const fields = await this.latestHistorySubmission();
+    if (this.form !== form || this._historyFillGeneration !== generation)
+      return;
+    renderer.addHistoryFillButtons(
+      Object.fromEntries(fields.map((id) => [id, () => this.historyValue(id)]))
+    );
+  }
+}
+
+var taskForm = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	TaskForm: TaskForm
+});
+
+class TaskHistory extends EmbeddedTable {
+  constructor(attributes) {
+    super(attributes);
+    this._updated = null;
+  }
+  get table() {
+    return this.target.querySelector("[data-role='table']");
+  }
+  async updated(response) {
+    this._updated = (response.html || null)?.querySelector(
+      "[data-role='completion-history']"
+    ) ?? null;
+  }
+  postreconcile() {
+    if (!this._updated) return;
+    this.visible = true;
+    this.target.dataset.visible = "true";
+    this.table?.replaceChildren(this._updated);
+    this._updated.dataset.visible = "true";
+    for (const table of this._updated.querySelectorAll("table")) {
+      table.dataset.visible = "true";
+      this.initVisibility(table, `columns-${this.component.name}-history`);
+    }
+    this._updated = null;
+  }
+}
+
+var taskHistory = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	TaskHistory: TaskHistory
+});
+
+export { taskForm as a, taskHistory as b, pageTaskList as p, taskSettings as t };

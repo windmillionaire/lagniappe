@@ -259,7 +259,10 @@ export default class ViewComponent {
 
 		const response = await this.view.load(this, route);
 		widget.modified = true;
-		if (!response) return null;
+		if (!response) {
+			widget.loading = false;
+			return null;
+		}
 		if (response.updated === false && widget.initialized) return null;
 		const html = response.html || null;
 		const responseTarget = html?.querySelector<HTMLElement>(
@@ -527,6 +530,7 @@ export default class ViewComponent {
 		}
 
 		this.elt.dataset.open = open || "false";
+		this.view.onComponentRendered?.(this);
 		void this.view.schedulePollingReconciliation?.();
 	}
 

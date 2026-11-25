@@ -1,2 +1,153 @@
-import{S as c}from"./ui-resources.js?v=b9ad6d22";import{Modal as d}from"./modal.js?v=b9ad6d22";import{r}from"./foundation.js?v=b9ad6d22";import{D as l}from"./combobox.js?v=b9ad6d22";import{c as p}from"./document.js?v=b9ad6d22";import"./upstreamUnavailable.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";import"./ui-controls.js?v=b9ad6d22";class h{constructor(o){this.toolbar=o,this.active=!1,this.button=null,this._dropdown=null,this._loadEntries=this._loadEntries.bind(this),this.refresh=this.refresh.bind(this)}init(o){Object.assign(this,o),this.button=p(o),this._dropdown=new l(this.button),this._dropdown.init({loadOptions:this._loadEntries,placement:"bottom-start",styles:{panel:`${c.dropdown.panel} ${c.editor.toolbar.portalIconContext} w-max max-w-[calc(100vw-0.625rem)]`}})}show(){this.button&&(this.button.hidden=!1)}async _loadEntries(){const o=this.toolbar.endpoints?.history;if(!o)return[];const i=await r.get(o,{refresh:Date.now()});if(!i?.ok)return[];const n=i.entries||[],e=[{name:"Pin Version",icon:"pin",onClick:()=>this.toolbar.openForm("pinVersion")},{name:"Storage backups",closeOnClick:!1,icon:"database",onClick:()=>this._showBackups()}];return(i.unpinned_count??0)>0&&e.push({name:"Clear Unpinned Versions",icon:"delete",onClick:t=>this._confirmClear(t)}),e.push(...n.map(t=>{const s=t.created?new Date(t.created).toLocaleString():"";return{name:t.pinned?`${t.name} \u2014 ${s}`:s,icon:t.pinned?"pin":"history",onClick:()=>this.toolbar.document.versions?.preview(t)}})),e}async refresh(){const o=await this._loadEntries();this._dropdown?.updateOptions(o)}async _confirmClear(o){const i=this.toolbar.endpoints?.history;if(!i)return;const n=new d(this.toolbar.document.view,o);await n.load(`${i}/unpinned?refresh=${Date.now()}`);const e=n.modal?.querySelector("[data-role='delete']"),t=e?.dataset.route;!e||!t||(e.addEventListener("click",async()=>{e.disabled=!0;const s=e.querySelector("#spinner");if(s&&(s.dataset.visible="true"),!(await r.delete(t))?.ok){e.disabled=!1,s&&(s.dataset.visible="false");return}await n.remove(),await this.refresh()}),e.focus())}async _showBackups(o=null,i=[]){const n=await r.get(`${this.toolbar.endpoints?.history}/backups`,{...o?{cursor:o}:{},refresh:Date.now()});if(!n?.ok){this.toolbar.document.versions?.notice(n?.error||"Unable to list storage backups.");return}const e=[...i,...n.entries||[]].sort((s,a)=>a.created.localeCompare(s.created)),t=e.map(s=>({name:`Storage backup \u2014 ${new Date(s.created).toLocaleString()}`,icon:"database",onClick:()=>this.toolbar.document.versions?.preview(s)}));n.cursor&&t.push({name:"Load more storage backups",closeOnClick:!1,icon:"database",onClick:()=>this._showBackups(n.cursor,e)}),t.length||this.toolbar.document.versions?.notice("No retained storage backups are available for this document."),t.unshift({name:"Back to pinned versions",closeOnClick:!1,icon:"pin",onClick:()=>this._showPins()}),this._dropdown?.updateOptions(t)}async _showPins(){await this.refresh()}destroy(){this._dropdown&&(this._dropdown.destroy(),this._dropdown=null)}}export{h as documentHistory};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from './ui-resources.js?v=b6ea3fe0';
+import { Modal } from './modal.js?v=b6ea3fe0';
+import { r as request } from './foundation.js?v=b6ea3fe0';
+import { D as Dropdown } from './combobox.js?v=b6ea3fe0';
+import { c as createMenuButton } from './document.js?v=b6ea3fe0';
+import './upstreamUnavailable.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+import './ui-controls.js?v=b6ea3fe0';
+
+class DocumentHistoryButton {
+  constructor(toolbar) {
+    this.toolbar = toolbar;
+    this.active = false;
+    this.button = null;
+    this._dropdown = null;
+    this._loadEntries = this._loadEntries.bind(this);
+    this.refresh = this.refresh.bind(this);
+  }
+  init(settings) {
+    Object.assign(this, settings);
+    this.button = createMenuButton(settings);
+    this._dropdown = new Dropdown(this.button);
+    this._dropdown.init({
+      loadOptions: this._loadEntries,
+      placement: "bottom-start",
+      styles: {
+        panel: `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext} w-max max-w-[calc(100vw-0.625rem)]`
+      }
+    });
+  }
+  show() {
+    if (this.button) this.button.hidden = false;
+  }
+  async _loadEntries() {
+    const endpoint = this.toolbar.endpoints?.history;
+    if (!endpoint) return [];
+    const response = await request.get(endpoint, {
+      refresh: Date.now()
+    });
+    if (!response?.ok) return [];
+    const entries = response.entries || [];
+    const items = [
+      {
+        name: "Pin Version",
+        icon: "pin",
+        onClick: () => this.toolbar.openForm("pinVersion")
+      },
+      {
+        name: "Storage backups",
+        closeOnClick: false,
+        icon: "database",
+        onClick: () => this._showBackups()
+      }
+    ];
+    if ((response.unpinned_count ?? 0) > 0) {
+      items.push({
+        name: "Clear Unpinned Versions",
+        icon: "delete",
+        onClick: (option) => this._confirmClear(option)
+      });
+    }
+    items.push(
+      ...entries.map((entry) => {
+        const date = entry.created ? new Date(entry.created).toLocaleString() : "";
+        return {
+          name: entry.pinned ? `${entry.name} \u2014 ${date}` : date,
+          icon: entry.pinned ? "pin" : "history",
+          onClick: () => this.toolbar.document.versions?.preview(entry)
+        };
+      })
+    );
+    return items;
+  }
+  async refresh() {
+    const items = await this._loadEntries();
+    this._dropdown?.updateOptions(items);
+  }
+  async _confirmClear(trigger) {
+    const endpoint = this.toolbar.endpoints?.history;
+    if (!endpoint) return;
+    const modal = new Modal(this.toolbar.document.view, trigger);
+    await modal.load(`${endpoint}/unpinned?refresh=${Date.now()}`);
+    const deleteButton = modal.modal?.querySelector(
+      "[data-role='delete']"
+    );
+    const route = deleteButton?.dataset.route;
+    if (!deleteButton || !route) return;
+    deleteButton.addEventListener("click", async () => {
+      deleteButton.disabled = true;
+      const spinner = deleteButton.querySelector("#spinner");
+      if (spinner) spinner.dataset.visible = "true";
+      const response = await request.delete(route);
+      if (!response?.ok) {
+        deleteButton.disabled = false;
+        if (spinner) spinner.dataset.visible = "false";
+        return;
+      }
+      await modal.remove();
+      await this.refresh();
+    });
+    deleteButton.focus();
+  }
+  async _showBackups(cursor = null, entries = []) {
+    const response = await request.get(
+      `${this.toolbar.endpoints?.history}/backups`,
+      { ...cursor ? { cursor } : {}, refresh: Date.now() }
+    );
+    if (!response?.ok) {
+      this.toolbar.document.versions?.notice(
+        response?.error || "Unable to list storage backups."
+      );
+      return;
+    }
+    const loaded = [...entries, ...response.entries || []].sort(
+      (a, b) => b.created.localeCompare(a.created)
+    );
+    const items = loaded.map((entry) => ({
+      name: `Storage backup \u2014 ${new Date(entry.created).toLocaleString()}`,
+      icon: "database",
+      onClick: () => this.toolbar.document.versions?.preview(entry)
+    }));
+    if (response.cursor)
+      items.push({
+        name: "Load more storage backups",
+        closeOnClick: false,
+        icon: "database",
+        onClick: () => this._showBackups(response.cursor, loaded)
+      });
+    if (!items.length)
+      this.toolbar.document.versions?.notice(
+        "No retained storage backups are available for this document."
+      );
+    items.unshift({
+      name: "Back to pinned versions",
+      closeOnClick: false,
+      icon: "pin",
+      onClick: () => this._showPins()
+    });
+    this._dropdown?.updateOptions(items);
+  }
+  async _showPins() {
+    await this.refresh();
+  }
+  destroy() {
+    if (this._dropdown) {
+      this._dropdown.destroy();
+      this._dropdown = null;
+    }
+  }
+}
+
+export { DocumentHistoryButton as documentHistory };

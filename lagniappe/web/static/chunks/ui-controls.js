@@ -1,2 +1,527 @@
-import{S as i,s as u,i as N,c as k}from"./ui-resources.js?v=b9ad6d22";const f=(e,n)=>{n.name&&(e.name=n.name),n.id&&(e.id=n.id),n.value!=null&&(e.value=String(n.value)),n.required&&(e.required=!0),n.disabled&&(e.classList.add("pointer-events-none","select-none"),e.readOnly=!0,e.tabIndex=-1,e.disabled=!0);for(const[t,o]of Object.entries(n.data||{}))o!=null&&(e.dataset[t]=String(o))};function x(e){const{label:n,icon:t,role:o="label",tag:l="label",styles:c={}}=e,s=document.createElement(l);s.className=`${c.label??i.form.elementLabel}`;const d=s.appendChild(E({role:o}));if(d.className=c.container??"flex flex-row items-center gap-1",t){const a=d.appendChild(document.createElement("span"));u(a,t,c.icon??i.icon.default);const r=d.appendChild(document.createElement("span"));r.textContent=n==null?null:String(n)}else{const a=d.appendChild(document.createElement("span"));a.textContent=n==null?null:String(n)}return s}function w(e){const{type:n="text",placeholder:t,styles:o={}}=e,l=document.createElement("input");if(l.type=n,l.autocomplete="off",l.setAttribute("data-1p-ignore",""),t&&(l.placeholder=t,l.dataset.placeholder=t),l.className=o.input??i.input,e.name=e.name??e.id,e.data={kind:e.kind,index:e.index,...e.data},f(l,e),["text","email","url","tel"].includes(n)?l.pattern=".*":n==="number"&&(l.step="any"),e.label){const c=x(e);return c.appendChild(l),c.classList.add("flex-col"),c}return l}function $(e){const{rows:n=3,placeholder:t,styles:o={}}=e,l=document.createElement("textarea");if(l.rows=n,t&&(l.placeholder=t),l.className=o.textarea??i.textarea,f(l,e),e.label){const c=x(e);return c.appendChild(l),c.classList.add("flex-col"),c}return l}const v=e=>{const{checked:n=!1,styles:t={},visible:o=!0}=e;t.label??=i.checkbox.label;let l=null;const c=document.createElement("div");c.className=t.container??i.checkbox.container;const s=c.appendChild(document.createElement("input"));s.type="checkbox",s.checked=n,s.className=t.checkbox??i.checkbox.default,f(s,e);const d=c.appendChild(document.createElement("span"));if(u(d,"check",t.icon??i.checkbox.icon),e.label){l=document.createElement("label"),l.dataset.role="label";const a=document.createElement("span");a.textContent=e.label,l.className=t.label??i.checkbox.label,c.classList.add("order-first"),l.append(c,a)}else l=c;return o||(l.dataset.visible="false"),l},S=e=>{const{checked:n=!1,styles:t={}}=e,o=document.createElement("input");o.type="radio",o.checked=n,o.className=t.radio??i.radio.default,f(o,e);const l=document.createElement("label");l.dataset.role="label";const c=document.createElement("span");return c.textContent=e.label==null?null:String(e.label),l.className=t.label??i.radio.label,o.classList.add("order-first"),l.append(o,c),l},L=e=>{const{placeholder:n,options:t=[],styles:o={}}=e,l=document.createElement("div");l.className=i.select.wrapper,e.kind&&(l.dataset.kind=e.kind);const c=l.appendChild(document.createElement("select"));if(c.className=o.select??i.select.default,f(c,e),e.name&&(c.name=e.name),e.id&&(c.id=e.id),e.required&&(c.required=!0),n){c.dataset.placeholder=n;const a=c.appendChild(document.createElement("option"));a.textContent=n,a.value="",a.selected=!0,a.hidden=!0}for(const a of t){const r=c.appendChild(document.createElement("option"));r.value=a.value,r.textContent=a.label,r.dataset.details=JSON.stringify(a.details??{name:a.label,id:a.value}),a.selected&&(r.selected=!0)}const s=l.appendChild(document.createElement("span")),d=e.selectIcon||(t.length?"dropdown":"search");if(u(s,d,i.select.icon),l.setAttribute("lp-select",""),e.label){const a=x(e);return a.appendChild(l),a.classList.add("flex-col"),a}return l},T=e=>{const{icon:n,text:t,kind:o,styles:l={}}=e,c=document.createElement("div");c.className=l.badge??i.badge.default,c.dataset.kind=o;const s=c.appendChild(document.createElement("span"));u(s,n,l.icon??i.badge.icon);const d=c.appendChild(document.createElement("span"));return d.textContent=t??null,d.className=l.text??"text-kind-default",c},j=e=>{const{icon:n,styles:t={}}=e,o=document.createElement("button");o.className=t.container??i.toggle.container;const l=o.appendChild(document.createElement("span"));return u(l,n,t.icon??""),f(o,e),o},I=()=>{const e=document.createElement("div");e.className=i.loading.wrapper;const n="h-4 bg-base-light rounded-full animate-pulse",t=[0,200,400];return e.innerHTML=t.map(o=>`<div class="${n}${o?` [animation-delay:${o}ms]`:""}"></div>`).join(""),e},A=e=>{const{icon:n,kind:t=null,role:o=null,style:l=null}=e,c=document.createElement("span");return t&&(c.dataset.kind=t),o&&(c.dataset.role=o),u(c,n,`${l??""} text-kind-default`.trim()),c},E=e=>{const{kind:n=null,role:t=null,style:o=null,data:l={}}=e,c=document.createElement("div");n&&(c.dataset.kind=n),t&&(c.dataset.role=t),o&&(c.className=o);for(const[s,d]of Object.entries(l))d!=null&&(c.dataset[s]=String(d));return c},O=e=>{const n=document.createElement("div");return n.className=i.message,n.dataset.role="error",n.dataset.visible="false",n.dataset.kind="error",e&&(n.textContent=e),n},U=e=>{const{text:n="",style:t=null,data:o={}}=e,l=document.createElement("span");l.textContent=n,t&&(l.className=t);for(const[c,s]of Object.entries(o))s!=null&&(l.dataset[c]=String(s));return l},q={checkbox:v,input:w,radio:S,textarea:$,select:L,label:x,badge:T,toggle:j,loading:I,icon:A,div:E,error:O,span:U},g={task:"pages",model:"projects",project:"projects",page:"pages",category:"categories",form:"forms"};function C(e){return!e||typeof e!="object"?null:{id:"id"in e&&typeof e.id=="string"?e.id:void 0,kind:"kind"in e&&typeof e.kind=="string"?e.kind:void 0,name:"name"in e&&typeof e.name=="string"?e.name:void 0}}const R=e=>e?(typeof e=="string"&&(e=new Date(`${e}T00:00:00`)),e.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})):"",P=e=>{if(!e)return null;const[n,t]=e.split(":").map(Number),o=n>=12?"PM":"AM";return`${n===0?12:n>12?n-12:n}:${t.toString().padStart(2,"0")} ${o}`},D=e=>e?e.replace(/(\d{3})(\d{3})(\d{4})/,"($1) $2-$3"):null,y=e=>{let n=null;const t=C(e.parent);return e.kind==="model"&&t?(n=new URL(`projects/${t.id}/status/${e.id}`,window.location.origin),n.searchParams.set("completed","false")):e.kind==="task"&&t?(n=new URL(`${g[t.kind??""]}/${t.id}`,window.location.origin),n.searchParams.set("task",String(e.id))):e.kind==="user"?n=new URL(`pages/${e.id}`,window.location.origin):e.kind==="group"?(n=new URL("users/index",window.location.origin),n.searchParams.set("group",String(e.id))):n=new URL(`${g[e.kind||e.index||""]}/${e.id}`,window.location.origin),n},H=e=>{const n=document.createElement("a");return n.href=`mailto:${e}`,n.textContent=e,n.className=`${i.link.emphasized}`,n},M=e=>{if(e.icon||e.kind){const n=document.createElement("span");return n.dataset.kind=e.kind||"default",u(n,e.icon||e.kind,"text-kind-default"),n}return null},z=({icon:e,kind:n=null,content:t,classes:o="",iconClasses:l=""})=>{const c=document.createElement("span");if(c.className=`${i.iconLabel.wrapper} ${o}`.trim(),e&&N(e)){const s=document.createElement("span");n&&(s.dataset.kind=n),u(s,e,`${i.iconLabel.icon} ${l}`.trim()),c.appendChild(s)}return typeof t=="string"?c.appendChild(document.createTextNode(t)):t&&c.appendChild(t),c},B=e=>{const n=e.kind||e.index||e.type,t=document.createElement("span");t.className=i.entity.name.wrapper;const o=document.createElement(e.link?"a":"span");o.dataset.kind=String(n),o.textContent=e.name??null,o.tagName==="A"?(o.setAttribute("href",y(e).href),o.className=`${i.link.emphasized}`):o.className="text-kind-default font-semibold";const l=C(e.parent);if(l){const c=t.appendChild(document.createElement("span"));c.dataset.kind=String(l.kind),c.className=`text-kind-default font-medium ${i.entity.name.parent}`;const s=c.appendChild(document.createElement("span"));s.textContent=l.name??null;const d=c.appendChild(document.createElement("span"));d.setAttribute("aria-hidden","true"),d.className=i.entity.name.separator,d.textContent="/",t.appendChild(document.createElement("wbr"))}return t.appendChild(o),t},J=e=>{const{kind:n="default",text:t}=e,o=document.createElement("span");return o.dataset.kind=n,o.className="text-kind-default",o.textContent=t??null,o},W=(e,n)=>{const t=document.createElement("span");t.dataset.role="icon",t.dataset.visible="true",t.appendChild(k("spinner"));const o=document.createElement("span");o.dataset.role="text",o.textContent=n,e.replaceChildren(t,o)},b={date:R,time:P,tel:D,url:y,email:H,icon:M,iconLabel:z,name:B,text:J,working:W},Y=(e,n)=>{if(e&&n)return b.iconLabel({icon:e,content:n});if(e){const o=document.createElement("span");return u(o,e),o}const t=document.createElement("span");return t.textContent=n,t},F=e=>h({type:"submit",style:i.button.submit,...e}),h=e=>{const{text:n="",type:t="button",icon:o=null,style:l=i.button.submit,kind:c=null,role:s=null,data:d={},classes:a=[]}=e,r=document.createElement("button");r.type=t,r.className=l,(o||n)&&r.appendChild(Y(o,n)),c&&(r.dataset.kind=c),s&&(r.dataset.role=s);for(const[p,m]of Object.entries(d))m!=null&&(r.dataset[p]=String(m));return a.length>0&&r.classList.add(...a),r},G=e=>{const n=e.existingButton||h(e),{defaultText:t=e.defaultText||e.text||n.textContent,processingText:o=e.processingText||!1,processingIcon:l=e.processingIcon||"spinner",completedText:c=e.completedText||e.text||n.textContent,completedIcon:s=e.completedIcon||e.icon}=e,d=(a,r)=>{let p=n.querySelector("[data-role='text']");p||(p=document.createElement("span"),p.dataset.role="text",n.replaceChildren(p)),p.textContent=r;let m=n.querySelector("[data-role='icon']");m||(m=document.createElement("span"),m.dataset.role="icon",m.setAttribute("aria-hidden","true"),n.prepend(m)),a?(m.replaceChildren(k(a)),m.dataset.visible="true"):(m.replaceChildren(),m.dataset.visible="false")};return d(e.icon,t),{element:n,activate:(a=null,r=null)=>{n.disabled=!0;const p=a||o||t;r&&(n.dataset.kind=r),d(l,p)},deactivate:(a=null,r=null)=>{n.disabled=!1;const p=a||c||t;r&&(n.dataset.kind=r),d(s,p)}}},K={default:h,submit:F,active:G};export{K as b,b as f,q as p};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES, s as setIcon, i as iconDefinition, c as createIcon } from './ui-resources.js?v=b6ea3fe0';
+
+const setAttributes = (elt, attributes) => {
+  if (attributes.name) elt.name = attributes.name;
+  if (attributes.id) elt.id = attributes.id;
+  if (attributes.value != null) elt.value = String(attributes.value);
+  if (attributes.required) elt.required = true;
+  if (attributes.disabled) {
+    elt.classList.add("pointer-events-none", "select-none");
+    elt.readOnly = true;
+    elt.tabIndex = -1;
+    elt.disabled = true;
+  }
+  for (const [k, v] of Object.entries(attributes.data || {})) {
+    if (v != null) elt.dataset[k] = String(v);
+  }
+};
+function label(attributes) {
+  const {
+    label: label2,
+    icon: icon2,
+    role = "label",
+    tag = "label",
+    styles = {}
+  } = attributes;
+  const labelElt = document.createElement(tag);
+  labelElt.className = `${styles.label ?? STYLES.form.elementLabel}`;
+  const container = labelElt.appendChild(div({ role }));
+  container.className = styles.container ?? "flex flex-row items-center gap-1";
+  if (icon2) {
+    const iconElt = container.appendChild(document.createElement("span"));
+    setIcon(iconElt, icon2, styles.icon ?? STYLES.icon.default);
+    const span2 = container.appendChild(document.createElement("span"));
+    span2.textContent = label2 == null ? null : String(label2);
+  } else {
+    const span2 = container.appendChild(document.createElement("span"));
+    span2.textContent = label2 == null ? null : String(label2);
+  }
+  return labelElt;
+}
+function input(attributes) {
+  const { type = "text", placeholder, styles = {} } = attributes;
+  const elt = document.createElement("input");
+  elt.type = type;
+  elt.autocomplete = "off";
+  elt.setAttribute("data-1p-ignore", "");
+  if (placeholder) {
+    elt.placeholder = placeholder;
+    elt.dataset.placeholder = placeholder;
+  }
+  elt.className = styles.input ?? STYLES.input;
+  attributes.name = attributes.name ?? attributes.id;
+  attributes.data = {
+    kind: attributes.kind,
+    index: attributes.index,
+    ...attributes.data
+  };
+  setAttributes(elt, attributes);
+  if (["text", "email", "url", "tel"].includes(type)) {
+    elt.pattern = ".*";
+  } else if (type === "number") {
+    elt.step = "any";
+  }
+  if (attributes.label) {
+    const container = label(attributes);
+    container.appendChild(elt);
+    container.classList.add("flex-col");
+    return container;
+  }
+  return elt;
+}
+function textarea(attributes) {
+  const { rows = 3, placeholder, styles = {} } = attributes;
+  const elt = document.createElement("textarea");
+  elt.rows = rows;
+  if (placeholder) elt.placeholder = placeholder;
+  elt.className = styles.textarea ?? STYLES.textarea;
+  setAttributes(elt, attributes);
+  if (attributes.label) {
+    const container = label(attributes);
+    container.appendChild(elt);
+    container.classList.add("flex-col");
+    return container;
+  }
+  return elt;
+}
+const checkbox = (attributes) => {
+  const { checked = false, styles = {}, visible = true } = attributes;
+  styles.label ??= STYLES.checkbox.label;
+  let element = null;
+  const wrapper = document.createElement("div");
+  wrapper.className = styles.container ?? STYLES.checkbox.container;
+  const elt = wrapper.appendChild(document.createElement("input"));
+  elt.type = "checkbox";
+  elt.checked = checked;
+  elt.className = styles.checkbox ?? STYLES.checkbox.default;
+  setAttributes(elt, attributes);
+  const icon2 = wrapper.appendChild(document.createElement("span"));
+  setIcon(icon2, "check", styles.icon ?? STYLES.checkbox.icon);
+  if (attributes.label) {
+    element = document.createElement("label");
+    element.dataset.role = "label";
+    const text = document.createElement("span");
+    text.textContent = attributes.label;
+    element.className = styles.label ?? STYLES.checkbox.label;
+    wrapper.classList.add("order-first");
+    element.append(wrapper, text);
+  } else {
+    element = wrapper;
+  }
+  if (!visible) element.dataset.visible = "false";
+  return element;
+};
+const radio = (attributes) => {
+  const { checked = false, styles = {} } = attributes;
+  const elt = document.createElement("input");
+  elt.type = "radio";
+  elt.checked = checked;
+  elt.className = styles.radio ?? STYLES.radio.default;
+  setAttributes(elt, attributes);
+  const labelElt = document.createElement("label");
+  labelElt.dataset.role = "label";
+  const text = document.createElement("span");
+  text.textContent = attributes.label == null ? null : String(attributes.label);
+  labelElt.className = styles.label ?? STYLES.radio.label;
+  elt.classList.add("order-first");
+  labelElt.append(elt, text);
+  return labelElt;
+};
+const select = (attributes) => {
+  const { placeholder, options = [], styles = {} } = attributes;
+  const container = document.createElement("div");
+  container.className = STYLES.select.wrapper;
+  if (attributes.kind) container.dataset.kind = attributes.kind;
+  const elt = container.appendChild(document.createElement("select"));
+  elt.className = styles.select ?? STYLES.select.default;
+  setAttributes(elt, attributes);
+  if (attributes.name) elt.name = attributes.name;
+  if (attributes.id) elt.id = attributes.id;
+  if (attributes.required) elt.required = true;
+  if (placeholder) {
+    elt.dataset.placeholder = placeholder;
+    const pl = elt.appendChild(document.createElement("option"));
+    pl.textContent = placeholder;
+    pl.value = "";
+    pl.selected = true;
+    pl.hidden = true;
+  }
+  for (const o of options) {
+    const opt = elt.appendChild(document.createElement("option"));
+    opt.value = o.value;
+    opt.textContent = o.label;
+    opt.dataset.details = JSON.stringify(
+      o.details ?? { name: o.label, id: o.value }
+    );
+    if (o.selected) opt.selected = true;
+  }
+  const icon2 = container.appendChild(document.createElement("span"));
+  const iconType = attributes.selectIcon || (options.length ? "dropdown" : "search");
+  setIcon(icon2, iconType, STYLES.select.icon);
+  container.setAttribute("lp-select", "");
+  if (attributes.label) {
+    const labelElt = label(attributes);
+    labelElt.appendChild(container);
+    labelElt.classList.add("flex-col");
+    return labelElt;
+  }
+  return container;
+};
+const badge = (attributes) => {
+  const { icon: icon2, text, kind, styles = {} } = attributes;
+  const badge2 = document.createElement("div");
+  badge2.className = styles.badge ?? STYLES.badge.default;
+  badge2.dataset.kind = kind;
+  const badgeIcon = badge2.appendChild(document.createElement("span"));
+  setIcon(badgeIcon, icon2, styles.icon ?? STYLES.badge.icon);
+  const name = badge2.appendChild(document.createElement("span"));
+  name.textContent = text ?? null;
+  name.className = styles.text ?? "text-kind-default";
+  return badge2;
+};
+const toggle = (attributes) => {
+  const { icon: icon2, styles = {} } = attributes;
+  const toggle2 = document.createElement("button");
+  toggle2.className = styles.container ?? STYLES.toggle.container;
+  const iconElt = toggle2.appendChild(document.createElement("span"));
+  setIcon(iconElt, icon2, styles.icon ?? "");
+  setAttributes(toggle2, attributes);
+  return toggle2;
+};
+const loading = () => {
+  const wrapper = document.createElement("div");
+  wrapper.className = STYLES.loading.wrapper;
+  const pulse = "h-4 bg-base-light rounded-full animate-pulse";
+  const delays = [0, 200, 400];
+  wrapper.innerHTML = delays.map(
+    (d) => `<div class="${pulse}${d ? ` [animation-delay:${d}ms]` : ""}"></div>`
+  ).join("");
+  return wrapper;
+};
+const icon$1 = (attributes) => {
+  const { icon: icon2, kind = null, role = null, style = null } = attributes;
+  const elt = document.createElement("span");
+  if (kind) elt.dataset.kind = kind;
+  if (role) elt.dataset.role = role;
+  setIcon(elt, icon2, `${style ?? ""} text-kind-default`.trim());
+  return elt;
+};
+const div = (attributes) => {
+  const { kind = null, role = null, style = null, data = {} } = attributes;
+  const elt = document.createElement("div");
+  if (kind) elt.dataset.kind = kind;
+  if (role) elt.dataset.role = role;
+  if (style) elt.className = style;
+  for (const [k, v] of Object.entries(data)) {
+    if (v != null) elt.dataset[k] = String(v);
+  }
+  return elt;
+};
+const error = (message) => {
+  const error2 = document.createElement("div");
+  error2.className = STYLES.message;
+  error2.dataset.role = "error";
+  error2.dataset.visible = "false";
+  error2.dataset.kind = "error";
+  if (message) error2.textContent = message;
+  return error2;
+};
+const span = (attributes) => {
+  const { text = "", style = null, data = {} } = attributes;
+  const span2 = document.createElement("span");
+  span2.textContent = text;
+  if (style) span2.className = style;
+  for (const [k, v] of Object.entries(data)) {
+    if (v != null) span2.dataset[k] = String(v);
+  }
+  return span2;
+};
+const primitives = {
+  checkbox,
+  input,
+  radio,
+  textarea,
+  select,
+  label,
+  badge,
+  toggle,
+  loading,
+  icon: icon$1,
+  div,
+  error,
+  span
+};
+
+const ROUTES = {
+  task: "pages",
+  model: "projects",
+  project: "projects",
+  page: "pages",
+  category: "categories",
+  form: "forms"
+};
+function entityParent(value) {
+  if (!value || typeof value !== "object") return null;
+  return {
+    id: "id" in value && typeof value.id === "string" ? value.id : void 0,
+    kind: "kind" in value && typeof value.kind === "string" ? value.kind : void 0,
+    name: "name" in value && typeof value.name === "string" ? value.name : void 0
+  };
+}
+const date = (date2) => {
+  if (!date2) return "";
+  if (typeof date2 === "string") {
+    date2 = /* @__PURE__ */ new Date(`${date2}T00:00:00`);
+  }
+  return date2.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+};
+const time = (timeValue) => {
+  if (!timeValue) return null;
+  const [hours, minutes] = timeValue.split(":").map(Number);
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
+};
+const tel = (telValue) => {
+  if (!telValue) return null;
+  return telValue.replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3");
+};
+const url = (data) => {
+  let url2 = null;
+  const parent = entityParent(data.parent);
+  if (data.kind === "model" && parent) {
+    url2 = new URL(
+      `projects/${parent.id}/status/${data.id}`,
+      window.location.origin
+    );
+    url2.searchParams.set("completed", "false");
+  } else if (data.kind === "task" && parent) {
+    url2 = new URL(
+      `${ROUTES[parent.kind ?? ""]}/${parent.id}`,
+      window.location.origin
+    );
+    url2.searchParams.set("task", String(data.id));
+  } else if (data.kind === "user") {
+    url2 = new URL(`pages/${data.id}`, window.location.origin);
+  } else if (data.kind === "group") {
+    url2 = new URL("users/index", window.location.origin);
+    url2.searchParams.set("group", String(data.id));
+  } else {
+    url2 = new URL(
+      `${ROUTES[data.kind || data.index || ""]}/${data.id}`,
+      window.location.origin
+    );
+  }
+  return url2;
+};
+const email = (email2) => {
+  const emailElement = document.createElement("a");
+  emailElement.href = `mailto:${email2}`;
+  emailElement.textContent = email2;
+  emailElement.className = `${STYLES.link.emphasized}`;
+  return emailElement;
+};
+const icon = (data) => {
+  if (data.icon || data.kind) {
+    const iconElement = document.createElement("span");
+    iconElement.dataset.kind = data.kind || "default";
+    setIcon(iconElement, data.icon || data.kind, "text-kind-default");
+    return iconElement;
+  }
+  return null;
+};
+const iconLabel = ({
+  icon: iconName,
+  kind = null,
+  content,
+  classes = "",
+  iconClasses = ""
+}) => {
+  const container = document.createElement("span");
+  container.className = `${STYLES.iconLabel.wrapper} ${classes}`.trim();
+  if (iconName && iconDefinition(iconName)) {
+    const iconElement = document.createElement("span");
+    if (kind) iconElement.dataset.kind = kind;
+    setIcon(
+      iconElement,
+      iconName,
+      `${STYLES.iconLabel.icon} ${iconClasses}`.trim()
+    );
+    container.appendChild(iconElement);
+  }
+  if (typeof content === "string") {
+    container.appendChild(document.createTextNode(content));
+  } else if (content) {
+    container.appendChild(content);
+  }
+  return container;
+};
+const name = (data) => {
+  const kind = data.kind || data.index || data.type;
+  const container = document.createElement("span");
+  container.className = STYLES.entity.name.wrapper;
+  const name2 = document.createElement(data.link ? "a" : "span");
+  name2.dataset.kind = String(kind);
+  name2.textContent = data.name ?? null;
+  if (name2.tagName === "A") {
+    name2.setAttribute("href", url(data).href);
+    name2.className = `${STYLES.link.emphasized}`;
+  } else {
+    name2.className = "text-kind-default font-semibold";
+  }
+  const parentDetails = entityParent(data.parent);
+  if (parentDetails) {
+    const parent = container.appendChild(document.createElement("span"));
+    parent.dataset.kind = String(parentDetails.kind);
+    parent.className = `text-kind-default font-medium ${STYLES.entity.name.parent}`;
+    const parentName = parent.appendChild(document.createElement("span"));
+    parentName.textContent = parentDetails.name ?? null;
+    const separator = parent.appendChild(document.createElement("span"));
+    separator.setAttribute("aria-hidden", "true");
+    separator.className = STYLES.entity.name.separator;
+    separator.textContent = "/";
+    container.appendChild(document.createElement("wbr"));
+  }
+  container.appendChild(name2);
+  return container;
+};
+const text = (data) => {
+  const { kind = "default", text: text2 } = data;
+  const textElement = document.createElement("span");
+  textElement.dataset.kind = kind;
+  textElement.className = "text-kind-default";
+  textElement.textContent = text2 ?? null;
+  return textElement;
+};
+const working = (button, newText) => {
+  const iconWrapper = document.createElement("span");
+  iconWrapper.dataset.role = "icon";
+  iconWrapper.dataset.visible = "true";
+  iconWrapper.appendChild(createIcon("spinner"));
+  const textElement = document.createElement("span");
+  textElement.dataset.role = "text";
+  textElement.textContent = newText;
+  button.replaceChildren(iconWrapper, textElement);
+};
+const formatting = {
+  date,
+  time,
+  tel,
+  url,
+  email,
+  icon,
+  iconLabel,
+  name,
+  text,
+  working
+};
+
+const buttonContents = (icon, text) => {
+  if (icon && text) {
+    return formatting.iconLabel({
+      icon,
+      content: text
+    });
+  }
+  if (icon) {
+    const iconElt = document.createElement("span");
+    setIcon(iconElt, icon);
+    return iconElt;
+  }
+  const textElt = document.createElement("span");
+  textElt.textContent = text;
+  return textElt;
+};
+const submit = (attributes) => {
+  return button({
+    type: "submit",
+    style: STYLES.button.submit,
+    ...attributes
+  });
+};
+const button = (attributes) => {
+  const {
+    text = "",
+    type = "button",
+    icon = null,
+    style = STYLES.button.submit,
+    kind = null,
+    role = null,
+    data = {},
+    classes = []
+  } = attributes;
+  const buttonElt = document.createElement("button");
+  buttonElt.type = type;
+  buttonElt.className = style;
+  if (icon || text) buttonElt.appendChild(buttonContents(icon, text));
+  if (kind) buttonElt.dataset.kind = kind;
+  if (role) buttonElt.dataset.role = role;
+  for (const [k, v] of Object.entries(data)) {
+    if (v != null) buttonElt.dataset[k] = String(v);
+  }
+  if (classes.length > 0) {
+    buttonElt.classList.add(...classes);
+  }
+  return buttonElt;
+};
+const active = (attributes) => {
+  const buttonElt = attributes.existingButton || button(attributes);
+  const {
+    defaultText = attributes.defaultText || attributes.text || buttonElt.textContent,
+    processingText = attributes.processingText || false,
+    processingIcon = attributes.processingIcon || "spinner",
+    completedText = attributes.completedText || attributes.text || buttonElt.textContent,
+    completedIcon = attributes.completedIcon || attributes.icon
+  } = attributes;
+  const setState = (icon, text) => {
+    let textElt = buttonElt.querySelector("[data-role='text']");
+    if (!textElt) {
+      textElt = document.createElement("span");
+      textElt.dataset.role = "text";
+      buttonElt.replaceChildren(textElt);
+    }
+    textElt.textContent = text;
+    let iconElt = buttonElt.querySelector("[data-role='icon']");
+    if (!iconElt) {
+      iconElt = document.createElement("span");
+      iconElt.dataset.role = "icon";
+      iconElt.setAttribute("aria-hidden", "true");
+      buttonElt.prepend(iconElt);
+    }
+    if (icon) {
+      iconElt.replaceChildren(createIcon(icon));
+      iconElt.dataset.visible = "true";
+    } else {
+      iconElt.replaceChildren();
+      iconElt.dataset.visible = "false";
+    }
+  };
+  setState(attributes.icon, defaultText);
+  return {
+    element: buttonElt,
+    activate: (activeText = null, kind = null) => {
+      buttonElt.disabled = true;
+      const text = activeText || processingText || defaultText;
+      if (kind) buttonElt.dataset.kind = kind;
+      setState(processingIcon, text);
+    },
+    deactivate: (inactiveText = null, kind = null) => {
+      buttonElt.disabled = false;
+      const text = inactiveText || completedText || defaultText;
+      if (kind) buttonElt.dataset.kind = kind;
+      setState(completedIcon, text);
+    }
+  };
+};
+const buttons = {
+  default: button,
+  submit,
+  active
+};
+
+export { buttons as b, formatting as f, primitives as p };

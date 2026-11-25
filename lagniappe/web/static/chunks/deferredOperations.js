@@ -1,2 +1,381 @@
-import{r as w}from"./forms.js?v=b9ad6d22";import{w as y,c as _}from"./foundation.js?v=b9ad6d22";import{c as S}from"./ui-resources.js?v=b9ad6d22";import"./ui-controls.js?v=b9ad6d22";import"./modal.js?v=b9ad6d22";import"./upstreamUnavailable.js?v=b9ad6d22";import"./connectivity.js?v=b9ad6d22";import"./combobox.js?v=b9ad6d22";function v(n){return typeof n=="number"?n:typeof n=="string"&&/^(0|[1-9][0-9]*)$/.test(n)?Number(n):n}function f(n){return Number.isInteger(n)}function k(n){const e=Math.max(Number(n)||0,0);if(e<10)return"just now";if(e<60)return`${Math.floor(e)} seconds`;const r=Math.floor(e/60);return r<60?`${r} min`:`${Math.floor(r/60)} hr ${r%60} min`}function h(n){return Array.from(document.querySelectorAll("[data-operation]")).filter(e=>e.dataset.operation===n)}function x(n){if(!n||n.isConnected===!1||n.closest?.("[hidden], .hidden, [data-visible='false']"))return!1;const e=n.getClientRects?.();return e?e.length>0:!0}function A(n,e){if(n.dataset.widget!=="TaskForm"||!n.dataset.operationBootstrap||!n.dataset.formState||e?.type!=="autofill"||!e.terminal)return!1;try{const r=JSON.parse(n.dataset.formState);return r.operation?.key===e.key&&r.operation?.revision===e.revision&&(e.status!=="succeeded"||r.reviews?.some(t=>t.operation===e.key))}catch{return!1}}class C{constructor(e){this.view=e,this.operations=new Map,this.destroyed=!1,this.ignored=new Set,this.unsubscribers=new Map}init(){return this.scan(),this}scan(e=document){const r=Array.from(e.querySelectorAll?.("[data-operation]")||[]);"matches"in e&&e.matches?.("[data-operation]")&&r.unshift(e);const t=new Set,a=new Set;for(const i of r){if(e===document&&i.dataset.widget==="TaskForm"&&i._lp_widget?.visible!==!0)continue;const d=i.dataset.operation;if(!d)continue;const s=v(i.dataset.operationRevision),o=i.dataset.operationBootstrap?JSON.parse(i.dataset.operationBootstrap):i.dataset.operationStatus?{key:d,revision:s,status:i.dataset.operationStatus,phase:i.dataset.operationPhase||"unknown",phase_label:i.dataset.operationPhaseLabel||"Working",elapsed_seconds:Number(i.dataset.operationElapsed)||0,recovering:i.dataset.operationRecovering==="true",terminal:i.dataset.operationTerminal==="true",...i.dataset.operationError?{error:i.dataset.operationError}:{}}:null;if(A(i,o))continue;this.track(d,{revision:s,node:i,immediate:!1,status:o})&&(a.add(d),o?.terminal&&t.add(o.key))}this._refreshCachedStatuses(a),t.size&&this.view.PollingCoordinator?.trigger(Array.from(t,i=>`operation:${i}`))}resumeTaskForm(e){if(e?.dataset.widget!=="TaskForm")return;this.scan(e);const r=e.dataset.operation;r&&this.operations.has(r)&&e.dataset.operationTerminal!=="true"&&this.view.PollingCoordinator?.trigger(`operation:${r}`)}suspendTaskForm(e){if(e?.dataset.widget!=="TaskForm")return;const r=e.dataset.operation;!r||h(r).some(t=>t!==e&&t._lp_widget?.visible===!0)||(this.operations.delete(r),this.unsubscribers.get(r)?.(),this.unsubscribers.delete(r))}track(e,{revision:r=0,node:t=null,immediate:a=!0,status:i=null}={}){if(this.destroyed||!e||this.ignored.has(e))return!1;const d=t?.dataset?.deferredStatus==="false"?null:t,s=d?.dataset?.operation;s&&s!==e&&!h(s).some(b=>b!==d)&&(this.operations.delete(s),this.unsubscribers.get(s)?.(),this.unsubscribers.delete(s),this._ignore(s)),d&&(d.dataset.operation=e),d&&d.dataset.pending!=="false"&&!i?.terminal&&y(()=>this.decorate(d,e),{label:"deferred-operation:decorate"});const o=this.operations.get(e),l=v(r??o?.revision??0),c=f(l)?Math.max(f(o?.revision)?o.revision:0,l):l,u=i&&(!o?.status||l>o.revision)?{status:{...i},receivedAt:Date.now()}:o;this.operations.set(e,{...u,revision:c});const p=this.view.PollingCoordinator;this.view.hidden&&this.view.blurred&&p?.blur(this.view.blurredAt??Date.now());let m=!1;if(!this.unsubscribers.has(e)){const b=p?.subscribe({id:`operation:${e}`,type:"operation",key:e,revision:i?.terminal?Math.max(Number(c)-1,0):typeof c=="number"?c:NaN},{mode:"periodic",initial:"scheduled",whileBlurred:()=>this.visible(e),onResult:async g=>{if(g.status==="changed"&&g.payload)return await this.receive(g.payload);g.status==="error"||g.status==="unavailable"?this._renderStatusDelay([e]):this._refreshCachedStatuses([e])}});b&&(this.unsubscribers.set(e,b),m=!0)}return a&&m&&p?.trigger(`operation:${e}`),m||p?.reschedule?.(),!0}visible(e){return this.operations.has(e)&&h(e).some(x)}decorate(e,r){if(!e||!r)return;if(e.dataset.operation=r,e.dataset.formState&&e.dataset.operationScope!=="form-change"){e._lp_widget&&w(e._lp_widget);return}if(e.dataset.deferredLock==="form"){e.setAttribute("aria-busy","true");for(const m of e.querySelectorAll("input, textarea, select, button"))m.disabled=!0}if(e.querySelector("[data-role='deferred-phase']"))return;const a=e.querySelector("[data-role='autofill']"),i=e.querySelector("[data-role='submit-group']"),d=e.querySelector("[data-role='autofill-submit-group']"),s=a&&i||d,o=document.createElement("p");o.dataset.role="deferred-progress",o.className=s?"flex min-h-10 items-center justify-center gap-2 rounded-md bg-kind-default px-4 py-2 text-sm font-semibold text-white shadow-sm":"mt-2 text-sm text-base-medium",o.setAttribute("aria-live","polite");const l=S("spinner");l.setAttribute("aria-hidden","true");const c=document.createElement("span");c.dataset.role="deferred-phase",c.textContent=e.dataset.operationPhaseLabel||(e.dataset.operationScope==="form-change"?"Schema migration in progress":s?"Autofill queued":"Waiting to start");const u=document.createElement("span");u.setAttribute("aria-hidden","true"),u.textContent=" \xB7 ";const p=document.createElement("span");p.dataset.role="deferred-elapsed",p.textContent="just now",s?(o.append(l,c,u,p),s.replaceWith(o),a&&a!==s&&a.remove()):(o.append(c,u,p),e.append(o))}nudge(e,r=null){const t=e?this.operations.get(e):null,a=r==null?r:v(r);return t&&f(a)&&f(t.revision)&&a<t.revision||e&&!this.track(e,{revision:a})?!1:(this.view.PollingCoordinator?.trigger(e?`operation:${e}`:null),!0)}async poll(){return this.view.PollingCoordinator?.trigger(Array.from(this.operations.keys(),e=>`operation:${e}`))}async receive(e){if(this.destroyed||!e?.key||!this.operations.has(e.key))return!1;const r=this.operations.get(e.key),t=v(e.revision);if(!f(t)||t<0)return _(new TypeError("Invalid deferred operation revision."),this.view.elt,{context:"polling-operation-payload"}),!1;const a=r?.revision;if(!f(a)||a<0||t<a)return!1;if(this.operations.set(e.key,{revision:t,status:{...e},receivedAt:Date.now()}),this._render(e),window.dispatchEvent(new CustomEvent("deferred-operation",{detail:{...e}})),e.terminal){let i=!0;try{(this.view.EditWatcher||await this.view.ensureEditWatcher?.())?.expectDeferredCompletion?.(e.entity_key,e.key),await this.view.reconcileChange?.({type:"deferred-complete",key:e.entity_key,source_widget:e.source_widget,destination:e.destination,deferred_revision:`${e.key}:${t}`}),e.type==="autofill"&&e.status==="succeeded"&&(i=!h(e.key).some(s=>{const o=s._lp_widget;return o?.visible===!0&&o.component?.active===o&&!o._reviewedOperations?.has(e.key)&&!o.reviewState?.stale_autofill&&!o.reviewState?.reviews?.some(l=>l.operation===e.key)}))}catch{i=!1}return i?(this.operations.delete(e.key),this.unsubscribers.get(e.key)?.(),this.unsubscribers.delete(e.key),this._ignore(e.key)):this._renderStatusDelay([e.key]),i}return!0}_render(e,r=e.elapsed_seconds){for(const t of h(e.key)){e.type==="autofill"&&t._lp_widget&&w(t._lp_widget,{...e,elapsed_seconds:r}),delete t.dataset.operationBootstrap,t.dataset.operationRevision=String(e.revision),t.dataset.operationStatus=e.status||"unknown",t.dataset.operationPhase=e.phase||"unknown",t.dataset.operationPhaseLabel=e.phase_label||"Working",t.dataset.operationElapsed=String(r||0),t.dataset.operationRecovering=e.recovering?"true":"false",e.error?t.dataset.operationError=e.error:delete t.dataset.operationError,t.dataset.operationTerminal=e.terminal?"true":"false";const a=t.querySelector("[data-role='deferred-phase']");a&&(a.textContent=e.error?`${e.phase_label}: ${e.error}`:e.recovering?`${e.phase_label}. Taking longer than expected.`:e.phase_label??null);const i=t.querySelector("[data-role='deferred-elapsed']");i&&(i.textContent=k(r))}}_refreshCachedStatuses(e=Array.from(this.operations.keys())){for(const r of e){const t=this.operations.get(r);if(!t?.status)continue;const a=(Number(t.status.elapsed_seconds)||0)+Math.max(Math.floor((Date.now()-t.receivedAt)/1e3),0);this._render(t.status,a)}}_renderStatusDelay(e=Array.from(this.operations.keys())){for(const r of e)for(const t of h(r)){const a=t.querySelector("[data-role='deferred-phase']");a&&(a.textContent="Status check delayed. Retrying.")}}_ignore(e){if(e&&(this.ignored.add(e),this.ignored.size>100)){const r=this.ignored.values().next();r.done||this.ignored.delete(r.value)}}destroy(){this.destroyed=!0;for(const e of this.unsubscribers.values())e();this.unsubscribers.clear(),this.operations.clear(),this.ignored.clear()}}export{C as DeferredOperationManager};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as renderReviewBar } from './forms.js?v=b6ea3fe0';
+import { w as withTransition, c as captureError } from './foundation.js?v=b6ea3fe0';
+import { c as createIcon } from './ui-resources.js?v=b6ea3fe0';
+import './ui-controls.js?v=b6ea3fe0';
+import './modal.js?v=b6ea3fe0';
+import './upstreamUnavailable.js?v=b6ea3fe0';
+import './connectivity.js?v=b6ea3fe0';
+import './combobox.js?v=b6ea3fe0';
+
+function operationRevision(value) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) {
+    return Number(value);
+  }
+  return value;
+}
+function isInteger(value) {
+  return Number.isInteger(value);
+}
+function elapsedLabel(value) {
+  const seconds = Math.max(Number(value) || 0, 0);
+  if (seconds < 10) return "just now";
+  if (seconds < 60) return `${Math.floor(seconds)} seconds`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} hr ${minutes % 60} min`;
+}
+function operationNodes(key) {
+  return Array.from(
+    document.querySelectorAll("[data-operation]")
+  ).filter((node) => node.dataset.operation === key);
+}
+function operationNodeVisible(node) {
+  if (!node || node.isConnected === false) return false;
+  if (node.closest?.("[hidden], .hidden, [data-visible='false']")) return false;
+  const rects = node.getClientRects?.();
+  return rects ? rects.length > 0 : true;
+}
+function completedAutofillInMarkup(node, status) {
+  if (node.dataset.widget !== "TaskForm" || !node.dataset.operationBootstrap || !node.dataset.formState || status?.type !== "autofill" || !status.terminal)
+    return false;
+  try {
+    const state = JSON.parse(node.dataset.formState);
+    return state.operation?.key === status.key && state.operation?.revision === status.revision && (status.status !== "succeeded" || state.reviews?.some((review) => review.operation === status.key));
+  } catch {
+    return false;
+  }
+}
+class DeferredOperationManager {
+  constructor(view) {
+    this.view = view;
+    this.operations = /* @__PURE__ */ new Map();
+    this.destroyed = false;
+    this.ignored = /* @__PURE__ */ new Set();
+    this.unsubscribers = /* @__PURE__ */ new Map();
+  }
+  init() {
+    this.scan();
+    return this;
+  }
+  scan(root = document) {
+    const nodes = Array.from(
+      root.querySelectorAll?.("[data-operation]") || []
+    );
+    if ("matches" in root && root.matches?.("[data-operation]"))
+      nodes.unshift(root);
+    const terminalKeys = /* @__PURE__ */ new Set();
+    const scannedKeys = /* @__PURE__ */ new Set();
+    for (const node of nodes) {
+      if (root === document && node.dataset.widget === "TaskForm" && node._lp_widget?.visible !== true)
+        continue;
+      const key = node.dataset.operation;
+      if (!key) continue;
+      const revision = operationRevision(node.dataset.operationRevision);
+      const status = node.dataset.operationBootstrap ? JSON.parse(node.dataset.operationBootstrap) : node.dataset.operationStatus ? {
+        key,
+        revision,
+        status: node.dataset.operationStatus,
+        phase: node.dataset.operationPhase || "unknown",
+        phase_label: node.dataset.operationPhaseLabel || "Working",
+        elapsed_seconds: Number(node.dataset.operationElapsed) || 0,
+        recovering: node.dataset.operationRecovering === "true",
+        terminal: node.dataset.operationTerminal === "true",
+        ...node.dataset.operationError ? { error: node.dataset.operationError } : {}
+      } : null;
+      if (completedAutofillInMarkup(node, status)) continue;
+      const tracked = this.track(key, {
+        revision,
+        node,
+        immediate: false,
+        status
+      });
+      if (tracked) {
+        scannedKeys.add(key);
+        if (status?.terminal) terminalKeys.add(status.key);
+      }
+    }
+    this._refreshCachedStatuses(scannedKeys);
+    if (terminalKeys.size) {
+      this.view.PollingCoordinator?.trigger(
+        Array.from(terminalKeys, (key) => `operation:${key}`)
+      );
+    }
+  }
+  resumeTaskForm(node) {
+    if (node?.dataset.widget !== "TaskForm") return;
+    this.scan(node);
+    const key = node.dataset.operation;
+    if (key && this.operations.has(key) && node.dataset.operationTerminal !== "true") {
+      this.view.PollingCoordinator?.trigger(`operation:${key}`);
+    }
+  }
+  suspendTaskForm(node) {
+    if (node?.dataset.widget !== "TaskForm") return;
+    const key = node.dataset.operation;
+    if (!key || operationNodes(key).some(
+      (other) => other !== node && other._lp_widget?.visible === true
+    ))
+      return;
+    this.operations.delete(key);
+    this.unsubscribers.get(key)?.();
+    this.unsubscribers.delete(key);
+  }
+  track(key, {
+    revision = 0,
+    node = null,
+    immediate = true,
+    status = null
+  } = {}) {
+    if (this.destroyed || !key || this.ignored.has(key)) return false;
+    const decorationNode = node?.dataset?.deferredStatus === "false" ? null : node;
+    const previous = decorationNode?.dataset?.operation;
+    if (previous && previous !== key && !operationNodes(previous).some((node2) => node2 !== decorationNode)) {
+      this.operations.delete(previous);
+      this.unsubscribers.get(previous)?.();
+      this.unsubscribers.delete(previous);
+      this._ignore(previous);
+    }
+    if (decorationNode) decorationNode.dataset.operation = key;
+    if (decorationNode && decorationNode.dataset.pending !== "false" && !status?.terminal) {
+      void withTransition(() => this.decorate(decorationNode, key), {
+        label: "deferred-operation:decorate"
+      });
+    }
+    const current = this.operations.get(key);
+    const incomingRevision = operationRevision(
+      revision ?? current?.revision ?? 0
+    );
+    const resolvedRevision = isInteger(incomingRevision) ? Math.max(
+      isInteger(current?.revision) ? current.revision : 0,
+      incomingRevision
+    ) : incomingRevision;
+    const latest = status && (!current?.status || incomingRevision > current.revision) ? { status: { ...status }, receivedAt: Date.now() } : current;
+    this.operations.set(key, { ...latest, revision: resolvedRevision });
+    const polling = this.view.PollingCoordinator;
+    if (this.view.hidden && this.view.blurred) {
+      polling?.blur(this.view.blurredAt ?? Date.now());
+    }
+    let subscribed = false;
+    if (!this.unsubscribers.has(key)) {
+      const unsubscribe = polling?.subscribe(
+        {
+          id: `operation:${key}`,
+          type: "operation",
+          key,
+          // A terminal HTML seed is not an acknowledgement of destination
+          // reconciliation. Keep its cursor behind until receive succeeds.
+          revision: status?.terminal ? Math.max(Number(resolvedRevision) - 1, 0) : typeof resolvedRevision === "number" ? resolvedRevision : NaN
+        },
+        {
+          mode: "periodic",
+          initial: "scheduled",
+          whileBlurred: () => this.visible(key),
+          onResult: async (result) => {
+            if (result.status === "changed" && result.payload) {
+              return await this.receive(result.payload);
+            } else if (result.status === "error" || result.status === "unavailable") {
+              this._renderStatusDelay([key]);
+            } else {
+              this._refreshCachedStatuses([key]);
+            }
+          }
+        }
+      );
+      if (unsubscribe) {
+        this.unsubscribers.set(key, unsubscribe);
+        subscribed = true;
+      }
+    }
+    if (immediate && subscribed) {
+      polling?.trigger(`operation:${key}`);
+    }
+    if (!subscribed) polling?.reschedule?.();
+    return true;
+  }
+  visible(key) {
+    return this.operations.has(key) && operationNodes(key).some(operationNodeVisible);
+  }
+  decorate(node, key) {
+    if (!node || !key) return;
+    node.dataset.operation = key;
+    if (node.dataset.formState && node.dataset.operationScope !== "form-change") {
+      if (node._lp_widget) renderReviewBar(node._lp_widget);
+      return;
+    }
+    const formLocked = node.dataset.deferredLock === "form";
+    if (formLocked) {
+      node.setAttribute("aria-busy", "true");
+      for (const control of node.querySelectorAll("input, textarea, select, button")) {
+        control.disabled = true;
+      }
+    }
+    if (node.querySelector("[data-role='deferred-phase']")) return;
+    const autofill = node.querySelector("[data-role='autofill']");
+    const submitGroup = node.querySelector("[data-role='submit-group']");
+    const autofillSubmitGroup = node.querySelector(
+      "[data-role='autofill-submit-group']"
+    );
+    const autofillTarget = autofill && submitGroup || autofillSubmitGroup;
+    const progress = document.createElement("p");
+    progress.dataset.role = "deferred-progress";
+    progress.className = autofillTarget ? "flex min-h-10 items-center justify-center gap-2 rounded-md bg-kind-default px-4 py-2 text-sm font-semibold text-white shadow-sm" : "mt-2 text-sm text-base-medium";
+    progress.setAttribute("aria-live", "polite");
+    const icon = createIcon("spinner");
+    icon.setAttribute("aria-hidden", "true");
+    const phase = document.createElement("span");
+    phase.dataset.role = "deferred-phase";
+    phase.textContent = node.dataset.operationPhaseLabel || (node.dataset.operationScope === "form-change" ? "Schema migration in progress" : autofillTarget ? "Autofill queued" : "Waiting to start");
+    const separator = document.createElement("span");
+    separator.setAttribute("aria-hidden", "true");
+    separator.textContent = " \xB7 ";
+    const elapsed = document.createElement("span");
+    elapsed.dataset.role = "deferred-elapsed";
+    elapsed.textContent = "just now";
+    if (autofillTarget) {
+      progress.append(icon, phase, separator, elapsed);
+      autofillTarget.replaceWith(progress);
+      if (autofill && autofill !== autofillTarget) autofill.remove();
+    } else {
+      progress.append(phase, separator, elapsed);
+      node.append(progress);
+    }
+  }
+  nudge(key, revision = null) {
+    const current = key ? this.operations.get(key) : null;
+    const incomingRevision = revision === null || revision === void 0 ? revision : operationRevision(revision);
+    if (current && isInteger(incomingRevision) && isInteger(current.revision) && incomingRevision < current.revision)
+      return false;
+    if (key && !this.track(key, { revision: incomingRevision })) return false;
+    this.view.PollingCoordinator?.trigger(key ? `operation:${key}` : null);
+    return true;
+  }
+  async poll() {
+    return this.view.PollingCoordinator?.trigger(
+      Array.from(this.operations.keys(), (key) => `operation:${key}`)
+    );
+  }
+  async receive(status) {
+    if (this.destroyed || !status?.key || !this.operations.has(status.key))
+      return false;
+    const current = this.operations.get(status.key);
+    const revision = operationRevision(status.revision);
+    if (!isInteger(revision) || revision < 0) {
+      captureError(
+        new TypeError("Invalid deferred operation revision."),
+        this.view.elt,
+        {
+          context: "polling-operation-payload"
+        }
+      );
+      return false;
+    }
+    const previousRevision = current?.revision;
+    if (!isInteger(previousRevision) || previousRevision < 0) return false;
+    if (revision < previousRevision) return false;
+    this.operations.set(status.key, {
+      revision,
+      status: { ...status },
+      receivedAt: Date.now()
+    });
+    this._render(status);
+    window.dispatchEvent(
+      new CustomEvent("deferred-operation", { detail: { ...status } })
+    );
+    if (status.terminal) {
+      let reconciled = true;
+      try {
+        const editWatcher = this.view.EditWatcher || await this.view.ensureEditWatcher?.();
+        editWatcher?.expectDeferredCompletion?.(status.entity_key, status.key);
+        await this.view.reconcileChange?.({
+          type: "deferred-complete",
+          key: status.entity_key,
+          source_widget: status.source_widget,
+          destination: status.destination,
+          deferred_revision: `${status.key}:${revision}`
+        });
+        if (status.type === "autofill" && status.status === "succeeded") {
+          reconciled = !operationNodes(status.key).some((node) => {
+            const widget = node._lp_widget;
+            return widget?.visible === true && widget.component?.active === widget && !widget._reviewedOperations?.has(status.key) && !widget.reviewState?.stale_autofill && !widget.reviewState?.reviews?.some(
+              (review) => review.operation === status.key
+            );
+          });
+        }
+      } catch {
+        reconciled = false;
+      }
+      if (reconciled) {
+        this.operations.delete(status.key);
+        this.unsubscribers.get(status.key)?.();
+        this.unsubscribers.delete(status.key);
+        this._ignore(status.key);
+      } else {
+        this._renderStatusDelay([status.key]);
+      }
+      return reconciled;
+    }
+    return true;
+  }
+  _render(status, elapsedSeconds = status.elapsed_seconds) {
+    for (const node of operationNodes(status.key)) {
+      if (status.type === "autofill" && node._lp_widget) {
+        renderReviewBar(node._lp_widget, {
+          ...status,
+          elapsed_seconds: elapsedSeconds
+        });
+      }
+      delete node.dataset.operationBootstrap;
+      node.dataset.operationRevision = String(status.revision);
+      node.dataset.operationStatus = status.status || "unknown";
+      node.dataset.operationPhase = status.phase || "unknown";
+      node.dataset.operationPhaseLabel = status.phase_label || "Working";
+      node.dataset.operationElapsed = String(elapsedSeconds || 0);
+      node.dataset.operationRecovering = status.recovering ? "true" : "false";
+      if (status.error) node.dataset.operationError = status.error;
+      else delete node.dataset.operationError;
+      node.dataset.operationTerminal = status.terminal ? "true" : "false";
+      const phase = node.querySelector("[data-role='deferred-phase']");
+      if (phase) {
+        phase.textContent = status.error ? `${status.phase_label}: ${status.error}` : status.recovering ? `${status.phase_label}. Taking longer than expected.` : status.phase_label ?? null;
+      }
+      const elapsed = node.querySelector("[data-role='deferred-elapsed']");
+      if (elapsed) elapsed.textContent = elapsedLabel(elapsedSeconds);
+    }
+  }
+  _refreshCachedStatuses(keys = Array.from(this.operations.keys())) {
+    for (const key of keys) {
+      const operation = this.operations.get(key);
+      if (!operation?.status) continue;
+      const elapsed = (Number(operation.status.elapsed_seconds) || 0) + Math.max(Math.floor((Date.now() - operation.receivedAt) / 1e3), 0);
+      this._render(operation.status, elapsed);
+    }
+  }
+  _renderStatusDelay(keys = Array.from(this.operations.keys())) {
+    for (const key of keys) {
+      for (const node of operationNodes(key)) {
+        const phase = node.querySelector("[data-role='deferred-phase']");
+        if (phase) phase.textContent = "Status check delayed. Retrying.";
+      }
+    }
+  }
+  _ignore(key) {
+    if (!key) return;
+    this.ignored.add(key);
+    if (this.ignored.size > 100) {
+      const oldest = this.ignored.values().next();
+      if (!oldest.done) this.ignored.delete(oldest.value);
+    }
+  }
+  destroy() {
+    this.destroyed = true;
+    for (const unsubscribe of this.unsubscribers.values()) unsubscribe();
+    this.unsubscribers.clear();
+    this.operations.clear();
+    this.ignored.clear();
+  }
+}
+
+export { DeferredOperationManager };

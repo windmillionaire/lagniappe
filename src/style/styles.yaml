@@ -234,6 +234,14 @@ dropdown:
     classes: p-1 scrollbar-thin scrollbar-thumb-base-light scrollbar-track-transparent absolute z-50 hidden max-h-96 min-w-64 overflow-y-auto rounded-md bg-white shadow-lg outline outline-base-light/50
     intent: panel presentation within dropdown
     surfaces: [frontend]
+  empty:
+    classes: px-3 py-2.5 text-sm italic text-base-medium
+    intent: non-interactive empty-state status row inside a dropdown popover
+    surfaces: [frontend]
+  emptyWithAction:
+    classes: mt-1 border-t border-base-light/50 px-3 py-2.5 text-sm italic text-base-medium
+    intent: non-interactive empty-state status row below an action option inside a dropdown popover
+    surfaces: [frontend]
   history:
     classes: text-left px-3 py-1.5 rounded-sm hover:bg-base-bg w-full
     intent: history presentation within dropdown
@@ -673,18 +681,39 @@ home:
     intent: section presentation within home
     surfaces: [server]
   toggle:
-    classes: flex w-full flex-row items-center gap-2 rounded-md bg-white hover:bg-kind-bg px-2.5 py-1.5 font-semibold text-base-dark shadow-sm outline focus-visible:outline-kind-default hover:outline-kind-default outline-base-light/50 hover:outline-2 focus-visible:outline-2
+    classes: flex w-full flex-row items-center gap-2 rounded-md bg-white hover:bg-kind-bg px-2.5 py-1.5 font-semibold text-base-dark shadow-sm outline focus-visible:outline-kind-default hover:outline-kind-default outline-base-light/50 hover:outline-2 focus-visible:outline-2 group/toggle
     intent: toggle presentation within home
     surfaces: [server]
+    markers: [group/toggle]
   toggleLabel:
     classes: flex min-w-0 flex-1 items-center gap-2 text-left
     intent: full-width Home toggle label with a vertically centered leading icon
     surfaces: [server]
   listToggle:
-    classes: flex w-full flex-row items-center gap-2 rounded-md bg-white hover:bg-kind-bg px-2.5 py-1.5 font-semibold text-base-dark shadow-sm outline focus-visible:outline-kind-default hover:outline-kind-default outline-base-light/50 hover:outline-2 focus-visible:outline-2 group/list-toggle
+    classes: flex w-full flex-row items-center gap-2 rounded-md bg-white hover:bg-kind-bg px-2.5 py-1.5 font-semibold text-base-dark shadow-sm outline focus-visible:outline-kind-default hover:outline-kind-default outline-base-light/50 hover:outline-2 focus-visible:outline-2 group/list-toggle group/toggle
     intent: home list toggle that exposes loading-state descendants
     surfaces: [server]
-    markers: [group/list-toggle]
+    markers: [group/list-toggle, group/toggle]
+  expandIndicator:
+    classes: shrink-0 text-base-medium transition-transform duration-150 motion-reduce:transition-none group-aria-expanded/toggle:rotate-180
+    intent: trailing disclosure chevron on expandable Home sections that rotates when open
+    surfaces: [server]
+  linkIndicator:
+    classes: shrink-0 text-base-medium
+    intent: trailing directional arrow distinguishing direct Home navigation links from expandable sections
+    surfaces: [server]
+  taskFeedback:
+    classes: flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-md border border-kind-light bg-kind-bg px-3 py-2 text-sm text-base-dark
+    intent: inline confirmation banner inside Home tasks when a personal task is saved outside the near-term list
+    surfaces: [server]
+  taskFeedbackLink:
+    classes: shrink-0 font-semibold text-kind-dark hover:underline focus-visible:underline
+    intent: action link inside the Home task confirmation banner pointing to My Page tasks
+    surfaces: [server]
+  taskFeedbackDismiss:
+    classes: grid size-6 shrink-0 place-items-center rounded-sm text-base-medium hover:bg-white/70 hover:text-base-dark focus-visible:outline-2 focus-visible:outline-kind-default
+    intent: dismiss control for the Home task confirmation banner
+    surfaces: [server]
   view:
     classes: grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 w-full p-4 sm:pb-0 sm:pt-6 lg:pt-8 sm:px-6 lg:px-8 mx-auto max-w-7xl
     intent: view presentation within home
@@ -762,6 +791,10 @@ note:
     classes: grid size-7 shrink-0 place-items-center rounded-md text-base-medium hover:bg-white hover:text-delete-default focus-visible:outline-2 focus-visible:outline-delete-default
     intent: local discard control for an unsynced Home note
     surfaces: [frontend]
+  empty:
+    classes: rounded-sm border border-dashed border-note-light/80 bg-note-bg/40 px-4 py-3 text-sm italic text-base-medium
+    intent: empty-state hint shown in the Home notes list when no notes exist
+    surfaces: [server, frontend]
 
 icon:
   default:
@@ -1123,6 +1156,29 @@ message:
   intent: shared presentation for the message UI role
   surfaces: [server, frontend]
 
+messages:
+  sidebarEmpty:
+    classes: px-6 py-4 text-sm italic text-base-medium
+    intent: empty-state hint inside the Messages conversation sidebar
+    surfaces: [frontend]
+  empty:
+    container:
+      classes: flex flex-1 flex-col items-center justify-center gap-2 py-12 px-4 text-center
+      intent: centered empty-state wrapper inside the Messages history pane
+      surfaces: [frontend]
+    title:
+      classes: text-base font-semibold text-base-dark
+      intent: empty-state heading inside the Messages history pane
+      surfaces: [frontend]
+    body:
+      classes: max-w-sm text-sm text-base-medium
+      intent: empty-state explanation inside the Messages history pane
+      surfaces: [frontend]
+    action:
+      classes: mt-2 inline-flex items-center gap-1.5 rounded-md bg-user-default px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-user-dark hover:outline-2 hover:outline-offset-2 hover:outline-user-dark focus-visible:bg-user-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-dark
+      intent: primary call-to-action button inside the Messages empty pane
+      surfaces: [frontend]
+
 modal:
   wrapper:
     classes: fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-100
@@ -1362,6 +1418,27 @@ table:
         classes: "[grid-area:1/1] invisible text-kind-default group-data-[sorting=true]/header:visible hover:text-delete-default"
         intent: clear-filter action shown on actively filtered table columns
         surfaces: [server]
+  loading:
+    cell:
+      classes: py-3 px-4 sm:px-0
+      intent: full-width container cell for delayed entity index loading skeleton
+      surfaces: [frontend]
+    list:
+      classes: flex flex-col gap-3 animate-pulse motion-reduce:animate-none
+      intent: stacked shimmer rows shown when an entity index load exceeds the grace delay
+      surfaces: [frontend]
+    item:
+      classes: flex items-center justify-between gap-4 py-1
+      intent: single placeholder row within an entity index loading skeleton
+      surfaces: [frontend]
+    barPrimary:
+      classes: h-4 w-2/5 max-w-64 rounded bg-base-light/50
+      intent: primary title shimmer bar within an entity index loading skeleton
+      surfaces: [frontend]
+    barSecondary:
+      classes: h-3.5 w-24 rounded bg-base-bg
+      intent: secondary metadata shimmer bar within an entity index loading skeleton
+      surfaces: [frontend]
 
 task:
   actionIconContext:

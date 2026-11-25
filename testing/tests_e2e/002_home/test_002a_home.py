@@ -156,6 +156,63 @@ def test_directory_list(get_admin, get_user):
     expect(directory_list).to_be_hidden()
 
 
+# @template home/home.html::main
+def test_home_row_affordances_and_section_persistence(get_admin, get_user):
+    """
+    Verify Home distinguishes links from accordions and remembers open sections.
+
+    Direct links render a trailing right arrow, expandable sections render a
+    rotating disclosure chevron synchronized with aria-expanded, and the
+    user's open sections persist across reloads via localStorage.
+    """
+    user = get_admin()
+    home = user.go(SitePages.HOME)
+
+    for link_selector in (home.USER_PAGE_BUTTON, home.MANUAL_BUTTON):
+        link = user.locate(link_selector)
+        expect(link.locator("span.icon[data-icon='right']")).to_be_visible()
+        expect(link.locator("span.icon[data-icon='down']")).to_have_count(0)
+
+    accordion_toggles = (
+        home.PAGE_LIST_TOGGLE,
+        home.NOTE_LIST_TOGGLE,
+        home.TASK_LIST_TOGGLE,
+        home.PROJECT_LIST_TOGGLE,
+        home.CATEGORY_LIST_TOGGLE,
+        home.STARRED_LIST_TOGGLE,
+        home.DIRECTORY_LIST_TOGGLE,
+    )
+    for toggle_selector in accordion_toggles:
+        toggle = user.locate(toggle_selector)
+        expect(toggle.locator("span.icon[data-icon='down']")).to_be_visible()
+        expect(toggle.locator("span.icon[data-icon='right']")).to_have_count(0)
+
+    directory_toggle = user.locate(home.DIRECTORY_LIST_TOGGLE)
+    directory_list = user.locate(home.DIRECTORY_LIST)
+    expect(directory_toggle).to_have_attribute("aria-expanded", "false")
+    expect(directory_list).to_be_hidden()
+
+    directory_toggle.click()
+    expect(directory_list).to_be_visible()
+    expect(directory_toggle).to_have_attribute("aria-expanded", "true")
+
+    reloaded_home = user.go(SitePages.HOME)
+    reloaded_toggle = user.locate(reloaded_home.DIRECTORY_LIST_TOGGLE)
+    reloaded_list = user.locate(reloaded_home.DIRECTORY_LIST)
+    expect(reloaded_list).to_be_visible()
+    expect(reloaded_toggle).to_have_attribute("aria-expanded", "true")
+
+    reloaded_toggle.click()
+    expect(reloaded_list).to_be_hidden()
+    expect(reloaded_toggle).to_have_attribute("aria-expanded", "false")
+
+    closed_home = user.go(SitePages.HOME)
+    expect(user.locate(closed_home.DIRECTORY_LIST)).to_be_hidden()
+    expect(user.locate(closed_home.DIRECTORY_LIST_TOGGLE)).to_have_attribute(
+        "aria-expanded", "false"
+    )
+
+
 def test_tasks_prefetch(get_admin, get_user):
     """
     Verify tasks are prefetched on page load.

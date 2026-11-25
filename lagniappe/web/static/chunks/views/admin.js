@@ -1,2 +1,15 @@
-import{E as s}from"../entity-foundation.js?v=b9ad6d22";import"../core-foundation.js?v=b9ad6d22";import"../connectivity.js?v=b9ad6d22";import"../foundation.js?v=b9ad6d22";import"../upstreamUnavailable.js?v=b9ad6d22";class a extends s{constructor(t){super(t),this._defaultTabId=t.dataset.defaultTab||"settings"}}export{a as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as Entity } from '../entity-foundation.js?v=b6ea3fe0';
+import '../core-foundation.js?v=b6ea3fe0';
+import '../connectivity.js?v=b6ea3fe0';
+import '../foundation.js?v=b6ea3fe0';
+import '../upstreamUnavailable.js?v=b6ea3fe0';
+
+class Admin extends Entity {
+  constructor(node) {
+    super(node);
+    this._defaultTabId = node.dataset.defaultTab || "settings";
+  }
+}
+
+export { Admin as default };
