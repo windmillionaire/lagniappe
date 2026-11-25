@@ -602,13 +602,15 @@ def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
     )
     assert dimensions["scrollWidth"] > dimensions["clientWidth"]
 
+    anonymous.locate("[data-role='ai-assisted-install'] summary").click()
     anonymous.locate("[data-role='delegated-owner-checklist'] summary").click()
     command_shells = anonymous.locate("[data-role='manual-command-shell']")
     shell_bounds = command_shells.evaluate_all(
         """elements => elements.map((element) => {
                 const shell = element.getBoundingClientRect();
-                const container = element.closest("[data-role='manual-card']")
-                    || element.closest("details").querySelector(":scope > div");
+                const container =
+                    element.closest("details")?.querySelector(":scope > div")
+                    || element.closest("[data-role='manual-card']");
                 const containerBounds = container.getBoundingClientRect();
                 const containerStyle = getComputedStyle(container);
                 return {
