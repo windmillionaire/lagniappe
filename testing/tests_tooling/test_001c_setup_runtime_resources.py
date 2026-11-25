@@ -3712,8 +3712,8 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
     spinner = SpinnerRecorder()
     formatter = _fake_formatter(spinner)
     monkeypatch.setattr(setup_pkg, "FORMATTER", formatter)
-    monkeypatch.setattr(gcloud, "FORMATTER", formatter)
-    monkeypatch.setattr(gcloud, "constants", constants)
+    monkeypatch.setattr(gcloud.services, "FORMATTER", formatter)
+    monkeypatch.setattr(gcloud.services, "constants", constants)
 
     calls = []
     mutations = []
@@ -3733,9 +3733,9 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
             )
         return completed_process(command)
 
-    monkeypatch.setattr(gcloud, "run_gcloud_command", run)
+    monkeypatch.setattr(gcloud.services, "run_gcloud_command", run)
     monkeypatch.setattr(
-        gcloud,
+        gcloud.services,
         "record_mutation",
         lambda *args, **kwargs: mutations.append((args, kwargs)),
     )
@@ -3761,7 +3761,7 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
             )
         return completed_process(command)
 
-    monkeypatch.setattr(gcloud, "run_gcloud_command", run_with_propagation)
+    monkeypatch.setattr(gcloud.services, "run_gcloud_command", run_with_propagation)
     assert gcloud.enable_gcloud_apis()
     assert calls == [
         (
@@ -3811,7 +3811,7 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
             stdout="\n".join(constants.REQUIRED_GOOGLE_CLOUD_APIS),
         )
 
-    monkeypatch.setattr(gcloud, "run_gcloud_command", list_enabled)
+    monkeypatch.setattr(gcloud.services, "run_gcloud_command", list_enabled)
     assert gcloud.enable_gcloud_apis()
     assert calls == [
         (
@@ -3849,8 +3849,8 @@ def test_enable_gcloud_apis_guides_maps_terms_then_retries_activation(
     spinner = SpinnerRecorder()
     formatter = _fake_formatter(spinner)
     monkeypatch.setattr(setup_pkg, "FORMATTER", formatter)
-    monkeypatch.setattr(gcloud, "FORMATTER", formatter)
-    monkeypatch.setattr(gcloud, "constants", constants)
+    monkeypatch.setattr(gcloud.services, "FORMATTER", formatter)
+    monkeypatch.setattr(gcloud.services, "constants", constants)
     provider_detail = (
         "ERROR: FAILED_PRECONDITION: The terms of service 'maps' for "
         "places.googleapis.com must be accepted. tos_id=maps "
@@ -3877,7 +3877,7 @@ def test_enable_gcloud_apis_guides_maps_terms_then_retries_activation(
         )
 
     monkeypatch.setattr(
-        gcloud,
+        gcloud.services,
         "run_gcloud_command",
         run,
     )
@@ -3894,7 +3894,7 @@ def test_enable_gcloud_apis_guides_maps_terms_then_retries_activation(
     )
     mutations = []
     monkeypatch.setattr(
-        gcloud,
+        gcloud.services,
         "record_mutation",
         lambda *args, **kwargs: mutations.append((args, kwargs)),
     )
@@ -4175,8 +4175,8 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
     )
     _install_config_package(monkeypatch, constants, settings=settings)
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
-    monkeypatch.setattr(gcloud, "FORMATTER", _fake_formatter())
-    monkeypatch.setattr(gcloud, "constants", constants)
+    monkeypatch.setattr(gcloud.jobs, "FORMATTER", _fake_formatter())
+    monkeypatch.setattr(gcloud.jobs, "constants", constants)
 
     commands = []
     iam_calls = []
@@ -4194,13 +4194,11 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
             )
         return completed_process(command)
 
-    monkeypatch.setattr(gcloud, "run_gcloud_command", fake_run)
+    monkeypatch.setattr(gcloud.jobs, "run_gcloud_command", fake_run)
     monkeypatch.setattr(
-        gcloud,
-        "configure_data_protection",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("deferred-job setup must not configure data protection")
-        ),
+        gcloud.storage,
+        "run_gcloud_command",
+        lambda *_args, **_kwargs: pytest.fail("deferred-job setup must not configure data protection"),
     )
     monkeypatch.setattr(
         gcloud.iam_access,
@@ -4321,9 +4319,9 @@ def test_setup_data_protection_contract(monkeypatch):
             return completed_process(command, stdout=json.dumps(schedules))
         return completed_process(command)
 
-    monkeypatch.setattr(gcloud, "run_gcloud_command", fake_run)
+    monkeypatch.setattr(gcloud.storage, "run_gcloud_command", fake_run)
     monkeypatch.setattr(
-        gcloud,
+        gcloud.storage,
         "record_mutation",
         lambda *args, **kwargs: mutations.append((args, kwargs)),
     )
@@ -5408,9 +5406,9 @@ def test_setup_storage_provisioning_is_bucket_scoped_and_idempotent(monkeypatch)
     settings.TEST_CONFIG = {"PREFIX": "test-"}
     _install_config_package(monkeypatch, constants, settings=settings)
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
-    monkeypatch.setattr(gcloud, "FORMATTER", _fake_formatter())
-    monkeypatch.setattr(gcloud, "constants", constants)
-    monkeypatch.setattr(gcloud, "install_if_missing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(gcloud.storage, "FORMATTER", _fake_formatter())
+    monkeypatch.setattr(gcloud.storage, "constants", constants)
+    monkeypatch.setattr(gcloud.storage, "install_if_missing", lambda *args, **kwargs: None)
     project_reconciliations = []
     monkeypatch.setattr(
         gcloud.iam_access,
@@ -5648,8 +5646,8 @@ def test_service_account_waits_for_newly_enabled_iam(monkeypatch, capsys):
 
     spinner = SpinnerRecorder()
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter(spinner))
-    monkeypatch.setattr(gcloud, "FORMATTER", _fake_formatter(spinner))
-    monkeypatch.setattr(gcloud, "install_if_missing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(gcloud.accounts, "FORMATTER", _fake_formatter(spinner))
+    monkeypatch.setattr(gcloud.accounts, "install_if_missing", lambda *args, **kwargs: None)
     delays = []
     monkeypatch.setattr(gcloud.time, "sleep", delays.append)
 
@@ -5739,8 +5737,10 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
     from installer import gcloud
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
-    monkeypatch.setattr(gcloud, "FORMATTER", _fake_formatter())
-    monkeypatch.setattr(gcloud, "install_if_missing", lambda *args, **kwargs: None)
+    formatter = _fake_formatter()
+    for resource in (gcloud.accounts, gcloud.app_engine, gcloud.jobs, gcloud.ocr):
+        monkeypatch.setattr(resource, "FORMATTER", formatter)
+        monkeypatch.setattr(resource, "install_if_missing", lambda *args, **kwargs: None)
     monkeypatch.setattr(gcloud.time, "sleep", lambda seconds: None)
 
     account = types.SimpleNamespace(
@@ -5827,7 +5827,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
         progress=lambda **kwargs: AppEngineSpinner(kwargs["text"]),
     )
     monkeypatch.setattr(
-        gcloud,
+        gcloud.app_engine,
         "FORMATTER",
         types.SimpleNamespace(initialize=lambda: app_engine_formatter),
     )
@@ -6042,8 +6042,8 @@ def test_app_engine_creation_prompt_and_bounded_failures(monkeypatch, capsys):
     spinner = SpinnerRecorder()
     formatter = _fake_formatter(spinner)
     monkeypatch.setattr(setup_pkg, "FORMATTER", formatter)
-    monkeypatch.setattr(gcloud, "FORMATTER", formatter)
-    monkeypatch.setattr(gcloud, "install_if_missing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(gcloud.app_engine, "FORMATTER", formatter)
+    monkeypatch.setattr(gcloud.app_engine, "install_if_missing", lambda *args, **kwargs: None)
 
     class AppNotFound(Exception):
         pass

@@ -144,7 +144,7 @@ unchanged when that confirmation is declined.
 | `setup_target.py` | Account/project selection, immutable `SetupTarget`, and read-only CLI authority checks. |
 | `project_bootstrap.py` | Project/billing/API preflight and separately invoked, confirmed bootstrap mutations. |
 | `commands.py` | Generic gcloud execution, prerequisite checks, and provider-error translation. |
-| `gcloud.py` | Project, billing, APIs, App Engine, runtime IAM, buckets, Tasks, OCR. |
+| `gcloud/` | Required APIs, runtime service account, App Engine, buckets, Firestore protection, Tasks, Scheduler, and OCR. |
 | `identity.py`, `admin.py`, `auth_email.py` | Identity Platform, Owner/OAuth and delegated application bootstrap, authentication email. |
 | `domain/` | App Engine mapping and Cloudflare/manual DNS. |
 | `ai.py`, `ai_email.py` | AI settings and AI email provider setup. |

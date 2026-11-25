@@ -577,6 +577,37 @@ def test_stale_gcloud_token_stops_with_setup_auth_instruction(
     assert "gcloud auth login" not in output
 
 
+def test_source_update_reloads_gcloud_api_discovery(monkeypatch):
+    import config
+    import installer
+    from installer import commands, gcloud
+
+    api = "storage.googleapis.com"
+    settings = types.SimpleNamespace(GCLOUD_CONFIG={"PROJECT": "updated-project"})
+    calls = []
+
+    def list_services(arguments, *, timeout):
+        calls.append(arguments)
+        return completed_process(arguments, stdout=api)
+
+    try:
+        with monkeypatch.context() as updated:
+            updated.setattr(config, "SETTINGS", settings)
+            updated.setattr(config.constants, "REQUIRED_GOOGLE_CLOUD_APIS", (api,))
+            updated.setattr(installer, "FORMATTER", _fake_formatter())
+            updated.setattr(commands, "GCLOUD_CLI", None)
+            updated.setattr(commands, "run_gcloud_command", list_services)
+            importlib.reload(gcloud)
+            assert gcloud.enable_gcloud_apis()
+    finally:
+        importlib.reload(gcloud)
+
+    assert {api} == settings._SETUP_ENABLED_GOOGLE_CLOUD_APIS
+    assert calls == [
+        ["services", "list", "--enabled", "--project=updated-project", "--format=value(config.name)"]
+    ]
+
+
 def test_portable_runtime_paths_commands_and_virtualenv_instructions():
     from runner import context as runner_context
 

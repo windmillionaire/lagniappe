@@ -1,10 +1,16 @@
 # Infrastructure Cloud Setup
 
-`installer/project_bootstrap.py` owns initial project, billing, and bootstrap
-API preparation; `installer/gcloud.py` owns required-API reconciliation and
-runtime resource provisioning. Both run with the selected human
-installer/deployer credential;
-application runtime clients use the attached service account.
+`installer/project_bootstrap.py` prepares the project, billing, and bootstrap
+APIs. The `installer/gcloud/` package enables the required services and
+provisions runtime resources with the selected human installer/deployer
+credential. Application runtime clients use the attached service account.
+
+Within the package, `services.py` handles API enablement and service agreements,
+`accounts.py` provisions the runtime identity, and `app_engine.py` creates or
+discovers the application. `storage.py` reconciles buckets and Firestore backups,
+`jobs.py` configures Cloud Tasks and Scheduler, and `ocr.py` manages the
+Document AI processor. Installation and upgrade commands import these operations
+through `installer.gcloud`.
 
 ## Identities
 
