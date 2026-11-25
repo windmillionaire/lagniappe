@@ -37,7 +37,7 @@ READ_ONLY_CONTEXT_TOOLS = (
     "list_workspace_resources",
     "get_guidelines",
     "search_entities",
-    "get_entity",
+    "get_entities",
     "get_schema",
     "get_file",
     "get_category_forms",

@@ -1,6 +1,7 @@
 """HTTP execution gates and request measurement lifecycle for experiments."""
 
 import json
+from hashlib import sha256
 from copy import deepcopy
 from types import SimpleNamespace
 
@@ -330,6 +331,10 @@ def test_app_wide_auto_execute_api_key_compact_get_and_one_step_submit(monkeypat
     agent_me = client.get("/api/v1/me", headers=remote_headers)
     assert agent_me.status_code == 200
     assert agent_me.json["capabilities"] == {"plans": True, "execute_plan": True}
+    metadata = [client.get(path, headers=remote_headers).get_json() for path in ("/api/v1", "/api/v1/tools")]
+    wire = "\n".join(json.dumps(doc, sort_keys=True, separators=(",", ":")) for doc in metadata)
+    assert agent_me.headers["X-Lagniappe-MCP-Metadata"] == sha256(wire.encode()).hexdigest()
+    assert "X-Lagniappe-MCP-Metadata" not in me.headers
 
     report.status = "ready"
     submitted_agent = client.post(

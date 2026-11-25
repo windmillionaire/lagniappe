@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from functools import lru_cache
+from hashlib import sha256
 
 if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
@@ -218,6 +220,9 @@ def openapi_document() -> ResponseReturnValue:
 @api_route
 def me() -> ResponseReturnValue:
     actor = g.agent_api_user
+    if getattr(g, "remote_mcp_authenticated", False):
+        discovery = json.dumps(_discovery_payload(), sort_keys=True, separators=(",", ":"))
+        g.mcp_metadata_digest = _metadata_digest(discovery)
     return {
         "user": {
             "name": actor.name,
@@ -236,6 +241,14 @@ def me() -> ResponseReturnValue:
             "source_id": CONFIG.EXPERIMENTS_SOURCE_ID or None,
         }} if CONFIG.EXPERIMENTS_ENABLED else {}),
     }
+
+
+@lru_cache(maxsize=4)
+def _metadata_digest(discovery: str) -> str:
+    """Fingerprint only deployment-wide descriptions, independently of live grants."""
+    full = _catalog_payload(ai_functions.tool_catalog(transport="rest"), "full")
+    catalog = json.dumps(full, sort_keys=True, separators=(",", ":"))
+    return sha256(f"{discovery}\n{catalog}".encode()).hexdigest()
 
 
 @api.get("/tools")
@@ -265,6 +278,10 @@ def tools() -> ResponseReturnValue:
             422,
             details={"available": list(ai_functions.DECLARATIONS)},
         ) from error
+    return _catalog_payload(catalog, view)
+
+
+def _catalog_payload(catalog, view):
     return {
         "tools": catalog,
         "view": view,

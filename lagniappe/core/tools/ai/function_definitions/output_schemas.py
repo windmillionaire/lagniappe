@@ -94,6 +94,15 @@ OUTPUT_SCHEMAS = {
     "preview_form_schema_update": _object(properties={"instances": ENTITY_LIST, "baseline": {"type": "string"}, "scope_fingerprint": {"type": "string"}, "has_more": {"type": "boolean"}, "next_cursor": {"type": ["string", "null"]}}),
     "search_entities": ENTITY_LIST,
     "get_entity": ENTITY,
+    "get_entities": _object("results", properties={"results": {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {"entity": ENTITY, "error": {"type": "string"}},
+            "oneOf": [{"required": ["entity"]}, {"required": ["error"]}],
+            "additionalProperties": False,
+        },
+    }}),
     "get_file": _object(
         properties={
             "content": {"type": "string"},
@@ -285,6 +294,7 @@ RESULT_PATHS = {
     "preview_form_schema_update": {"primary_collection": "$.instances", "pagination": {"has_more": "$.has_more", "next_cursor": "$.next_cursor", "returned": "$.returned", "total": "$.affected"}},
     "search_entities": {"primary_collection": "$", "pagination": None},
     "get_entity": {"primary_entity": "$", "pagination": None},
+    "get_entities": {"primary_collection": "$.results", "pagination": None},
     "get_file": {"primary_entity": "$", "pagination": None},
     "get_category_pages": {
         "primary_collection": "$.pages",

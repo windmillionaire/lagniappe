@@ -542,6 +542,8 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
     )
     by_name = {tool["name"]: tool for tool in tools}
     rest_by_name = {tool["name"]: tool for tool in catalog["tools"]}
+    if "get_entities" in rest_by_name:
+        rest_by_name.pop("get_entity", None)  # Legacy call is hidden in the model's menu.
     assert list(by_name) == [*LIFECYCLE_TOOLS, *sorted(rest_by_name)]
     assert not set(LIFECYCLE_TOOLS).intersection(rest_by_name)
     assert all(re.fullmatch(r"[a-z][a-z0-9_]{0,63}", name) for name in by_name)
@@ -565,6 +567,10 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
             "Load full details only for information missing from the results.",
         ),
         "get_entity": (
+            "Reuse attached Form schemas and other returned evidence;",
+            "fetch again only for missing information or relevant changes.",
+        ),
+        "get_entities": (
             "Reuse attached Form schemas and other returned evidence;",
             "fetch again only for missing information or relevant changes.",
         ),

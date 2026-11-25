@@ -3,7 +3,7 @@ AI tool declarations and execution handlers for Gemini function calling.
 
 Provides tools that let the AI query the app's data at generation time:
 - search_entities: ranked candidate search across the workspace
-- get_entity: load full details of a specific entity
+- get_entities: load full details of one or more known entities
 - get_file: retrieve file content and attach supported small files for analysis
 - get_category_pages: sample pages from a category to understand its content
 - get_page_details: load a page, its model category, and optionally its tasks
@@ -94,6 +94,7 @@ DECLARATIONS = {
     "get_help": get_help.GET_HELP,
     "search_entities": search.SEARCH_ENTITIES,
     "get_entity": get_entity.GET_ENTITY,
+    "get_entities": get_entity.GET_ENTITIES,
     "get_file": get_file.GET_FILE,
     "get_category_pages": get_pages.GET_CATEGORY_PAGES,
     "get_category_forms": get_forms.GET_CATEGORY_FORMS,
@@ -111,7 +112,10 @@ DECLARATIONS = {
     "query_workspace_filter": workspace_filter.QUERY_WORKSPACE_FILTER,
 }
 
-FUNCTION_TOOL = types.Tool(function_declarations=list(DECLARATIONS.values()))
+# Keep the original REST/call contract for existing clients and recorded prompts.
+FUNCTION_TOOL = types.Tool(function_declarations=[
+    declaration for name, declaration in DECLARATIONS.items() if name != "get_entity"
+])
 
 
 def build_function_tool(*names: str) -> types.Tool | None:
@@ -126,6 +130,7 @@ HANDLERS: dict[str, Callable[[Mapping[str, object], User], ToolResult | ToolResp
     "get_help": get_help.execute_get_help,
     "search_entities": search.execute_search,
     "get_entity": get_entity.execute_get_entity,
+    "get_entities": get_entity.execute_get_entities,
     "get_file": get_file.execute_get_file,
     "get_category_pages": get_pages.execute_get_category_pages,
     "get_category_forms": get_forms.execute_get_category_forms,
@@ -212,7 +217,8 @@ def execute_registered_tool(name: str, args: object, user: User, *, external: bo
     if not isinstance(args, dict):
         return {"error": "Tool arguments must be a JSON object."}, []
 
-    normalized_args = normalize_hash_references(args)
+    # The bulk handler bounds its array before resolving hashes in the cache.
+    normalized_args = args if name == "get_entities" else normalize_hash_references(args)
     if external and name == "get_guidelines":
         result = get_guidelines.execute_external_get_guidelines(normalized_args, user)
     elif name == "search_entities":

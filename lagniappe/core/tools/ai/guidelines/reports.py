@@ -55,7 +55,7 @@ FILE_ORGANIZATION_GUIDELINES = """
 - For discovery on a known Page, prefer get_page_tasks with compact=true. Reuse
   sufficient search/list evidence; a duplicate check does not require both.
   Follow task_list continuation and resolve incomplete results before claiming
-  no match exists. Use get_entity for likely matches when descriptions or form
+  no match exists. Use get_entities for likely matches when descriptions or form
   values matter, and get_schema for the selected task/form's exact fields.
 - Choose a reusable collection when justified, or an Uncategorized Page for a
   one-off subject. Do not create one Page per artifact or a category-level
@@ -71,7 +71,7 @@ FILE_ORGANIZATION_GUIDELINES = """
   dated work must remain open. A matching completed Task can still be the right
   evidence target; inspect history only when it would resolve a real question.
 - Author final form values using exact target schema ids and assigned evidence.
-  Reuse schemas already returned by get_entity or get_schema. Do not rely on a
+  Reuse schemas already returned by get_entities or get_schema. Do not rely on a
   later form-completion stage. Preserve existing values that the evidence does
   not replace, and retain unresolved source conflicts for review. Fetch
   form_autofill with actions=["update_task", "update_page"] and the actual field types

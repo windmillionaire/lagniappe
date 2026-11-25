@@ -177,6 +177,7 @@ class RESTClient:
         storage_client: httpx.AsyncClient | None = None,
     ) -> None:
         self.config = config
+        self.metadata_digest: str | None = None
         timeout = httpx.Timeout(
             RESPONSE_TIMEOUT_SECONDS,
             connect=CONNECT_TIMEOUT_SECONDS,
@@ -377,6 +378,9 @@ class RESTClient:
                     "API returned an unexpected status.",
                     status=response.status_code,
                 )
+            if method == "GET" and target == "me":
+                digest = response.headers.get("X-Lagniappe-MCP-Metadata", "")
+                self.metadata_digest = digest if re.fullmatch("[0-9a-f]{64}", digest) else None
             return value, request_id
         except (TimeoutError, httpx.TimeoutException) as error:
             raise TransportError(

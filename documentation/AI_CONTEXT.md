@@ -216,7 +216,7 @@ Initial attachments and tool-returned files use the `FileConsumer` boundary.
 Autofill receives a supplied original file directly and never waits for its
 summary. Other target attachments are listed with compact identifiers, filenames
 and MIME types; `get_file(include_original=true)` reads them when needed. Optional
-Page/Category background is referenced through `get_entity` instead of eagerly
+Page/Category background is referenced through `get_entities` instead of eagerly
 injecting documents and descriptions. Focused public web research remains
 available, including title-only requests. The report planner starts
 from saved summaries and file metadata, then reads further evidence

@@ -229,7 +229,7 @@ def test_compact_tasks_disclose_partial_failure_without_losing_continuation(task
     assert result["task_list"]["serialization_errors"] == [
         {
             "hash": "hash:000000000001",
-            "message": "Task details could not be read. Use get_entity for this task.",
+            "message": "Task details could not be read. Use get_entities for this task.",
         }
     ]
     next_result = read_tasks(page, user, cursor=result["task_list"]["next_cursor"])

@@ -103,7 +103,7 @@ launch input includes:
 
 - target name, description, schema, and current typed submission;
 - compact parent Page and Category context for Tasks;
-- references for optional Page/Category context through `get_entity`; and
+- references for optional Page/Category context through `get_entities`; and
 - compact readable target File references and any supplied original File.
 
 Existing answers use the same exact field-ID projection as `get_schema`, including

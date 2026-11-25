@@ -22,7 +22,7 @@ GET_PAGE_TASKS = types.FunctionDeclaration(
         "completion state, bounded descriptions, dates and model/form references, "
         "without schemas or submissions. Inspect task_list for counts, continuation "
         "and partial errors; follow next_cursor before claiming a complete inventory. "
-        "Use get_entity on likely matches when descriptions or form values matter; "
+        "Use get_entities on likely matches when descriptions or form values matter; "
         "use get_schema for a referenced task/form when preparing field values. "
         "Reuse sufficient search/list evidence; a duplicate check does not require both. "
         "Omit compact for the existing full task details."

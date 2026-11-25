@@ -679,7 +679,7 @@ def catalog_tools(catalog: Mapping[str, object]) -> tuple[ToolDefinition, ...]:
                 " Returned hits are view-authorized; reuse their evidence. "
                 "Load full details only for information missing from the results."
             )
-        elif name == "get_entity":
+        elif name in {"get_entity", "get_entities"}:
             description += (
                 " Reuse attached Form schemas and other returned evidence; "
                 "fetch again only for missing information or relevant changes."

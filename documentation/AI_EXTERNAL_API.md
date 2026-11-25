@@ -285,8 +285,12 @@ view/edit permissions, visible project/model/form references, and descriptions
 bounded to 500 characters. `description_truncated` marks shortened descriptions;
 due/completion dates use the viewer's timezone. Compact projection does not call
 the full task serializer or load form schemas/submissions just to discard them.
-Use `get_entity` for a likely match when its full description or field values
-affect the decision, and `get_schema` on a task/form reference for exact fields.
+When the answer needs missing descriptions or field values, pass the known hashes
+to `get_entities(ids=[...])`. One call accepts 1–20 IDs, including IDs from different
+pages or entity kinds. Each position in `results` contains an `entity` or an `error`
+and corresponds to the same position in the input. Use a one-item array for a
+single record. Existing clients can still call `get_entity(id=...)` for the
+original single-record response. Use `get_schema` for exact form fields.
 
 Compact task reads accept `limit` (default 25, maximum 100) and `cursor`.
 `task_list` describes the returned scope, limit, total visible active/completed
@@ -378,6 +382,12 @@ revisions until execution begins. Fetch discovery, OpenAPI, and the tool catalog
 reuse the parsed values in memory. This is run-local reuse, not persistent HTTP
 caching: API responses remain `no-store`, and the current plan contract must
 still be fetched after uploads and immediately before submission.
+
+The hosted MCP service checks the live actor on every request. The API includes
+a digest of its discovery document and full tool catalog in that check. A worker
+can reuse matching, validated tool definitions for the actor's current execution
+capability. Changes to either document trigger a fresh load. Older API versions
+use ordinary discovery on each call.
 
 1. `GET /` points a client given only the versioned base URL to the authoritative
    discovery resources.
@@ -569,13 +579,13 @@ content the replacement renderer cannot preserve, a missing HTML projection,
 or truncation makes that flag false. `page_document_markdown_truncated` identifies
 the size limit. Ordinary reads retain the existing plain-text projection.
 
-Use `get_entity(view="edit")` or paginated `get_page_tasks(view="edit")` for
+Use `get_entities(view="edit")` or paginated `get_page_tasks(view="edit")` for
 complete descriptions, answer IDs, revisions, relationships, and shared schemas.
 Contract 10 removes superseded atomic updates and aliases. Schema migrations,
 completion, file movement and document append remain distinct actions.
 
 `update_file` edits the display `name` and/or `description` of an existing File.
-Use `get_entity(view="edit")` for its complete description and editable fields.
+Use `get_entities(view="edit")` for its complete description and editable fields.
 Omitted fields are preserved; `description: null` clears it. The original bytes,
 filename and attachment location remain unchanged. Description search follows
 whether the new description is nonempty, as in File Info, without launching AI

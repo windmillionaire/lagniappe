@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+from hashlib import sha256
 from contextlib import asynccontextmanager
 import json
 import time
@@ -95,6 +96,8 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                         "file_usage_schema": {"type": "array"},
                         "proposal_schema": None,
                         "schema_scope": "summary",
+                        "schema_actions": [],
+                        "schema_instructions": "Request the action schemas you need.",
                         "permissions": {},
                         "required_file_refs": [item["ref"] for item in inventory()],
                         "file_checklist": [],
@@ -477,6 +480,89 @@ def test_hosted_configuration_and_public_discovery_are_exact():
             assert (
                 await _rpc(client, "ping", token="lgn_existing-key")
             ).status_code == 401
+
+    asyncio.run(scenario())
+
+
+def test_verified_metadata_reuses_setup_across_reads_and_rechecks_live_grants():
+    async def scenario():
+        requests, revoked = [], set()
+        async with _adapter(TOKEN_A, [], set()) as probe:
+            discovery, _, catalog = await probe.rest.startup()
+        bulk = {
+            **catalog["tools"][0], "name": "get_entities",
+            "input_schema": {"type": "object", "required": ["ids"], "properties": {
+                "ids": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 20},
+            }},
+            "output_schema": {"type": "object", "required": ["results"], "properties": {
+                "results": {"type": "array", "items": {"type": "object"}},
+            }},
+        }
+        catalog["tools"].append(bulk)
+        catalog["selected_count"] = 2
+
+        def digest(doc):
+            wire = "\n".join(json.dumps(part, sort_keys=True, separators=(",", ":")) for part in (discovery, doc))
+            return sha256(wire.encode()).hexdigest()
+
+        revision = digest(catalog)
+        can_execute = False
+
+        def factory(token):
+            def upstream(request):
+                if token in revoked:
+                    return None  # Delegate to the fixture's revoked-grant response.
+                if request.url.path.endswith("/me"):
+                    actor = _actor(token)
+                    actor["capabilities"]["execute_plan"] = can_execute
+                    return httpx.Response(200, json=actor, headers={"X-Lagniappe-MCP-Metadata": revision})
+                if request.url.path.endswith("/tools"):
+                    return httpx.Response(200, json=catalog)
+                if request.url.path.endswith("/tools/get_entities"):
+                    ids = json.loads(request.content)["arguments"]["ids"]
+                    return httpx.Response(200, json={"result": {"results": [{"entity": {"hash": ref}} for ref in ids]}})
+            return _adapter(token, requests, revoked, upstream)
+
+        app = hosted.create_app(CONFIG, adapter_factory=factory)
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin,
+        ) as client:
+            async def listing(token=TOKEN_A):
+                response = await _rpc(client, "tools/list", token=token)
+                return {tool["name"] for tool in response.json()["result"]["tools"]}
+
+            first, second = await asyncio.gather(listing(), listing(TOKEN_B))
+            assert first == second and "get_entities" in first and "get_entity" not in first
+            assert [path for _, path in requests].count("/api/v1/tools") == 1
+            requests.clear()
+            ids = [f"hash:{i:012x}" for i in range(13)]
+            reply = await _rpc(client, "tools/call", params={"name": "get_entities", "arguments": {"ids": ids}})
+            assert reply.json()["result"]["structuredContent"]["results"] == [{"entity": {"hash": ref}} for ref in ids]
+            assert requests == [(TOKEN_A, "/api/v1/me"), (TOKEN_A, "/api/v1/tools/get_entities")]
+            old = await _rpc(client, "tools/call", params={"name": "get_entity", "arguments": {"hash": ids[0]}})
+            assert old.json()["result"]["structuredContent"] == {"name": "Alice's record"}
+            who = await _rpc(client, "tools/call", token=TOKEN_B, params={"name": "get_actor", "arguments": {}})
+            assert who.json()["result"]["structuredContent"]["user"]["name"] == "Bob"
+            revoked.add(TOKEN_B)
+            assert (await _rpc(client, "tools/list", token=TOKEN_B)).status_code == 401
+            can_execute = True
+            assert "execute_plan" in await listing()
+            can_execute = False
+            assert "execute_plan" not in await listing()
+
+            # A mixed-version response may serve a different catalog than /me advertised.
+            catalog["tools"].remove(bulk)
+            catalog["selected_count"] = 1
+            revision = "0" * 64
+            requests.clear()
+            assert "get_entity" in await listing()
+            assert "get_entities" not in await listing()
+            assert [path for _, path in requests].count("/api/v1/tools") == 2
+            revision = digest(catalog)
+            requests.clear()
+            assert "get_entity" in await listing()
+            assert "get_entities" not in await listing()
+            assert [path for _, path in requests].count("/api/v1/tools") == 1
 
     asyncio.run(scenario())
 
