@@ -569,6 +569,7 @@ def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
     tmp_path,
 ):
     from runner import upgrade
+    from runner.upgrade import python_packages
 
     setup_requirements = tmp_path / "requirements-installer.txt"
     runtime_requirements = tmp_path / "requirements.txt"
@@ -585,9 +586,9 @@ def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
         dev_requirements,
         font_requirements,
     )
-    monkeypatch.setattr(upgrade, "REQUIREMENTS_PATHS", requirement_paths)
+    monkeypatch.setattr(python_packages, "REQUIREMENTS_PATHS", requirement_paths)
     monkeypatch.setattr(
-        upgrade,
+        python_packages,
         "collect_pip_installed_versions",
         lambda packages, report: {},
     )
@@ -598,7 +599,7 @@ def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
         commands.append(command)
         return subprocess.CompletedProcess(command, 0, "", "")
 
-    monkeypatch.setattr(upgrade, "run_command", resolve)
+    monkeypatch.setattr(python_packages, "run_command", resolve)
 
     report = upgrade.UpgradeReport()
     assert upgrade.upgrade_pip_packages(report)
@@ -620,7 +621,7 @@ def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
 
     freeze = "\n".join(["yaspin==3.5.0", "Flask==3.1.3", "ruff==0.15.22", "fonttools==4.60.2"])
     monkeypatch.setattr(
-        upgrade,
+        python_packages,
         "run_command",
         lambda command, **kwargs: subprocess.CompletedProcess(
             command,
@@ -665,6 +666,7 @@ def test_dependency_upgrade_report_includes_setup_pins(capsys):
 
 def test_dependency_upgrade_updates_node_version_pin(monkeypatch, tmp_path):
     from runner import upgrade
+    from runner.upgrade import node
 
     responses = iter(
         [
@@ -681,13 +683,13 @@ def test_dependency_upgrade_updates_node_version_pin(monkeypatch, tmp_path):
     docker_path.parent.mkdir(parents=True)
     docker_path.write_text("FROM node:24-bookworm-slim@sha256:" + "a" * 64 + " AS node-runtime\n")
     image = "node:26.5.0-bookworm-slim@sha256:" + "b" * 64
-    monkeypatch.setattr(upgrade, "resolve_node_image", lambda version: image)
+    monkeypatch.setattr(node, "resolve_node_image", lambda version: image)
     original_update_pin = upgrade.update_node_version_pin
 
     monkeypatch.setattr(upgrade.Path, "home", lambda: tmp_path)
-    monkeypatch.setattr(upgrade, "run_command", lambda *args, **kwargs: next(responses))
+    monkeypatch.setattr(node, "run_command", lambda *args, **kwargs: next(responses))
     monkeypatch.setattr(
-        upgrade,
+        node,
         "update_node_version_pin",
         lambda version, report: original_update_pin(version, report, pin_path),
     )
