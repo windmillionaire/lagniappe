@@ -1,6 +1,7 @@
 """Attempt deadlines, progress boundaries, and background lease renewal."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from datetime import datetime
 import threading
 
@@ -34,6 +35,8 @@ class DeferredExecutionControl:
         self._active_check = active_check
         self._progress_callback = progress_callback
         self._phase: str | None = None
+        self._phase_held = False
+        self._provider_retry_lock = threading.Lock()
         self._details: dict[str, str | int] = {}
         self._lost = False
         self._background_error: BaseException | None = None
@@ -52,8 +55,9 @@ class DeferredExecutionControl:
         self._background_error = error
 
     def claim_provider_retry(self) -> bool:
-        self.ensure_active()
-        return bool(self.provider_retry_callback and self.provider_retry_callback())
+        with self._provider_retry_lock:
+            self.ensure_active()
+            return bool(self.provider_retry_callback and self.provider_retry_callback())
 
     def ensure_active(self) -> None:
         """Check local stop conditions and fresh durable ownership, without renewal."""
@@ -79,6 +83,9 @@ class DeferredExecutionControl:
             )
 
     def set_phase(self, phase: DeferredJobPhase | str, **details: object) -> None:
+        if self._phase_held:
+            self.ensure_active()
+            return
         phase = str(getattr(phase, "value", phase))
         bounded = {
             key: value
@@ -100,6 +107,17 @@ class DeferredExecutionControl:
             )
         self._phase = phase
         self._details = bounded
+
+    @contextmanager
+    def hold_phase(self, phase: DeferredJobPhase | str) -> Iterator[None]:
+        """Parallel provider calls share one progress phase and retain cancellation checks."""
+        self.set_phase(phase)
+        previously_held = self._phase_held
+        self._phase_held = True
+        try:
+            yield
+        finally:
+            self._phase_held = previously_held
 
     def before_provider(self, stage: str) -> None:
         self.set_phase(

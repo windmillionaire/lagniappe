@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Never, Unpack, cast, overload
 
 if TYPE_CHECKING:
     from ...entities.user import User
+    from ...properties.file_assets import FilePart
     from .prompt import Prompt
 
 from google import genai
@@ -18,6 +19,7 @@ from lagniappe import CONFIG
 from ... import exceptions
 from .settings import RuntimeAISettings, runtime_ai_settings
 from .provider_policy import (
+    ReportOriginalsRejected,
     is_provider_quota_error as is_provider_quota_error,
     is_provider_transient_error as is_provider_transient_error,
     provider_error_details as provider_error_details,
@@ -320,10 +322,30 @@ class GenAI:
                 types.Part.from_bytes(data=data["bytes"], mime_type=data["mime_type"])
             )
         for file in prompt.files:
+            if ref := file.get("report_file_ref"):
+                contents.append(types.Part.from_text(text=f"Original for report_file_ref {ref}:"))
             contents.append(
                 types.Part.from_uri(file_uri=file["uri"], mime_type=file["mime_type"])
             )
         return contents
+
+    def count_file_tokens(self, files: list[FilePart]) -> int | None:
+        """Count the entire upload bundle against the configured primary model."""
+        control = current_execution_control()
+        options = retry_http_options(attempts=1)
+        # A routing decision must leave time for the actual planning request.
+        options.timeout = 5000
+        if control is not None:
+            options.timeout = min(options.timeout, max(1, int(control.remaining_seconds * 1000)))
+        result = self.client.models.count_tokens(
+            model=runtime_ai_settings()["AI_MODEL"],
+            contents=[
+                types.Part.from_uri(file_uri=file["uri"], mime_type=file["mime_type"])
+                for file in files
+            ],
+            config=types.CountTokensConfig(http_options=options),
+        )
+        return result.total_tokens
 
     @staticmethod
     def _extract_text(response: types.GenerateContentResponse, output_format: str | None):
@@ -416,7 +438,7 @@ class GenAI:
 
             raise exceptions.AIException(EMPTY_TEXT_RESPONSE_MESSAGE)
         except BaseException as error:
-            terminal_error = error
+            terminal_error = error.__cause__ if isinstance(error, ReportOriginalsRejected) else error
             raise
         finally:
             current_session.reset(session_token)
@@ -492,6 +514,8 @@ class GenAI:
                     "initial",
                     quota=is_provider_quota_error(e),
                 )
+            if prompt.prompt_type == "ai report" and prompt.files and ReportOriginalsRejected.matches(e):
+                raise ReportOriginalsRejected(provider_error_message(e)) from e
             _raise_provider_error(e)
         if execution_control is not None:
             execution_control.after_provider("initial")

@@ -19,8 +19,7 @@ Selected `create_task` guidance also supplies the same scheduling rules to nativ
 and external callers, including one-time due dates and recurrence semantics.
 
 `POST /tools/ai` and `/tools/ai/direct-upload` replace the three old routes.
-`REPORT_AI` runs `AIReportAdapter` and `tools/ai/planner.py`. There is no intent
-router, upload-dependent action profile, or separate completion-model stage.
+`REPORT_AI` runs `AIReportAdapter` and `tools/ai/planner.py`.
 The report conversation has 17 common workspace read tools and Google Search.
 Its initial structured output contract is compact: summary, optional
 answer_markdown, confidence, issues, actions, and file_usage. The model obtains
@@ -39,18 +38,38 @@ summary actions. Selected action guidance retains the general proposal rules
 for work that has no files.
 
 `AI.ASK` permits answers and evidence files. `AI.CREATE` additionally permits
-proposals, constrained by live workspace permissions. Available actions do not
-depend on whether files were uploaded. Jobs recheck entitlement before publishing
+proposals, constrained by live workspace permissions. Jobs recheck entitlement before publishing
 mutations; deterministic browser execution also checks resource permissions.
 External clients use their own model and do not require provider entitlement.
 
 Each upload has exactly one `{file, usage}` entry in the report's `file_usage`,
 where usage is `evidence` or `organize`. Organize files require an executable
-attachment destination; external proposals additionally supply one summarize_file
-action and two retrieval terms for each organize file. Evidence files require
-neither action. Native jobs checkpoint finalized uploads and summary preparation
-before the single planning conversation, then checkpoint the validated proposal
-and file_usage before publication.
+attachment destination. When the native planner receives originals, it follows
+the same filing contract as MCP. It proposes one `summarize_file` action with a
+grounded summary and two distinct retrieval terms for each organized upload.
+Execution saves the reviewed summaries. Evidence-only files require no actions.
+
+Native jobs send fresh, readable uploads together in the primary planner's
+first turn, each labeled with its exact `report_file_ref`. The initial budget
+is 32,000 tokens for the combined originals. Text bundles up to 32,000 bytes
+qualify immediately. For other supported bundles up to 30 MiB the worker asks
+the primary model's token-count endpoint once for the entire set. Larger
+bundles, unknown sizes, existing summaries, Office extraction, and an
+unavailable token count use the summary-first path. The utility model processes
+up to four files concurrently. The worker saves each finished summary, reuses
+it on retry, and passes the collected summaries to the planner. A provider
+rejection of an unreadable original can also switch the job to this path.
+The file preparation choice and validated proposal are checkpointed separately.
+
+On an Experiments installation, compare the two paths with fresh copies of the
+five files in [case 08](../testing/ai_test_cases/cases/08-organize-mixed-files/).
+Submit identical instructions through **Create a Plan** twice with automatic
+execution off. Use the default submission on one run. On the other, send the
+`X-Lagniappe-Experiments-Report-Files: summaries` header on `POST /tools/ai`.
+AI Analytics records the primary planner's attachment count and each utility
+generation. Compare time to a reviewable proposal, total cost across both
+tiers including cached input, and whether both proposals file the receipt and
+ledger against one service visit and use the final rain-garden decision in the log.
 
 A proposal contains summary, optional answer_markdown, confidence, issues, and
 actions. Markdown is sanitized by the server. `output_kind` is derived from

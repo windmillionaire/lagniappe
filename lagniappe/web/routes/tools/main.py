@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 from flask import abort, redirect, request, url_for
 from flask_login import current_user
 
+from lagniappe import CONFIG
 from lagniappe.core.definitions import (
     AI,
     Action,
@@ -215,6 +216,9 @@ def _start_tool_report(
     )
     if auto_execute:
         report.db["auto_execute"] = True
+    if (CONFIG.EXPERIMENTS_ENABLED and (input_files or upload_manifest)
+            and request.headers.get("X-Lagniappe-Experiments-Report-Files") == "summaries"):
+        report.db["summaries_first"] = True
     Entities.save(*input_files, report, authenticated_user())
 
     try:

@@ -19,6 +19,169 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("can_create", [True, False])
+def test_native_report_reads_originals_together_and_only_summarizes_filed_uploads(monkeypatch, can_create):
+    from lagniappe.core.tools.ai import references
+    from lagniappe.core.tools.ai.function_definitions.get_guidelines import execute_get_guidelines
+    from testing.utility.ai_report_fakes import _test_user
+    from testing.utility.test_entities import TestEntities
+
+    actor = _test_user("upload-owner")
+    monkeypatch.setattr(type(actor), "access", lambda self, level: can_create or level == AI.ASK)
+    # Distinct stored objects can share the same uploaded filename.
+    def upload(ref, path, mime):
+        file = TestEntities.get("FILE", {
+            "hash": ref, "assets": {"file": {"type": "file", "path": path, "size": 512}},
+        })
+        file.filename, file.mimetype, file.report_user = "records.txt", mime, actor
+        return file
+
+    first = upload("aaaaaaaaaaaa", "receipt.json", "application/json")
+    second = upload("bbbbbbbbbbbb", "account.md", "text/markdown")
+    report = SimpleNamespace(
+        input_files=[first, second], instructions="Compare both records, and file the receipt.",
+        upload_manifest=[], db={},
+    )
+    stages = []
+    context = DeferredJobContext(
+        job=SimpleNamespace(attempt=1), actor=actor, notification=None, inputs={"report": report},
+        parameters={}, checkpoint={}, checkpoint_callback=lambda cp, **kw: stages.append(cp["stage"]),
+    )
+    refs = ["hash:aaaaaaaaaaaa", "hash:bbbbbbbbbbbb"]
+    monkeypatch.setattr(references.cache, "get_details_by_hash", lambda hashes: {
+        file.hash: {"id": file.urlsafe_key, "kind": "file"} for file in (first, second)
+    })
+    model = report_adapters.report_planner.ai_model
+    monkeypatch.setattr(model, "count_file_tokens", lambda *_: pytest.fail("Small text needs no provider count"))
+    calls = []
+
+    def generate(prompt, *, validator, validation_retries):
+        calls.append(prompt.prompt_type)
+        assert prompt.model_tier == "primary"
+        assert ("summarize_file" in prompt.allowed_actions) is can_create
+        _, label1, part1, label2, part2 = model._build_contents(prompt)
+        assert refs[0] in label1.text and refs[1] in label2.text
+        assert part1.file_data.file_uri == "gs://private-bucket/receipt.json"
+        assert part2.file_data.file_uri == "gs://private-bucket/account.md"
+        assert part1.file_data.mime_type == part2.file_data.mime_type == "text/plain"
+        usage = [{"file": ref, "usage": "evidence"} for ref in refs]
+        answer = {"summary": "Compared the records.", "confidence": 1, "issues": [], "actions": [], "file_usage": usage}
+        if can_create:
+            summary = {"id": "summary", "type": "summarize_file", "data": {
+                "file": refs[0], "summary": "A paid receipt.", "retrieval_terms": ["payment", "maintenance"],
+            }}
+            answer["actions"] = [summary]
+            with pytest.raises(report_adapters.exceptions.AIException, match="classified as organize"):
+                validator(answer)
+            usage[0]["usage"] = "organize"
+            attach = {"id": "attach", "type": "attach_file", "data": {"entity": "destination", "file": refs[0]}}
+            answer["actions"] = [attach]
+            with pytest.raises(report_adapters.exceptions.AIException, match="summarize every upload"):
+                validator(answer)
+            schema = execute_get_guidelines({"task": "report_actions", "actions": ["summarize_file"]}, actor)
+            assert "retrieval_terms" in schema["action_schema"]["anyOf"][0]["properties"]["data"]["required"]
+            answer["actions"].append(summary)
+        return validator(answer)
+
+    monkeypatch.setattr(model, "generate_content", generate)
+    report_adapters.AIReportAdapter().prepare(context)
+    assert calls == ["ai report"]
+    assert stages == ["uploads_finalized", "originals_ready", "ready_to_apply"]
+    assert context.checkpoint["status"] == ("ready" if can_create else "complete")
+    assert [action["type"] for action in context.checkpoint["proposal"]["actions"]] == (
+        ["attach_file", "summarize_file"] if can_create else []
+    )
+    assert first.summary is None and second.summary is None
+
+
+@pytest.mark.parametrize("stage,force_summaries,expected", [
+    ("uploads_finalized", True, ["summary", "planner"]),
+    ("summaries_pending", False, ["summary", "planner"]),
+    ("summaries_ready", False, ["planner"]),
+    ("originals_ready", False, ["originals"]),
+])
+def test_report_reuses_file_preparation_choice_on_retry(monkeypatch, stage, force_summaries, expected):
+    from testing.utility.ai_report_fakes import _test_file, _test_user
+
+    actor = _test_user("retry-owner")
+    file = _test_file("invoice.txt", "text/plain")
+    file.report_user = actor
+    report = SimpleNamespace(input_files=[file], instructions="Read this.", db={"summaries_first": force_summaries})
+    context = DeferredJobContext(
+        job=SimpleNamespace(attempt=2), actor=actor, notification=None, inputs={"report": report},
+        parameters={}, checkpoint={"stage": stage},
+    )
+    events = []
+    monkeypatch.setattr(report_adapters.report_files, "use_original_report_files", lambda *_: pytest.fail("Rerouted"))
+
+    def summarize(report, *, service_tier, **kwargs):
+        assert service_tier == "priority"
+        events.append("summary")
+
+    def plan(prompt):
+        assert prompt.service_tier == "priority"
+        events.append("originals" if prompt.files else "planner")
+        return {"proposal": {"summary": "Compared.", "actions": []}, "file_usage": []}
+
+    monkeypatch.setattr(report_adapters.report_files, "summarize_report_input_files", summarize)
+    monkeypatch.setattr(report_adapters.report_planner, "generate_report", plan)
+    report_adapters.AIReportAdapter().prepare(context)
+    assert events == expected
+
+
+@pytest.mark.parametrize("failure", ["unreadable", "quota", "lost access"])
+def test_report_falls_back_only_for_rejected_originals(monkeypatch, failure):
+    from google.genai import errors
+    from lagniappe.core.tools.ai.summarize import UNREADABLE_PDF_SUMMARY_ERROR
+    from testing.utility.ai_report_fakes import _prompt_context_json, _test_file, _test_user
+
+    actor = _test_user("originals-owner")
+    file = _test_file("invoice.pdf")
+    file.report_user = actor
+    report = SimpleNamespace(input_files=[file], instructions="Read the invoice.", db={})
+    context = DeferredJobContext(
+        job=SimpleNamespace(attempt=1), actor=actor, notification=None, inputs={"report": report},
+        parameters={}, checkpoint={"stage": "originals_ready"},
+    )
+    events = []
+
+    def reject_original(**_request):
+        events.append("originals")
+        if failure == "quota":
+            raise errors.ClientError(429, {"error": {"message": "Quota exceeded"}})
+        raise errors.ClientError(400, {"error": {"message": "The document has no pages."}})
+
+    model = report_adapters.report_planner.ai_model
+    monkeypatch.setattr(model, "_request_content", reject_original)
+
+    def plan(prompt):
+        if prompt.files:
+            return model._generate_content_once(prompt, model="primary")
+        events.append("planner")
+        assert "encrypted" in _prompt_context_json(prompt, "Report Input Files")[0]["summary_warning"]
+        return {"proposal": {"summary": "Unreadable file", "actions": []}, "file_usage": []}
+
+    def summarize(file, **kwargs):
+        events.append("summary")
+        file.properties.summarize.error = UNREADABLE_PDF_SUMMARY_ERROR
+
+    monkeypatch.setattr(report_adapters.report_planner, "generate_report", plan)
+    monkeypatch.setattr(report_adapters.report_files, "generate_summary", summarize)
+    monkeypatch.setattr(report_adapters.Entities, "save", lambda f: events.append("save"))
+    if failure == "lost access":
+        monkeypatch.setattr(type(file), "allowed", lambda *a, **kw: False)
+        with pytest.raises(report_adapters.exceptions.ValidationError, match="access"):
+            report_adapters.AIReportAdapter().prepare(context)
+        assert events == []
+    elif failure == "quota":
+        with pytest.raises(report_adapters.exceptions.AIQuotaError):
+            report_adapters.AIReportAdapter().prepare(context)
+        assert events == ["originals"]
+    else:
+        report_adapters.AIReportAdapter().prepare(context)
+        assert events == ["originals", "summary", "save", "planner"]
+
+
 @pytest.mark.parametrize("tier", [AI.NONE, AI.ASK, AI.CREATE])
 @pytest.mark.parametrize("corrective", [False, True])
 def test_corrective_report_generation_requires_create_access(monkeypatch, tier, corrective):
@@ -690,11 +853,11 @@ def test_ai_report_resumes_prepared_proposal(monkeypatch, changes, revision):
     adapter = report_adapters.AIReportAdapter()
     adapter.prepare(context)
     assert calls[0].service_tier == "priority"
-    assert summaries[0]["service_tier"] == "priority"
+    assert summaries == []
     assert context.checkpoint["stage"] == "ready_to_apply"
     assert adapter.checkpoint_ready(context)
     adapter.prepare(context)
-    assert len(calls) == len(summaries) == 1
+    assert len(calls) == 1 and summaries == []
     result = adapter.apply(context)
     assert result["status"] == ("ready" if changes else "complete")
     assert report.file_usage == []

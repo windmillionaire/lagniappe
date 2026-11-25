@@ -375,10 +375,16 @@ class Prompt:
     def files(self) -> list[FilePart]:
         return self._files
 
-    def add_file(self, file: File, user: User | None = None) -> Self:
+    def add_file(
+        self, file: File, user: User | None = None, *, report_file_ref: str | None = None
+    ) -> Self:
         """Attach a Cloud Storage file reference to the prompt."""
         file_part = file.properties.file.uri_to_ai
-        if file_part:
+        if report_file_ref is not None:
+            if not file_part:
+                raise ValueError("A report upload no longer has a readable original.")
+            self._files.append({**file_part, "report_file_ref": report_file_ref})
+        elif file_part:
             self._files.append(file_part)
         return self
 

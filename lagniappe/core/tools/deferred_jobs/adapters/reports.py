@@ -20,12 +20,14 @@ from lagniappe.core.definitions import (
     DeferredJobStatus,
     DeferredJobType,
     Fetch,
+    FetchReason,
     MutationIntent,
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools.ai import external_operations
 from lagniappe.core.tools.ai import planner as report_planner
+from lagniappe.core.tools.ai.provider_policy import ReportOriginalsRejected
 from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai.reporting.completion import files as report_files
 from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
@@ -256,57 +258,65 @@ class AIReportAdapter(ReportAdapter):
     def prepare(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         report, actor = required_input(context, "report"), context.actor
         stage = (context.checkpoint or {}).get("stage")
-        stage_index = {
-            None: 0,
-            "uploads_finalized": 1,
-            "summaries_ready": 2,
-            "ready_to_apply": 3,
-        }.get(stage, 0)
+        if stage == "ready_to_apply":
+            return None
         service_tier = (
             "priority" if int(getattr(context.job, "attempt", 0) or 0) > 1 else None
         )
-        if stage_index < 1:
+        if stage not in {"uploads_finalized", "originals_ready", "summaries_pending", "summaries_ready"}:
             context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
             report_uploads.finalize_report_upload_manifest(
                 report, actor, ensure_active=context.ensure_active
             )
-            context.checkpoint_stage(
-                "uploads_finalized", phase=DeferredJobPhase.PREPARING_INPUTS.value
-            )
+            stage = "uploads_finalized"
+            context.checkpoint_stage(stage, phase=DeferredJobPhase.PREPARING_INPUTS.value)
         if not report.input_files and not str(report.instructions or "").strip():
             raise exceptions.ValidationError(
                 "Provide instructions or at least one file."
             )
-        if stage_index < 2:
-            context.set_phase(DeferredJobPhase.SUMMARIZING)
-            report_files.summarize_report_input_files(
-                report,
-                save=Entities.save,
-                search=actor.access(AI.CREATE),
-                service_tier=service_tier,
-                ensure_active=context.ensure_active,
-            )
-            context.checkpoint_stage(
-                "summaries_ready", phase=DeferredJobPhase.SUMMARIZING.value
-            )
-        if stage_index < 3:
+        attached = [file for file in report.input_files if file.has_references]
+        if attached:
+            Entities.fetch(*attached, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+        if any(not file.allowed(Action.VIEW, actor) for file in report.input_files):
+            raise exceptions.ValidationError("You no longer have access to a report upload.")
+
+        originals = stage == "originals_ready"
+        if report.input_files and stage == "uploads_finalized":
+            context.ensure_active()
+            originals = not report.db.get("summaries_first") and report_files.use_original_report_files(report)
+            stage = "originals_ready" if originals else "summaries_pending"
+            context.checkpoint_stage(stage, phase=DeferredJobPhase.PREPARING_INPUTS.value)
+
+        feedback = context.parameters.get("feedback") if context.parameters.get("mode") == "revise" else None
+        while True:
+            if report.input_files and not originals and stage != "summaries_ready":
+                context.set_phase(DeferredJobPhase.SUMMARIZING)
+                report_files.summarize_report_input_files(
+                    report, save=Entities.save, search=actor.access(AI.CREATE),
+                    service_tier=service_tier, ensure_active=context.ensure_active,
+                )
+                context.checkpoint_stage("summaries_ready", phase=DeferredJobPhase.SUMMARIZING.value)
             context.set_phase(DeferredJobPhase.GENERATING)
-            feedback = (
-                context.parameters.get("feedback")
-                if context.parameters.get("mode") == "revise"
-                else None
+            prompt = report_planner.report_prompt(
+                report, actor, feedback=feedback, original_files=originals,
             )
-            prompt = report_planner.report_prompt(report, actor, feedback=feedback)
             if service_tier:
                 prompt.set_service_tier(service_tier)
-            prepared = report_planner.generate_report(prompt)
-            context.ensure_active()
-            prepared["status"] = (
-                "ready" if prepared["proposal"].get("actions") else "complete"
-            )
-            context.checkpoint_stage(
-                "ready_to_apply", prepared, phase=DeferredJobPhase.PREPARED.value
-            )
+            try:
+                prepared = report_planner.generate_report(prompt)
+                break
+            except ReportOriginalsRejected:
+                if not originals:
+                    raise
+                # Isolate a rejected original and carry its warning into planning.
+                originals = False
+                stage = "summaries_pending"
+                context.checkpoint_stage(stage, phase=DeferredJobPhase.SUMMARIZING.value)
+
+        prepared["status"] = "ready" if prepared["proposal"].get("actions") else "complete"
+        context.checkpoint_stage(
+            "ready_to_apply", prepared, phase=DeferredJobPhase.PREPARED.value
+        )
         return None
 
 
