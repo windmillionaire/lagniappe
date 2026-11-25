@@ -6,12 +6,9 @@ if TYPE_CHECKING:
     from flask import Request
     from flask.typing import ResponseReturnValue
     from lagniappe.core.entities import types as models
-    from lagniappe.core.entities.entity import Entity
     from lagniappe.core.entities.task import TaskData
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
-
-import json
 
 from flask import abort, request, get_template_attribute
 from flask_login import current_user
@@ -38,10 +35,6 @@ from lagniappe.core.tools.auth.references import (
     SubmittedReferenceResolver,
     UNAVAILABLE_REFERENCE_ERROR,
 )
-from lagniappe.core.tools.auth.task_attachments import (
-    sign_task_attachment_claim,
-    valid_task_attachment_claim,
-)
 from lagniappe.core.tools.tasks import combine as task_combine
 from lagniappe.core.tools.tasks import scheduling
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
@@ -60,7 +53,7 @@ from lagniappe.web import deferred_autofill
 from lagniappe.core.tools.forms import review as form_review
 
 from ..pages.main import _load_page_settings_relations
-from . import tasks
+from . import attachments, tasks
 
 
 def _ai_schedule_requested(form):
@@ -203,85 +196,6 @@ def combine(
     return responses.task_combine_delta(result.main, result.removed, page)
 
 
-def _upload_assets_payload(request):
-    raw_assets = request.form.get("assets")
-    if raw_assets is None:
-        return None
-
-    try:
-        assets = json.loads(raw_assets or "{}")
-    except json.JSONDecodeError as error:
-        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR) from error
-
-    if not isinstance(assets, dict):
-        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
-    return assets
-
-
-def _asset_file_keys(assets):
-    if assets is None:
-        return []
-
-    file_keys = []
-    for definition in assets.values():
-        if not isinstance(definition, dict):
-            continue
-
-        file_key = definition.get("key") or definition.get("id")
-        if file_key:
-            file_keys.append(file_key)
-
-    return file_keys
-
-
-def _add_file_to_assets(assets, file, *, attachment_claim=None):
-    assets = dict(assets or {})
-    details = dict(file.details)
-    if attachment_claim:
-        details["attachment_claim"] = attachment_claim
-    assets[file.filename or file.name or file.hash] = details
-    return assets
-
-
-def _asset_claims(assets, file_key):
-    return [
-        definition.get("attachment_claim")
-        for definition in (assets or {}).values()
-        if isinstance(definition, dict)
-        and (definition.get("key") or definition.get("id")) == file_key
-        and definition.get("attachment_claim")
-    ]
-
-
-def _remove_file_from_assets(assets, file_key):
-    return {
-        name: definition
-        for name, definition in (assets or {}).items()
-        if not isinstance(definition, dict)
-        or (definition.get("key") or definition.get("id")) != file_key
-    }
-
-
-def _create_task_file():
-    uploaded_file = request.files.get("task-file") or direct_uploads.direct_upload_file(
-        "task-file"
-    )
-    if not uploaded_file:
-        return None
-
-    data = {
-        "filename": uploaded_file.filename,
-        "mimetype": request.form.get("mimetype"),
-    }
-    file = Entities.FILE().create(
-        upload=uploaded_file,
-        data=data,
-        report_user=authenticated_user(),
-    )
-    file.save()
-    return file
-
-
 def _task_base_data(request: Request) -> TaskData:
     return {
         "name": request.form.get("name"),
@@ -327,8 +241,8 @@ def task_data(
     request: Request, page: models.Page, task: models.Task | None = None
 ) -> TaskData:
     """Resolve form data into a dict suitable for Task.create() or Task.update()."""
-    assets = _upload_assets_payload(request)
-    asset_file_keys = _asset_file_keys(assets)
+    assets = attachments.submitted_assets(request)
+    asset_file_keys = attachments.file_keys(assets)
     if "page" in request.form:
         raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
 
@@ -449,77 +363,11 @@ def task_data(
     }
 
     if assets is not None:
-        existing_files = list(task.files) if task else []
-        scope = task or page
-
-        def file_authorized(file):
-            return (file.has_references and file.allowed(Action.VIEW, user=current_user)) or any(
-                valid_task_attachment_claim(
-                    claim,
-                    actor=authenticated_user(),
-                    file=file,
-                    scope=scope,
-                )
-                for claim in _asset_claims(assets, file.urlsafe_key)
-            )
-
-        selected_files = resolver.many(
-            asset_file_keys,
-            expected=Entities.FILE,
-            existing=existing_files,
-            authorize=file_authorized,
+        task_data["asset_files"] = attachments.resolve_files(
+            resolver, asset_file_keys, assets=assets, page=page, task=task
         )
-        selected_keys = {file.key for file in selected_files}
-        preserved_files = [
-            file
-            for file in existing_files
-            if file.key not in selected_keys
-            and not file.allowed(Action.VIEW, user=current_user)
-        ]
-        task_data["asset_files"] = [*selected_files, *preserved_files]
 
     return task_data
-
-
-@tasks.route("<key>/upload-file", methods=["POST"])
-@permission(requested=Action.EDIT)
-def upload_file(
-    key: str, **kwargs: Unpack[EntityContext[Entity]]
-) -> ResponseReturnValue:
-    abort_public_user_action()
-
-    try:
-        existing_assets = _upload_assets_payload(request)
-    except exceptions.ValidationError as error:
-        return responses.error(str(error))
-
-    file = _create_task_file()
-    if not file:
-        return responses.error("No file uploaded")
-
-    scope = kwargs["entity"]
-    attachment_claim = sign_task_attachment_claim(
-        actor=authenticated_user(),
-        file=file,
-        scope=scope,
-    )
-    assets = _add_file_to_assets(
-        existing_assets,
-        file,
-        attachment_claim=attachment_claim,
-    )
-    details = dict(file.details)
-    details["attachment_claim"] = attachment_claim
-
-    return responses.json_response({"assets": assets, "file": details})
-
-
-@tasks.route("<key>/upload-file/direct-upload", methods=["POST"])
-@permission(requested=Action.EDIT)
-def upload_file_direct(key: str, **kwargs: object) -> ResponseReturnValue:
-    abort_public_user_action()
-
-    return direct_uploads.direct_upload_response()
 
 
 def _should_submit_task_form(active, role, task):
@@ -808,49 +656,6 @@ def latest_history_submission(
         return responses.json_response({"latest_submission": {field_id: field.form_value}})
     except exceptions.ValidationError as error:
         return responses.json_response({"error": str(error)}, status=422)
-
-
-def _delete_file_if_unreferenced(file):
-    if file and not file.has_references:
-        Entities.delete(file)
-
-
-@tasks.route("<key>/files/<file_key>", methods=["DELETE"])
-@permission(Resource.TASK, Action.EDIT)
-def delete_file(
-    key: str, file_key: str, **kwargs: Unpack[EntityContext[models.Task]]
-) -> ResponseReturnValue:
-    task = load_route_entity(
-        kwargs["entity"],
-        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
-    )
-    file = Entities.fetch_one(file_key, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
-    if (
-        not isinstance(file, Entities.FILE)
-        or file.key not in task.properties.files.keys
-        or not file.allowed(Action.VIEW, user=current_user)
-    ):
-        return responses.not_found("File not found")
-
-    try:
-        assets = _upload_assets_payload(request) or task.properties.files.preload
-    except exceptions.ValidationError as error:
-        return responses.error(str(error))
-    assets = _remove_file_from_assets(assets, file.urlsafe_key)
-    task.properties.files.remove(file)
-    task.save()
-    _delete_file_if_unreferenced(file)
-
-    return responses.entity_response(
-        responses.json_response(
-            {
-                "assets": assets,
-                "deleted": file.details,
-            }
-        ),
-        task,
-        task.page,
-    )
 
 
 @tasks.route("<key>/patch", methods=["PATCH"])

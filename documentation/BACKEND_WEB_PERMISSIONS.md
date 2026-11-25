@@ -147,6 +147,11 @@ and preservation does not authorize replacing it with another hidden target.
 Task attachment selectors and attached-Form preload data are also
 permission-filtered to avoid exposing stored details in the browser.
 
+The task upload and removal routes live in `lagniappe/web/routes/tasks/attachments.py`.
+When a task form is saved, `task_data()` in `tasks/main.py` includes the submitted
+file keys in the same lookup as the form, assignee, project, and model. The
+attachment module uses that resolver to select files and check their claims.
+
 The internal Link preflight is deliberately enabled by browser route callers.
 Trusted AI, import, migration, and background-service flows keep their existing
 service-owned policy instead of depending on Flask session state.
