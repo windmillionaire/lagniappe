@@ -184,6 +184,8 @@ def test_poll_state_read_batches_notifications_and_operations(redis, monkeypatch
     assert notification_state == {
         "generation": "generation-one",
         "revision": 3,
+        "aggregate_revision": -1,
+        "aggregate_generation": "",
         "message_revision": 2,
         "ordinary_count": 1,
         "unread_message_count": 0,

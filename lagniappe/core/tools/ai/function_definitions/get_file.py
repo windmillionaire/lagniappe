@@ -10,7 +10,9 @@ if TYPE_CHECKING:
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
+from lagniappe.core.definitions.asset import FileAsset
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.database import assets as storage_assets
 
 GET_FILE = types.FunctionDeclaration(
     name="get_file",
@@ -50,7 +52,7 @@ def _truthy(value):
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
-def execute_get_file(args: Mapping[str, object], user: User) -> Mapping[str, object] | tuple[Mapping[str, object], list[FilePart]]:
+def execute_get_file(args: Mapping[str, object], user: User, *, external: bool = False) -> Mapping[str, object] | tuple[Mapping[str, object], list[FilePart]]:
     file_id = args.get("id")
     if not isinstance(file_id, str) or not file_id:
         return {"error": "id is required"}
@@ -68,34 +70,39 @@ def execute_get_file(args: Mapping[str, object], user: User) -> Mapping[str, obj
     if text_content:
         result["content"] = text_content
 
-    file_parts = []
-    file_part = entity.properties.file.uri_to_ai
     include_original = _truthy(args.get("include_original"))
-    if file_part:
-        if not include_original:
-            result["original_file"] = {
-                "supported": True,
-                "attached": False,
-                "reason": (
+    file_part = entity.properties.file.uri_to_ai
+    reason = (
+        "Original content was not included by default. Call get_file "
+        "again with include_original=true if the original bytes are necessary."
+    )
+    if external:
+        asset = entity.properties.file.value
+        if isinstance(asset, FileAsset) and asset.path:
+            if include_original:
+                result["original_file"] = {
+                    "supported": True,
+                    "attached": False,
+                    "download_url": storage_assets.get_signed_url(asset.path, expires_in=300),
+                    "expires_in": 300,
+                }
+                return result
+            if not file_part:
+                reason = (
                     "Original content was not included by default. Call get_file "
-                    "again with include_original=true if the original bytes are "
-                    "necessary."
-                ),
-            }
-        else:
-            result["original_file"] = {
-                "supported": True,
-                "attached": True,
-            }
-            file_parts.append(file_part)
-    else:
-        result["original_file"] = {
-            "supported": False,
-            "attached": False,
-            "reason": "Original content is unavailable for this file.",
-        }
+                    "again with include_original=true to receive a five-minute signed "
+                    "download URL."
+                )
+            result["original_file"] = {"supported": True, "attached": False, "reason": reason}
+            return result
 
-    if file_parts:
-        return result, file_parts
+    if file_part and include_original:
+        result["original_file"] = {"supported": True, "attached": True}
+        return result, [file_part]
 
+    result["original_file"] = {
+        "supported": bool(file_part),
+        "attached": False,
+        "reason": reason if file_part else "Original content is unavailable for this file.",
+    }
     return result

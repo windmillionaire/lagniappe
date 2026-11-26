@@ -17,17 +17,13 @@ import time
 from flask import g, make_response, request, url_for
 
 from lagniappe import CONFIG
-from lagniappe.core.definitions import Action, Fetch, FetchReason
-from lagniappe.core.definitions.asset import FileAsset
-from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import summarize_actions
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai.external import definitions
 from lagniappe.core.tools.ai.external.openapi import build_openapi_document
 from lagniappe.core.tools.ai import functions as ai_functions
-from lagniappe.core.tools.ai.references import hash_reference, normalize_hash_references
+from lagniappe.core.tools.ai.references import hash_reference
 from lagniappe.core.tools.cache.rate_limit import client_ip
-from lagniappe.core.tools.database import assets as storage_assets
 
 from . import api, api_family
 from .http import APIProblem, api_absolute_url, api_route, json_body, rate_limit
@@ -498,56 +494,6 @@ def finalize_uploads(plan_id: str) -> ResponseReturnValue:
     return _plan_payload(finalized)
 
 
-def _original_file_download(tool_name, arguments, result):
-    if tool_name != "get_file" or not isinstance(arguments, dict):
-        return result
-    include_original = arguments.get("include_original")
-    include_original = include_original is True or str(
-        include_original
-    ).strip().casefold() in {"1", "true", "yes", "on"}
-    original_file = result.get("original_file") if isinstance(result, dict) else None
-    if (
-        not include_original
-        and isinstance(original_file, dict)
-        and original_file.get("supported") is not False
-    ):
-        return result
-
-    normalized = normalize_hash_references(arguments)
-    entity = Entities.fetch_one(normalized.get("id"), request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
-    if not isinstance(entity, Entities.FILE) or not entity.allowed(
-        Action.VIEW, user=g.agent_api_user
-    ):
-        return result
-    asset = entity.properties.file.value
-    if not isinstance(asset, FileAsset) or not asset.path:
-        return result
-
-    if not isinstance(result, dict):
-        result = {"result": result}
-    result = dict(result)
-    if not include_original:
-        result["original_file"] = {
-            "supported": True,
-            "attached": False,
-            "reason": (
-                "Original content was not included by default. Call get_file "
-                "again with include_original=true to receive a five-minute signed "
-                "download URL."
-            ),
-        }
-        return result
-
-    download_url = storage_assets.get_signed_url(asset.path, expires_in=300)
-    result["original_file"] = {
-        "supported": True,
-        "attached": False,
-        "download_url": download_url,
-        "expires_in": 300,
-    }
-    return result
-
-
 @api.post("/tools/<tool_name>", defaults={"plan_id": None})
 @api.post("/plans/<plan_id>/tools/<tool_name>")
 @api_route
@@ -594,7 +540,6 @@ def execute_tool(plan_id: str, tool_name: str) -> ResponseReturnValue:
             g.agent_api_user,
             external=True,
         )
-        result = _original_file_download(tool_name, arguments, result)
         safe_result = _json_safe(result)
         result_bytes = len(
             json.dumps(safe_result, ensure_ascii=False, default=str).encode("utf-8")

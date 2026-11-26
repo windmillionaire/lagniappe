@@ -121,3 +121,30 @@ def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     assert captured and captured[0][1]["context"] == {
         "operation": "notification-aggregate-publish"
     }
+
+
+@pytest.mark.parametrize("clear", [False, True], ids=["dismiss-one", "clear-all"])
+def test_dismissal_publishes_committed_counts_and_refreshes_on_noop(monkeypatch, clear):
+    from unittest.mock import Mock
+
+    user = managed_user("notice-user", "Notice User")
+    committed = {"ordinary_count": 0}
+    recent = {"ordinary_count": 2}
+    mutation = Mock(side_effect=[(1 if clear else True, committed), (0 if clear else False, None)])
+    lookup = Mock(return_value=recent)
+    publish = Mock()
+    monkeypatch.setattr(notification_database, "get_notification_aggregate", lookup)
+    monkeypatch.setattr(notification_service, "publish_notification_aggregate", publish)
+    if clear:
+        monkeypatch.setattr(notification_database, "clear_ordinary_notification_records", mutation)
+        dismiss, target = notification_service.clear_ordinary_notifications, [user.key]
+    else:
+        monkeypatch.setattr(notification_database, "delete_ordinary_notification_record", mutation)
+        dismiss, target = notification_service.delete_ordinary_notification, user.key
+
+    assert dismiss(user, target)
+    publish.assert_called_once_with(user, committed)
+    lookup.assert_not_called()
+    assert not dismiss(user, target)
+    lookup.assert_called_once_with(user)
+    publish.assert_called_with(user, recent)

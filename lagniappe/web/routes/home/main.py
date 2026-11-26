@@ -115,8 +115,6 @@ def notifications() -> ResponseReturnValue:
 def clear_notifications() -> ResponseReturnValue:
     notification_keys = database_notifications.notification_keys(authenticated_user())
     notification_service.clear_ordinary_notifications(authenticated_user(), notification_keys)
-    aggregate = database_notifications.get_notification_aggregate(authenticated_user())
-    notification_service.publish_notification_aggregate(authenticated_user(), aggregate)
 
     return responses.ok()
 
@@ -173,8 +171,6 @@ def delete_activity(key: str) -> ResponseReturnValue:
         if activity.key is None:
             return responses.not_found("Activity item not found")
         notification_service.delete_ordinary_notification(authenticated_user(), activity.key)
-        aggregate = database_notifications.get_notification_aggregate(authenticated_user())
-        notification_service.publish_notification_aggregate(authenticated_user(), aggregate)
     else:
         Entities.delete(activity)
 

@@ -28,7 +28,9 @@ def publish_notification_aggregate(user: User, aggregate: DatastoreRow | None) -
     try:
         from .. import cache
 
-        return cache.publish_notification_aggregate(user, aggregate)
+        return cache.publish_notification_aggregate(
+            user, aggregate, load_current=lambda: database_notifications.get_notification_aggregate(user)
+        )
     except Exception as error:
         from ...exceptions import capture
 
@@ -135,14 +137,20 @@ def publish_plan_notification(report: AIReport, user: User) -> None:
 
 
 def delete_ordinary_notification(user: User, notification_key: Key) -> bool:
-    deleted, _aggregate = database_notifications.delete_ordinary_notification_record(
+    deleted, aggregate = database_notifications.delete_ordinary_notification_record(
         user, notification_key
     )
+    if aggregate is None:
+        aggregate = database_notifications.get_notification_aggregate(user)
+    publish_notification_aggregate(user, aggregate)
     return deleted
 
 
 def clear_ordinary_notifications(user: User, keys: Iterable[Key]) -> int:
-    cleared, _aggregate = database_notifications.clear_ordinary_notification_records(user, keys)
+    cleared, aggregate = database_notifications.clear_ordinary_notification_records(user, keys)
+    if aggregate is None:
+        aggregate = database_notifications.get_notification_aggregate(user)
+    publish_notification_aggregate(user, aggregate)
     return cleared
 
 

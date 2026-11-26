@@ -33,6 +33,11 @@ projection. Redis failure does not roll back the mutation. The menu loads at
 most 25 ordinary keys per page and reads the aggregate separately; it does not
 query message history.
 
+Dismiss and clear publish the aggregate returned by the successful transaction.
+Redis stores its durable generation and revision alongside the badge revision.
+A late publisher can reuse the newer cached counts. A cold cache or a changed
+durable generation requires a fresh aggregate lookup.
+
 Deferred work may create a pending Notification and update the same row at
 completion. File jobs can use completion-only notifications. Reviewed report
 execution uses no Notification. AI email ingestion creates a Notification only

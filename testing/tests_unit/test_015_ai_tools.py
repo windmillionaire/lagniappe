@@ -4126,3 +4126,47 @@ def test_disabled_ai_never_resolves_models_or_calls_provider(monkeypatch):
     for operation in (generator.generate_content, generator.generate_image):
         with pytest.raises(ai_core.exceptions.AIException, match="disabled"):
             operation(Prompt("No provider call"))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("allowed,original", [(True, True), (True, False), (False, True)])
+def test_external_original_uses_the_authorized_file_once(monkeypatch, allowed, original):
+    from unittest.mock import Mock
+    from lagniappe.core.definitions.asset import FileAsset
+
+    actor = object()
+
+    class File:
+        properties = SimpleNamespace(
+            text=SimpleNamespace(asset=None),
+            file=SimpleNamespace(value=FileAsset({"path": "fixture/archive.zip"}), uri_to_ai=None),
+        )
+
+        def allowed(self, action, user):
+            assert action == ai_get_file.Action.VIEW and user is actor
+            return allowed
+
+        def to_ai(self, user):
+            return {"kind": "file"}
+
+    fetch = Mock(return_value=File())
+    sign = Mock(return_value="temporary-url")
+    monkeypatch.setattr(ai_get_file.Entities, "FILE", File)
+    monkeypatch.setattr(ai_get_file.Entities, "fetch_one", fetch)
+    monkeypatch.setattr(ai_get_file.storage_assets, "get_signed_url", sign)
+    result, parts = ai_functions.execute_registered_tool(
+        "get_file", {"id": "file-key", "include_original": original}, actor, external=True,
+    )
+    fetch.assert_called_once()
+    assert not parts
+    if allowed and original:
+        sign.assert_called_once_with("fixture/archive.zip", expires_in=300)
+        assert result["original_file"] == {
+            "supported": True, "attached": False, "download_url": "temporary-url", "expires_in": 300,
+        }
+    else:
+        sign.assert_not_called()
+        if allowed:
+            assert result["original_file"]["supported"] and "download_url" not in result["original_file"]
+        else:
+            assert result == {"error": "Access denied"}

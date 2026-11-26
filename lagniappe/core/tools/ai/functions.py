@@ -221,6 +221,8 @@ def execute_registered_tool(name: str, args: object, user: User, *, external: bo
     normalized_args = args if name == "get_entities" else normalize_hash_references(args)
     if external and name == "get_guidelines":
         result = get_guidelines.execute_external_get_guidelines(normalized_args, user)
+    elif external and name == "get_file":
+        result = get_file.execute_get_file(normalized_args, user, external=True)
     elif name == "search_entities":
         search_handler = cast(_SearchHandler, HANDLERS[name])
         result = search_handler(normalized_args, user, candidate_search=True)

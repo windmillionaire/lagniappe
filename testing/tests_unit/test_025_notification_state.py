@@ -282,3 +282,35 @@ def test_notification_list_keys_repair_warm_projection(redis):
     assert repaired["generation"] == seeded["generation"]
     assert repaired["revision"] == seeded["revision"] + 1
     assert repaired["members"] == {"notification-a", "notification-b"}
+
+
+def test_delayed_aggregate_cannot_restore_a_dismissed_notification(redis):
+    owner = user()
+    newer = {"aggregate_generation": "a", "aggregate_revision": 12, "ordinary_count": 0}
+    older = {**newer, "aggregate_revision": 11, "ordinary_count": 1}
+
+    # After eviction, a delayed publisher must first establish the durable baseline.
+    latest = notifications.publish_notification_aggregate(owner, older, load_current=lambda: newer)
+    assert latest["count"] == 0
+    for publish in (
+        lambda: notifications.repair_notification_state(owner, ["page-member"], older),
+        lambda: notifications.update_notification_projection(
+            upserts=[item("another-member", owner)], aggregates={owner.urlsafe_key: older},
+        )[owner.urlsafe_key],
+    ):
+        assert publish()["count"] == 0
+    current = notifications.peek_notification_state(owner)
+    assert current["revision"] > newer["aggregate_revision"]
+    assert notifications.publish_notification_aggregate(
+        owner, older, load_current=lambda: pytest.fail("warm dismissal reread Datastore"),
+    ) == current
+    updated = notifications.publish_notification_aggregate(
+        owner, {**newer, "aggregate_revision": 13, "unread_message_count": 1},
+    )
+    assert updated["count"] == 1
+    assert notifications.take_recorded_notification_state(owner)["count"] == 1
+
+    # A recreated durable aggregate starts its own revision sequence.
+    replacement = {**newer, "aggregate_generation": "b", "aggregate_revision": 0}
+    state = notifications.publish_notification_aggregate(owner, replacement, load_current=lambda: replacement)
+    assert state["count"] == 0 and state["aggregate_generation"] == "b"

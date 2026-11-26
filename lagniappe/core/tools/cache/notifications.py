@@ -9,6 +9,7 @@ from redis import WatchError
 
 from .core import cache
 from .notification_state import (
+    AggregateCounts,
     NotificationState,
     PublicNotificationState,
     clear_recorded_notification_states as clear_recorded_notification_states,
@@ -36,6 +37,42 @@ MAX_TRANSACTION_ATTEMPTS = 8
 def _aggregate_count(aggregate: Mapping[str, object], field: str) -> int:
     # Datastore rows also contain keys, timestamps and unrelated metadata.
     return int(cast(int | str, aggregate.get(field) or 0))
+
+
+def _ordered_counts(
+    current: NotificationState | None, aggregate: Mapping[str, object] | None,
+    members: set[str],
+) -> AggregateCounts:
+    """Keep durable count ordering independent of Redis membership revisions."""
+    generation = str((aggregate or {}).get("aggregate_generation") or "")
+    revision = (
+        _aggregate_count(aggregate, "aggregate_revision")
+        if aggregate is not None and "aggregate_revision" in aggregate else -1
+    )
+    if current and current["aggregate_revision"] >= 0 and (
+        aggregate is None or (
+            generation == current["aggregate_generation"]
+            and revision < current["aggregate_revision"]
+        )
+    ):
+        aggregate = current
+        generation = current["aggregate_generation"]
+        revision = current["aggregate_revision"]
+    if aggregate is None:
+        return {
+            "ordinary_count": len(members),
+            "unread_message_count": current["unread_message_count"] if current else 0,
+            "message_revision": current["message_revision"] if current else 0,
+            "aggregate_generation": "",
+            "aggregate_revision": -1,
+        }
+    return {
+        "ordinary_count": _aggregate_count(aggregate, "ordinary_count"),
+        "unread_message_count": _aggregate_count(aggregate, "unread_message_count"),
+        "message_revision": _aggregate_count(aggregate, "message_revision"),
+        "aggregate_generation": generation,
+        "aggregate_revision": revision,
+    }
 
 
 def peek_notification_state(user: object) -> NotificationState | None:
@@ -98,23 +135,14 @@ def seed_notification_state(
                             )
                     except Exception:
                         aggregate = None
-                ordinary_count = (
-                    _aggregate_count(aggregate, "ordinary_count")
-                    if aggregate is not None
-                    else len(members)
-                )
-                unread_message_count = (
-                    _aggregate_count(aggregate, "unread_message_count")
-                    if aggregate is not None
-                    else 0
-                )
-                message_revision = (
-                    _aggregate_count(aggregate, "message_revision")
-                    if aggregate is not None
-                    else 0
-                )
+                counts = _ordered_counts(current, aggregate, members)
 
-                changed = bool(current and members != current["members"])
+                changed = bool(current and (
+                    members != current["members"]
+                    or counts["ordinary_count"] != current["ordinary_count"]
+                    or counts["unread_message_count"] != current["unread_message_count"]
+                    or counts["message_revision"] != current["message_revision"]
+                ))
                 generation = current["generation"] if current else str(uuid.uuid4())
                 revision = (
                     current["revision"] + 1
@@ -131,14 +159,7 @@ def seed_notification_state(
                 pipe.delete(state_key)
                 pipe.hset(
                     state_key,
-                    mapping=_write_mapping(
-                        generation,
-                        revision,
-                        members,
-                        ordinary_count=ordinary_count,
-                        unread_message_count=unread_message_count,
-                        message_revision=message_revision,
-                    ),
+                    mapping=_write_mapping(generation, revision, members, **counts),
                 )
                 pipe.expire(state_key, NOTIFICATION_TTL_SECONDS)
                 pipe.expire(epoch_key, NOTIFICATION_TTL_SECONDS)
@@ -146,10 +167,8 @@ def seed_notification_state(
                 return {
                     "generation": generation,
                     "revision": revision,
-                    "message_revision": message_revision,
-                    "ordinary_count": ordinary_count,
-                    "unread_message_count": unread_message_count,
-                    "count": ordinary_count + unread_message_count,
+                    **counts,
+                    "count": counts["ordinary_count"] + counts["unread_message_count"],
                     "members": members,
                 }
             except WatchError:
@@ -195,41 +214,18 @@ def update_notification_projection(
                         members.update(changes["upserts"])
                         revision = current["revision"] + 1
                         aggregate = (aggregates or {}).get(user)
-                        ordinary_count = (
-                            _aggregate_count(aggregate, "ordinary_count")
-                            if aggregate is not None
-                            else len(members)
-                        )
-                        unread_message_count = (
-                            _aggregate_count(aggregate, "unread_message_count")
-                            if aggregate is not None
-                            else current.get("unread_message_count", 0)
-                        )
-                        message_revision = (
-                            _aggregate_count(aggregate, "message_revision")
-                            if aggregate is not None
-                            else current.get("message_revision", 0)
-                        )
+                        counts = _ordered_counts(current, aggregate, members)
                         pipe.delete(state_key)
                         pipe.hset(
                             state_key,
-                            mapping=_write_mapping(
-                                current["generation"],
-                                revision,
-                                members,
-                                ordinary_count=ordinary_count,
-                                unread_message_count=unread_message_count,
-                                message_revision=message_revision,
-                            ),
+                            mapping=_write_mapping(current["generation"], revision, members, **counts),
                         )
                         pipe.expire(state_key, NOTIFICATION_TTL_SECONDS)
                         state = {
                             "generation": current["generation"],
                             "revision": revision,
-                            "message_revision": message_revision,
-                            "ordinary_count": ordinary_count,
-                            "unread_message_count": unread_message_count,
-                            "count": ordinary_count + unread_message_count,
+                            **counts,
+                            "count": counts["ordinary_count"] + counts["unread_message_count"],
                             "members": members,
                         }
                     pipe.execute()
@@ -245,7 +241,8 @@ def update_notification_projection(
 
 
 def publish_notification_aggregate(
-    user: object, aggregate: Mapping[str, object]
+    user: object, aggregate: Mapping[str, object], *,
+    load_current: Callable[[], Mapping[str, object] | None] | None = None,
 ) -> NotificationState:
     """Mirror canonical durable counts without reading notification history."""
     identifier = _user_id(user)
@@ -259,27 +256,28 @@ def publish_notification_aggregate(
                 epoch = int(raw_epoch or 0)
                 members = set(current.get("members", ())) if current else set()
                 generation = current.get("generation") if current else str(uuid.uuid4())
+                snapshot = aggregate
+                if load_current and (
+                    not current or current["aggregate_revision"] < 0
+                    or current["aggregate_generation"] != str(aggregate.get("aggregate_generation") or "")
+                ):
+                    # A cold or legacy cache has no comparable durable revision.
+                    snapshot = load_current() or aggregate
+                counts = _ordered_counts(current, snapshot, members)
+                if (
+                    current and counts["aggregate_revision"] > _aggregate_count(snapshot, "aggregate_revision")
+                ):
+                    _record(identifier, current)
+                    return current
                 revision = max(
-                    (current or {}).get("revision", 0) + 1,
-                    _aggregate_count(aggregate, "aggregate_revision"),
-                    epoch + 1,
+                    (current or {}).get("revision", 0) + 1, counts["aggregate_revision"], epoch + 1,
                 )
-                ordinary_count = _aggregate_count(aggregate, "ordinary_count")
-                unread_message_count = _aggregate_count(aggregate, "unread_message_count")
-                message_revision = _aggregate_count(aggregate, "message_revision")
                 pipe.multi()
                 pipe.set(epoch_key, str(revision))
                 pipe.delete(state_key)
                 pipe.hset(
                     state_key,
-                    mapping=_write_mapping(
-                        generation,
-                        revision,
-                        members,
-                        ordinary_count=ordinary_count,
-                        unread_message_count=unread_message_count,
-                        message_revision=message_revision,
-                    ),
+                    mapping=_write_mapping(generation, revision, members, **counts),
                 )
                 pipe.expire(state_key, NOTIFICATION_TTL_SECONDS)
                 pipe.expire(epoch_key, NOTIFICATION_TTL_SECONDS)
@@ -287,10 +285,8 @@ def publish_notification_aggregate(
                 state: NotificationState = {
                     "generation": generation,
                     "revision": revision,
-                    "message_revision": message_revision,
-                    "ordinary_count": ordinary_count,
-                    "unread_message_count": unread_message_count,
-                    "count": ordinary_count + unread_message_count,
+                    **counts,
+                    "count": counts["ordinary_count"] + counts["unread_message_count"],
                     "members": members,
                 }
                 _record(identifier, state)

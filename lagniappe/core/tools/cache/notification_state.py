@@ -18,12 +18,17 @@ class PublicNotificationState(TypedDict):
     count: int | None
 
 
-class NotificationState(TypedDict):
-    generation: str
-    revision: int
+class AggregateCounts(TypedDict):
+    aggregate_revision: int
+    aggregate_generation: str
     message_revision: int
     ordinary_count: int
     unread_message_count: int
+
+
+class NotificationState(AggregateCounts):
+    generation: str
+    revision: int
     count: int
     members: set[str]
 
@@ -98,6 +103,7 @@ def project[K: str | bytes, V: str | bytes](raw: Mapping[K, V] | None) -> Notifi
         return None
     try:
         revision = int(values.get("revision") or 0)
+        aggregate_revision = int(values.get("aggregate_revision", -1))
         message_revision = int(values.get("message_revision") or 0)
         ordinary_count = int(values.get("ordinary_count") or 0)
         unread_message_count = int(values.get("unread_message_count") or 0)
@@ -113,6 +119,8 @@ def project[K: str | bytes, V: str | bytes](raw: Mapping[K, V] | None) -> Notifi
     return {
         "generation": generation,
         "revision": revision,
+        "aggregate_revision": aggregate_revision,
+        "aggregate_generation": values.get("aggregate_generation", ""),
         "message_revision": max(0, message_revision),
         "ordinary_count": max(0, ordinary_count),
         "unread_message_count": max(0, unread_message_count),
@@ -166,6 +174,8 @@ def write_mapping(
     ordinary_count: int | None = None,
     unread_message_count: int = 0,
     message_revision: int = 0,
+    aggregate_revision: int = -1,
+    aggregate_generation: str = "",
 ) -> dict[FieldT, str]:
     if ordinary_count is None:
         ordinary_count = len(members)
@@ -173,6 +183,8 @@ def write_mapping(
         "schema": NOTIFICATION_SCHEMA_VERSION,
         "generation": generation,
         "revision": str(int(revision)),
+        "aggregate_revision": str(aggregate_revision),
+        "aggregate_generation": aggregate_generation,
         "message_revision": str(max(0, int(message_revision))),
         "ordinary_count": str(max(0, int(ordinary_count))),
         "unread_message_count": str(max(0, int(unread_message_count))),
