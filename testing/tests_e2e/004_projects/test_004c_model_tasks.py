@@ -104,10 +104,7 @@ def test_change_model_task_form(get_admin, get_user):
     user.go(model_task.project)
     info_form = model_task.open_info()
 
-    form_button = FormSelect(info_form).button
-    expect(form_button).to_contain_text(
-        model_task.definition.form.value.definition.name
-    )
+    FormSelect(info_form).contains(model_task.definition.form.value)
 
     FormSelect(info_form).select(new_form)
 
@@ -116,8 +113,7 @@ def test_change_model_task_form(get_admin, get_user):
 
     assert SpinnerButtons.UPDATE_SUCCESS.successful(info_form)
 
-    form_button = FormSelect(info_form).button
-    expect(form_button).to_contain_text(new_form.name)
+    FormSelect(info_form).contains(new_form)
 
 
 def test_delete_model_task_form(get_admin, get_user):
@@ -127,10 +123,7 @@ def test_delete_model_task_form(get_admin, get_user):
 
     info_form = model_task.open_info()
 
-    form_button = FormSelect(info_form).button
-    expect(form_button).to_contain_text(
-        model_task.definition.form.value.definition.name
-    )
+    FormSelect(info_form).contains(model_task.definition.form.value)
 
     FormSelect(info_form).clear()
 

@@ -22,6 +22,7 @@ Usage:
     SpinnerButtons.CREATE.click(form)
 """
 
+import re
 from enum import Enum
 
 from playwright.sync_api import expect
@@ -66,6 +67,17 @@ class SelectButton:
     def button(self):
         return self._element
 
+    def _is_direct_combobox(self):
+        return self._element.locator("input[role='combobox']").count() > 0
+
+    def _expect_selection_text(self, text):
+        if self._is_direct_combobox():
+            expect(Select(self._element).input).to_have_attribute(
+                "placeholder", re.compile(re.escape(text))
+            )
+        else:
+            expect(self._element).to_contain_text(text)
+
     def contains(self, resource):
         """
         Check if the select button contains the item.
@@ -74,7 +86,7 @@ class SelectButton:
             element: Parent element containing the select button
             resource: Resource with .definition.name to check
         """
-        expect(self._element).to_contain_text(resource.definition.name)
+        self._expect_selection_text(resource.definition.name)
         return True
 
     def panel(self, fill=False):
@@ -85,8 +97,11 @@ class SelectButton:
             element: Parent element containing the select button
             fill: Value to fill the combobox input with
         """
-        self._element.click()
         combobox = Select(self._element)
+        if self._is_direct_combobox():
+            combobox.open()
+        else:
+            self._element.click()
         if fill:
             combobox.fill(fill)
         return combobox.panel
@@ -102,14 +117,14 @@ class SelectButton:
         combobox = Select(self._element)
         combobox.select_by_key(self.selection_key(item), query=item.definition.name)
 
-        expect(self._element).to_contain_text(item.definition.name)
+        self._expect_selection_text(item.definition.name)
 
     def select_by_key(self, item):
         """Open dropdown and select an item by its persisted entity key."""
         combobox = Select(self._element)
         combobox.select_by_key(self.selection_key(item))
 
-        expect(self._element).to_contain_text(item.definition.name)
+        self._expect_selection_text(item.definition.name)
 
     @staticmethod
     def selection_key(item):
@@ -133,9 +148,9 @@ class SelectButton:
 
     def clear(self):
         """
-        Clear the selected item by clicking the 'x' button.
+        Clear the selected item by clicking the Clear action button.
 
-        When a select button has a value (preloaded or selected), it shows
+        When a select control has a value (preloaded or selected), it shows
         a clear button (data-role='clear') that removes the selection.
 
         Args:
@@ -145,17 +160,25 @@ class SelectButton:
             src/script/elements/sectionToggle.ts: select button behavior
         """
         expect(self._element).to_be_visible()
-        row = self._element.locator(
-            "xpath=ancestor-or-self::*[@data-role='section-toggle-row'][1]"
-        )
-        clear_button = (
-            row.locator(self.CLEAR_BUTTON)
-            if row.count() > 0
-            else self._element.locator(self.CLEAR_BUTTON)
-        )
+        clear_button = self._element.locator(self.CLEAR_BUTTON)
+        if clear_button.count() == 0:
+            row = self._element.locator(
+                "xpath=ancestor-or-self::*[@data-role='section-toggle-row'][1]"
+            )
+            if row.count() > 0 and row.locator(self.CLEAR_BUTTON).count() > 0:
+                clear_button = row.locator(self.CLEAR_BUTTON)
+            else:
+                clear_button = self._element.locator(
+                    "xpath=ancestor::*[.//*[@data-role='clear']][1]"
+                ).locator(self.CLEAR_BUTTON)
         expect(clear_button).to_be_visible()
         clear_button.click()
-        expect(self._element).to_contain_text(self.default_text)
+        if self._is_direct_combobox():
+            expect(Select(self._element).input).to_have_attribute(
+                "data-values", "false"
+            )
+        else:
+            expect(self._element).to_contain_text(self.default_text)
 
 
 class FormSelect(SelectButton):

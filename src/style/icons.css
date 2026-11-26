@@ -144,7 +144,7 @@ button[type="submit"] .icon[data-icon="generate"] {
 }
 
 /* @style select.heading */
-.select-heading .icon {
+.select-heading > .icon {
 	--icon-box-size: var(--icon-sm-box-size);
 	--icon-size: var(--icon-sm-glyph-size);
 	--icon-offset-y: -1px;

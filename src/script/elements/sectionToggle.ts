@@ -39,16 +39,18 @@ const clearButton = (
 ) => {
 	const button = document.createElement("button");
 	button.dataset.role = "clear";
-	button.dataset.kind = "delete";
+	button.dataset.kind = "default";
 	button.type = "button";
-	button.className = STYLES.select.action;
+	button.className = STYLES.form.icon;
 	button.setAttribute("aria-label", label);
 	button.title = label;
 	setIcon(
 		button.appendChild(document.createElement("span")),
 		open ? "x" : "clear",
-		"icon-sm",
+		"icon-xs text-delete-default",
 	);
+	const text = button.appendChild(document.createElement("span"));
+	text.textContent = open ? "Close" : "Clear";
 	button.addEventListener("click", (e) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -74,10 +76,12 @@ const openLinkButton = (parent: SectionToggleControl) => {
 	link.dataset.role = "open-link";
 	link.dataset.kind = String(details.kind || parent.kind || "default");
 	link.href = href;
-	link.className = STYLES.select.action;
+	link.className = STYLES.form.icon;
 	link.setAttribute("aria-label", label);
 	link.title = label;
-	setIcon(link.appendChild(document.createElement("span")), "right", "icon-sm");
+	setIcon(link.appendChild(document.createElement("span")), "right", "icon-xs");
+	const text = link.appendChild(document.createElement("span"));
+	text.textContent = "Open";
 	return link;
 };
 
@@ -283,14 +287,21 @@ export class SectionToggle {
 		button.replaceChildren(...contents);
 
 		if (row) {
-			for (const node of row.querySelectorAll(
-				":scope > [data-role='open-link'], :scope > [data-role='clear']",
-			)) {
-				node.remove();
+			const heading =
+				row.parentElement?.querySelector<HTMLElement>(
+					":scope > .select-heading, :scope > h3, :scope > [data-role='label']",
+				) ?? null;
+			const actionHost = heading ?? row;
+			for (const container of heading ? [row, heading] : [row]) {
+				for (const node of container.querySelectorAll(
+					":scope > [data-role='open-link'], :scope > [data-role='clear']",
+				)) {
+					node.remove();
+				}
 			}
 
 			const link = openLinkButton(this.parent);
-			if (link) row.appendChild(link);
+			if (link) actionHost.appendChild(link);
 
 			const needsToggleClose = Boolean(this.parent.index);
 			if (
@@ -301,7 +312,7 @@ export class SectionToggle {
 				const clearLabel = this.parent.open
 					? `Close ${fieldTitle}`
 					: `Clear ${fieldTitle}`;
-				row.appendChild(
+				actionHost.appendChild(
 					clearButton(this.parent.open, clearLabel, () => this.parent.clear()),
 				);
 			}
@@ -425,22 +436,71 @@ export class FacetControl {
 
 	_initButtonFacet() {
 		if (!this.button) return;
-		this.toggle = new SectionToggle(this, this.widget);
-		this.toggle.display();
+		const button = this.button;
+		const wrapper = document.createElement("div");
+		wrapper.className = "min-w-0 w-full";
+		wrapper.setAttribute("lp-select", "");
+		if (button.dataset.action) wrapper.dataset.action = button.dataset.action;
+		if (this.kind) wrapper.dataset.kind = String(this.kind);
+		if (button.dataset.preload)
+			wrapper.dataset.preload = button.dataset.preload;
+		if (button.dataset.title) wrapper.dataset.title = button.dataset.title;
 
-		this.select = new FacetsBox(this.button);
-		this.element = document.createElement("input");
-		this.element.className = STYLES.select.default;
-		this.element.dataset.visible = "false";
-		this.element.dataset.kind = String(this.kind);
-		this.element.name = String(this.button.dataset.name || this.index);
-		this.button.after(this.element);
+		const input = document.createElement("input");
+		input.className = STYLES.select.default;
+		input.name = String(button.dataset.name || this.index || "");
+		if (this.index) input.dataset.index = this.index;
+		if (this.kind) input.dataset.kind = String(this.kind);
+		if (button.dataset.placeholder) {
+			input.dataset.placeholder = button.dataset.placeholder;
+		}
+		if (button.dataset.creatable) {
+			input.dataset.creatable = button.dataset.creatable;
+		}
+		if (button.dataset.formType) {
+			input.dataset.formType = button.dataset.formType;
+		}
+		if (button.dataset.permission) {
+			input.dataset.permission = button.dataset.permission;
+		}
+		if (button.dataset.multiple) {
+			input.dataset.multiple = button.dataset.multiple;
+		}
 
-		this.select.element = this.element;
+		wrapper.appendChild(input);
+		button.replaceWith(wrapper);
+
+		this.root = wrapper as FacetSource;
+		this.source = wrapper as FacetSource;
+		this.element = input;
+		this.select = new FacetsBox(wrapper);
 		this.select.init();
 
 		this.select.element.addEventListener("updated", this._updated);
-		this.select.element.addEventListener("deactivate", this._deactivate);
+		this._syncHeadingActions();
+	}
+
+	_syncHeadingActions() {
+		const host =
+			this.container?.querySelector<HTMLElement>(
+				":scope > .select-heading, :scope > h3, :scope > [data-role='label']",
+			) ?? null;
+		if (!host) return;
+		for (const node of host.querySelectorAll(
+			":scope > [data-role='open-link'], :scope > [data-role='clear']",
+		)) {
+			node.remove();
+		}
+		if (this.readonly || !this.active) return;
+
+		const link = openLinkButton(this);
+		if (link) host.appendChild(link);
+
+		const fieldTitle =
+			this.source?.dataset.title || this.button?.dataset.title || "selection";
+		host.appendChild(
+			clearButton(false, `Clear ${fieldTitle}`, () => this.clear()),
+		);
 	}
 
 	_initInputFacet() {
@@ -460,7 +520,11 @@ export class FacetControl {
 				? (Object.values(options).find(isFacetOption) ?? {})
 				: {};
 		this.open = false;
-		this._reconcile();
+		if (this.toggle) {
+			this._reconcile();
+		} else {
+			this._syncHeadingActions();
+		}
 	}
 
 	_deactivate() {
@@ -470,13 +534,17 @@ export class FacetControl {
 
 	toggleVisibility() {
 		if (this.readonly) return;
+		if (!this.toggle) {
+			this.element?.focus({ preventScroll: true });
+			return;
+		}
 		this.open = !this.open;
 		this._reconcile();
 	}
 
 	_reconcile() {
 		const { button, element, select, toggle } = this;
-		if (!button || !element) return;
+		if (!button || !element || !toggle) return;
 
 		withTransition(() => {
 			if (!this.open) {
@@ -489,14 +557,18 @@ export class FacetControl {
 				element.focus({ preventScroll: true });
 				select?.showPanel();
 			}
-			toggle?.display();
+			toggle.display();
 		});
 	}
 
 	addOption(option?: ComboboxOption) {
 		this.details = option || {};
 		this.select?.addOption(option);
-		this.toggle?.display();
+		if (this.toggle) {
+			this.toggle.display();
+		} else {
+			this._syncHeadingActions();
+		}
 	}
 
 	clear() {
@@ -504,7 +576,11 @@ export class FacetControl {
 		this.details = {};
 		this.select?.clear();
 		this.open = false;
-		this._reconcile();
+		if (this.toggle) {
+			this._reconcile();
+		} else {
+			this._syncHeadingActions();
+		}
 	}
 
 	destroy() {

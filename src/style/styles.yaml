@@ -1397,9 +1397,9 @@ select:
     hooks: [select-button, form-input]
     css: [src/style/forms.css, src/style/icons.css]
   heading:
-    classes: select-heading flex items-center gap-1.5 sm:text-sm font-semibold leading-none text-base-dark mb-1.5
-    intent: section heading with leading semantic icon above a section toggle row
-    surfaces: [server]
+    classes: select-heading flex min-h-6 items-center gap-1 sm:text-sm font-semibold leading-none text-base-dark mb-1
+    intent: section heading with leading semantic icon and optional label-row actions above a select control
+    surfaces: [server, frontend]
     hooks: [select-heading]
     css: [src/style/icons.css]
   label:
@@ -1414,12 +1414,6 @@ select:
     classes: ml-auto shrink-0 text-base-medium transition-transform duration-150 group-aria-expanded/toggle:rotate-180
     intent: trailing chevron indicating expandable section toggle state
     surfaces: [frontend]
-  action:
-    classes: form-input grid size-10 shrink-0 place-items-center rounded-md text-kind-default
-    intent: flat thin-bordered square companion open-link or clear button beside a select control
-    surfaces: [frontend]
-    hooks: [form-input]
-    css: [src/style/forms.css]
 
 signature:
   pad:

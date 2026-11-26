@@ -21,7 +21,7 @@
 	}
 }
 
-/* @style checkbox.default input radio.default select.action select.button select.default task.quickAdd.input textarea */
+/* @style checkbox.default input radio.default select.button select.default task.quickAdd.input textarea */
 .form-input {
 	background-color: white;
 	color: var(--color-base-dark);

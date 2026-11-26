@@ -98,6 +98,86 @@ test("test_section_toggle_renders_sibling_link_and_clear_buttons_without_nesting
 	assert.equal(button.title, "Attach Form");
 });
 
+test("test_facet_control_converts_button_to_direct_combobox_with_heading_actions", async (t) => {
+	createBrowser(t, {
+		url: "https://lagniappe.test/pages/page-1",
+		html: `
+			<div data-role="form-select" data-kind="form">
+				<h3 class="select-heading"><span>Attached Form</span></h3>
+				<button type="button"
+				        lp-select
+				        data-action="select-form"
+				        data-index="form"
+				        data-kind="form"
+				        data-title="Attach Form"
+				        data-placeholder="attach a form..."
+				        data-preload='{"id":"form-123","kind":"form","name":"Inspection Checklist"}'></button>
+			</div>
+		`,
+	});
+	window.matchMedia = () => ({
+		matches: false,
+		addEventListener() {},
+		removeEventListener() {},
+	});
+	const prevIO = globalThis.IntersectionObserver;
+	const prevRO = globalThis.ResizeObserver;
+	class StubObserver {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	}
+	globalThis.IntersectionObserver = StubObserver;
+	globalThis.ResizeObserver = StubObserver;
+	t.after(() => {
+		globalThis.IntersectionObserver = prevIO;
+		globalThis.ResizeObserver = prevRO;
+	});
+
+	const { SectionToggle } = await import(
+		"../../src/script/elements/sectionToggle.ts"
+	);
+	const button = document.querySelector("button[data-action='select-form']");
+	const control = SectionToggle.facet({}, button);
+	control.init();
+
+	try {
+		const container = document.querySelector("[data-role='form-select']");
+		const heading = container.querySelector(":scope > h3.select-heading");
+		const input = container.querySelector("input[role='combobox']");
+		assert.ok(input, "Button facet should upgrade to a direct combobox input");
+		assert.equal(input.placeholder, "Inspection Checklist");
+
+		const openLink = heading.querySelector(":scope > a[data-role='open-link']");
+		assert.ok(openLink, "Open link should live in the heading row");
+		assert.ok(openLink.classList.contains("form-field-action"));
+		assert.equal(
+			openLink.getAttribute("href"),
+			"https://lagniappe.test/forms/form-123",
+		);
+
+		const clearBtn = heading.querySelector(
+			":scope > button[data-role='clear']",
+		);
+		assert.ok(clearBtn, "Clear button should live in the heading row");
+		assert.ok(clearBtn.classList.contains("form-field-action"));
+		assert.equal(clearBtn.querySelector("[data-icon]")?.dataset.icon, "clear");
+
+		clearBtn.click();
+		assert.equal(
+			heading.querySelector(":scope > a[data-role='open-link']"),
+			null,
+		);
+		assert.equal(
+			heading.querySelector(":scope > button[data-role='clear']"),
+			null,
+		);
+		assert.equal(input.dataset.values, "false");
+	} finally {
+		control.destroy();
+	}
+});
+
 test("test_search_results_facets_sync_aria_pressed_on_toggle_and_reset", async (t) => {
 	createBrowser(t, {
 		url: "https://lagniappe.test/l/search?q=hive&kind=page",
@@ -117,6 +197,19 @@ test("test_search_results_facets_sync_aria_pressed_on_toggle_and_reset", async (
 		matches: false,
 		addEventListener() {},
 		removeEventListener() {},
+	});
+	const prevIO = globalThis.IntersectionObserver;
+	const prevRO = globalThis.ResizeObserver;
+	class StubObserver {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	}
+	globalThis.IntersectionObserver = StubObserver;
+	globalThis.ResizeObserver = StubObserver;
+	t.after(() => {
+		globalThis.IntersectionObserver = prevIO;
+		globalThis.ResizeObserver = prevRO;
 	});
 
 	class ShellViewStub {

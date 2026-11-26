@@ -328,6 +328,7 @@ export class TaskChipController {
 		const config = {
 			project: {
 				title: "Project Tracking",
+				icon: "project",
 				index: "project",
 				kind: "project",
 				name: "project",
@@ -339,6 +340,7 @@ export class TaskChipController {
 			form: {
 				title:
 					taskRow.dataset.hasForm === "true" ? "Change Form" : "Attach Form",
+				icon: "form",
 				index: "form",
 				kind: "form",
 				name: "form",
@@ -350,6 +352,7 @@ export class TaskChipController {
 			},
 			assigned_to: {
 				title: "Assigned To",
+				icon: "user",
 				index: "user",
 				kind: "user",
 				name: "assigned_to",
@@ -379,11 +382,76 @@ export class TaskChipController {
 
 		const errorEl = this._drawerErrorElement();
 
-		const row = document.createElement("div");
-		row.className = STYLES.select.row;
+		const fieldWrap = document.createElement("div");
+		fieldWrap.className = "flex flex-col";
+		fieldWrap.dataset.kind = config.kind;
+
+		const heading = document.createElement("h3");
+		heading.className = STYLES.select.heading;
+		heading.dataset.role = "label";
+		heading.append(
+			createIcon(config.icon, STYLES.icon.default),
+			Object.assign(document.createElement("span"), {
+				textContent: config.title,
+			}),
+		);
+
+		if (openLink) {
+			const link = document.createElement("a");
+			link.href = openLink.href;
+			link.dataset.role = "open-link";
+			link.dataset.kind = existingOption?.kind || config.kind;
+			link.className = STYLES.form.icon;
+			link.setAttribute("aria-label", openLink.label);
+			link.title = openLink.label;
+			link.append(
+				createIcon("right", "icon-xs"),
+				Object.assign(document.createElement("span"), {
+					textContent: "Open",
+				}),
+			);
+			heading.appendChild(link);
+		}
+
+		if (existingOption) {
+			const clearBtn = document.createElement("button");
+			clearBtn.type = "button";
+			clearBtn.dataset.role = "clear";
+			clearBtn.dataset.kind = "default";
+			clearBtn.className = STYLES.form.icon;
+			const clearText = `${config.clearLabel} ${config.title.toLowerCase()}`;
+			clearBtn.setAttribute("aria-label", clearText);
+			clearBtn.title = clearText;
+			clearBtn.append(
+				createIcon("clear", "icon-xs text-delete-default"),
+				Object.assign(document.createElement("span"), {
+					textContent: config.clearLabel,
+				}),
+			);
+			clearBtn.addEventListener("click", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				const data = new FormData();
+				data.append("active", "TaskChip");
+				data.append("chip_field", field);
+				if (field === "project") {
+					data.append("project", "");
+					data.append("model", "");
+				} else {
+					data.append(config.name, "");
+				}
+				void this._saveChip(taskRow, drawer, data, {
+					chipField: field,
+					formChanged: field === "form",
+					keepDrawerOpen: true,
+					remountCombobox: true,
+				});
+			});
+			heading.appendChild(clearBtn);
+		}
 
 		const wrapper = document.createElement("div");
-		wrapper.className = "min-w-0 flex-1";
+		wrapper.className = "min-w-0 w-full";
 		wrapper.setAttribute("lp-select", "");
 		wrapper.dataset.kind = config.kind;
 		wrapper.dataset.role = `${field}-chip-select`;
@@ -405,53 +473,9 @@ export class TaskChipController {
 			input.dataset.permission = config.permission;
 		}
 		wrapper.appendChild(input);
-		row.appendChild(wrapper);
 
-		if (openLink) {
-			const link = document.createElement("a");
-			link.href = openLink.href;
-			link.dataset.role = "open-link";
-			link.dataset.kind = existingOption?.kind || config.kind;
-			link.className = STYLES.select.action;
-			link.setAttribute("aria-label", openLink.label);
-			link.title = openLink.label;
-			link.appendChild(createIcon("right", "icon-sm"));
-			row.appendChild(link);
-		}
-
-		if (existingOption) {
-			const clearBtn = document.createElement("button");
-			clearBtn.type = "button";
-			clearBtn.dataset.role = "clear";
-			clearBtn.dataset.kind = "delete";
-			clearBtn.className = STYLES.select.action;
-			const clearText = `${config.clearLabel} ${config.title.toLowerCase()}`;
-			clearBtn.setAttribute("aria-label", clearText);
-			clearBtn.title = config.clearLabel;
-			clearBtn.appendChild(createIcon("clear", "icon-sm"));
-			clearBtn.addEventListener("click", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				const data = new FormData();
-				data.append("active", "TaskChip");
-				data.append("chip_field", field);
-				if (field === "project") {
-					data.append("project", "");
-					data.append("model", "");
-				} else {
-					data.append(config.name, "");
-				}
-				void this._saveChip(taskRow, drawer, data, {
-					chipField: field,
-					formChanged: field === "form",
-					keepDrawerOpen: true,
-					remountCombobox: true,
-				});
-			});
-			row.appendChild(clearBtn);
-		}
-
-		drawer.replaceChildren(errorEl, row);
+		fieldWrap.append(heading, wrapper);
+		drawer.replaceChildren(errorEl, fieldWrap);
 
 		const box = new FacetsBox(wrapper);
 		box.init();

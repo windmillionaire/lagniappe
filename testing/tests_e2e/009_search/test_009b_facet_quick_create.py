@@ -102,7 +102,7 @@ def _quick_create_option(user, panel, label, name, response_glob):
 def _quick_create_from_select_button(user, select_button, label, name, response_glob):
     panel = select_button.panel(fill=name)
     _quick_create_option(user, panel, label, name, response_glob)
-    expect(select_button.button).to_contain_text(name)
+    select_button._expect_selection_text(name)
 
 
 def _quick_create_from_combobox(user, combobox, label, name, response_glob):

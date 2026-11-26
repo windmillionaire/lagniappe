@@ -726,9 +726,9 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     expect(Select(categories).input).to_have_attribute(
         "placeholder", re.compile(re.escape(category.definition.name))
     )
-    expect(info_form.locator("[data-role='form-select']")).to_contain_text(
-        form.definition.name
-    )
+    expect(
+        Select(info_form.locator("[data-role='form-select']")).input
+    ).to_have_attribute("placeholder", re.compile(re.escape(form.definition.name)))
 
     settings_panel = open_user_settings(owner, user_page)
     expect(settings_panel.locator("input[name='name']")).to_have_value(updated_name)

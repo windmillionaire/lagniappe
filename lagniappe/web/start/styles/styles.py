@@ -425,11 +425,10 @@ STYLES = {
 		"default": "form-input col-start-1 row-start-1 h-10 w-full appearance-none rounded-md py-1.25 pr-8 pl-3 sm:text-sm placeholder:text-base-medium",
 		"icon": "select-icon pointer-events-none col-start-1 row-start-1 mr-2.5 self-center justify-self-end z-25 text-base-medium",
 		"button": "select-button form-input group/toggle flex h-10 min-w-0 w-full flex-1 flex-row items-center gap-2 rounded-md px-3 text-left sm:text-sm font-semibold disabled:pointer-events-none",
-		"heading": "select-heading flex items-center gap-1.5 sm:text-sm font-semibold leading-none text-base-dark mb-1.5",
+		"heading": "select-heading flex min-h-6 items-center gap-1 sm:text-sm font-semibold leading-none text-base-dark mb-1",
 		"label": "min-w-0 flex-1 truncate text-left",
 		"row": "flex w-full items-center gap-2",
-		"expandIndicator": "ml-auto shrink-0 text-base-medium transition-transform duration-150 group-aria-expanded/toggle:rotate-180",
-		"action": "form-input grid size-10 shrink-0 place-items-center rounded-md text-kind-default"
+		"expandIndicator": "ml-auto shrink-0 text-base-medium transition-transform duration-150 group-aria-expanded/toggle:rotate-180"
 	},
 	"signature": {
 		"pad": "relative rounded-md w-full h-40 bg-white outline-base-light outline",
