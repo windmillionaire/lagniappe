@@ -229,6 +229,16 @@ INDEX_YAML = {
                 {"name": "modified", "direction": "desc"},
             ],
         },
+        # Ordinary Category listings include both owned and linked Pages.
+        {
+            "kind": "instances",
+            "properties": [
+                {"name": "active"},
+                {"name": "type"},
+                {"name": "model"},
+                {"name": "modified", "direction": "desc"},
+            ],
+        },
         {
             "kind": "instances",
             "properties": [
@@ -245,6 +255,36 @@ INDEX_YAML = {
                 {"name": "active"},
                 {"name": "type"},
                 {"name": "due_date", "direction": "asc"},
+            ],
+        },
+        # Home counts incomplete Tasks owned by or assigned to the viewer's Page.
+        {
+            "kind": "instances",
+            "properties": [
+                {"name": "active"},
+                {"name": "type"},
+                {"name": "completed"},
+                {"name": "page"},
+            ],
+        },
+        {
+            "kind": "instances",
+            "properties": [
+                {"name": "active"},
+                {"name": "type"},
+                {"name": "completed"},
+                {"name": "assigned_to"},
+            ],
+        },
+        # Incomplete undated Tasks, newest first.
+        {
+            "kind": "instances",
+            "properties": [
+                {"name": "active"},
+                {"name": "type"},
+                {"name": "completed"},
+                {"name": "due_date"},
+                {"name": "modified", "direction": "desc"},
             ],
         },
         # tasks_without_due_dates when requires is not filtered (unrestricted users)
@@ -318,6 +358,15 @@ INDEX_YAML = {
                 {"name": "active"},
                 {"name": "type"},
                 {"name": "due_date"},
+                {"name": "modified", "direction": "desc"},
+            ],
+        },
+        {
+            "kind": "instances",
+            "properties": [
+                {"name": "active"},
+                {"name": "type"},
+                {"name": "categories"},
                 {"name": "modified", "direction": "desc"},
             ],
         },
