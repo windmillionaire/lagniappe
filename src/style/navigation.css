@@ -191,8 +191,9 @@ nav:has(> [data-role="actions"]) > [data-role="actions"] {
 	display: none;
 }
 
-/* @style entity.description */
-[data-role="description"][data-editable="true"] {
+/* @style category.defaultForm.display entity.description */
+[data-role="description"][data-editable="true"],
+[data-role="default-form"][data-editable="true"] {
 	cursor: pointer;
 	transition:
 		outline-color 120ms ease,

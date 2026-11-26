@@ -208,3 +208,66 @@
             class="{{ styles.button.submit }} flex-1">Reset</button>
   </div>
 {% endmacro %}
+
+{% macro filter_bar(entity) %}
+  <div id="filter-bar"
+       lp-component
+       data-default="FilterBar"
+       data-visible="true"
+       data-persistent="true"
+       class="{{ styles.filterBar.container }}">
+    <div data-widget="FilterBar"
+         data-persistent="true"
+         data-visible="true"
+         data-key="{{ entity.urlsafe_key }}"
+         data-kind="{{ 'task' if entity.entity_kind == 'project' else 'page' }}"
+         data-can-edit="{{ entity.allowed(Action.EDIT)|yesno }}"
+         data-conditions='{{ entity.properties.filters.preload|tojson }}'
+         class="{{ styles.filterBar.row }}">
+      <div data-role="chips-group" class="{{ styles.filterBar.chipsGroup }}">
+        <div class="relative inline-flex" data-role="saved-anchor">
+          <button type="button"
+                  data-role="saved-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  class="{{ styles.filterBar.savedButton }}">
+            {{ render_icon("bookmark", styles.filterBar.icon) }}
+            <span>Saved filters</span>
+            {{ render_icon("down", styles.filterBar.chevron) }}
+          </button>
+          <div data-role="saved-popover"
+               data-visible="false"
+               class="{{ styles.filterBar.savedPopover }}"></div>
+        </div>
+        <div data-role="chips" class="{{ styles.filterBar.chips }}"></div>
+        <div class="relative inline-flex" data-role="add-anchor">
+          <button type="button"
+                  data-role="add-trigger"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                  class="{{ styles.filterBar.addButton }}">
+            {{ render_icon("add", styles.filterBar.icon) }}
+            <span>Filter</span>
+          </button>
+          <div data-role="add-popover"
+               data-visible="false"
+               class="{{ styles.filterBar.addPopover }}"></div>
+        </div>
+      </div>
+      <div data-role="bar-actions"
+           data-visible="false"
+           class="{{ styles.filterBar.actions }}">
+        <span data-role="match-status" class="{{ styles.filterBar.status }}"></span>
+        {% if entity.allowed(Action.EDIT) %}
+          <button type="button"
+                  data-role="save-filter"
+                  data-kind="{{ 'task' if entity.entity_kind == 'project' else 'page' }}"
+                  class="{{ styles.filterBar.saveButton }}">Save filter</button>
+        {% endif %}
+        <button type="button"
+                data-role="clear-filters"
+                class="{{ styles.filterBar.clearButton }}">Clear</button>
+      </div>
+    </div>
+  </div>
+{% endmacro %}

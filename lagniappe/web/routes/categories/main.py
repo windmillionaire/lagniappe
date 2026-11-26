@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
 
-from flask import request
+from flask import jsonify, request
 from flask_login import current_user
 
 from lagniappe.core.entities import Entities
@@ -106,6 +106,72 @@ def update(
     Entities.save(category)
 
     return responses.category_info(category)
+
+
+@categories.route("/<key>/patch", methods=["PATCH"])
+@permission(Resource.CATEGORY, Action.EDIT)
+def patch(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
+    category = kwargs["entity"]
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return responses.bad_request("Invalid category patch payload")
+
+    schema_id = payload.get("schema_id")
+    value = payload.get("value")
+
+    if schema_id == "name":
+        data: CategoryData = {
+            "name": str(value) if value is not None else "",
+            "description": category.description,
+            "form": category.form,
+        }
+    elif schema_id == "description":
+        data = {
+            "name": category.name,
+            "description": str(value) if value is not None else "",
+            "form": category.form,
+        }
+    elif schema_id == "form":
+        form_key = str(value).strip() if value else None
+        try:
+            selected_form = SubmittedReferenceResolver(
+                authenticated_user(), form_key
+            ).one(
+                form_key,
+                expected=Entities.FORM,
+                action=Action.VIEW,
+                existing=category.form,
+                predicate=lambda candidate: candidate.form_type == "page",
+            )
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
+        data = {
+            "name": category.name,
+            "description": category.description,
+            "form": selected_form,
+        }
+    else:
+        return responses.bad_request(f"Unsupported category field: {schema_id}")
+
+    try:
+        category.update(data)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
+    Entities.save(category)
+
+    return (
+        jsonify(
+            {
+                "name": category.name,
+                "description": category.description or "",
+                "form": category.properties.form.column_value if category.form else None,
+                "fingerprint": category.fingerprint,
+            }
+        ),
+        200,
+    )
 
 
 def _generate_category(generated_data: ai_category.GeneratedCategory) -> CategoryData:

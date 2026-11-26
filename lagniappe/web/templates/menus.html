@@ -50,6 +50,17 @@
   </button>
 {% endmacro %}
 
+{% macro category_action(label, icon, action_name, kind="default", label_role=None) %}
+  <button type="button"
+          data-menu-item
+          data-kind="{{ kind }}"
+          data-category-action="{{ action_name }}"
+          class="{{ styles.dropdown.option.action }}">
+    {{ render_icon((icon), (styles.dropdown.icon ~ " text-kind-default")) }}
+    <span{% if label_role %} data-role="{{ label_role }}"{% endif %}>{{ label }}</span>
+  </button>
+{% endmacro %}
+
 {% macro star(starred) %}
   <button type="button"
           data-menu-item

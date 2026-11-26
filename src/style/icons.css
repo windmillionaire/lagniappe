@@ -307,13 +307,13 @@ button.tab-icon .icon {
 	--icon-offset-x: 0.5px;
 }
 
-/* @style builder.settings.toggle.icon */
+/* @style builder.settings.toggle.icon filterBar.chevron */
 .icon.icon-xs {
 	--icon-box-size: var(--icon-xs-box-size);
 	--icon-size: var(--icon-xs-glyph-size);
 }
 
-/* @style nav.menu.chevron */
+/* @style category.defaultForm.icon filterBar.icon index.header.primaryActionIcon nav.menu.chevron */
 .icon.icon-sm {
 	--icon-box-size: var(--icon-sm-box-size);
 	--icon-size: var(--icon-sm-glyph-size);

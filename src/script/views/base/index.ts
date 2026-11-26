@@ -51,6 +51,7 @@ export default class EntityIndex extends Core {
 		const table = this.getComponent(this.elt.querySelector("#table"));
 		if (!table) throw new Error("Entity index requires a table component");
 		const tools = this.elt.querySelector<HTMLElement>("#tools");
+		const filterBar = this.elt.querySelector<HTMLElement>("#filter-bar");
 		const mobileControls =
 			this.elt.querySelector<HTMLElement>("#mobile-controls");
 		let indexTable: LoadedWidget | null = null;
@@ -122,26 +123,144 @@ export default class EntityIndex extends Core {
 		};
 		this.elt.addEventListener("mobile-resize", this._indexMobileResize);
 
-		if (!tools) {
-			return;
+		if (tools) {
+			const thead = table.elt.querySelector("thead");
+			this.toolsObserver = new MutationObserver((mutations) => {
+				for (const mutation of mutations) {
+					if (mutation.attributeName === "data-visible") {
+						const visible = tools?.dataset.visible === "true";
+						thead?.classList.toggle("sticky", !visible);
+					}
+				}
+			});
+			this.toolsObserver.observe(tools, { attributes: true });
+			await this._renderDefaultTool(tools);
 		}
 
-		const thead = table.elt.querySelector("thead");
-		this.toolsObserver = new MutationObserver((mutations) => {
-			for (const mutation of mutations) {
-				if (mutation.attributeName === "data-visible") {
-					const visible = tools?.dataset.visible === "true";
-					thead?.classList.toggle("sticky", !visible);
-				}
-			}
-		});
-		this.toolsObserver.observe(tools, { attributes: true });
-		await this._renderDefaultTool(tools);
+		if (filterBar && this._defaultToolSlug() === "filters") {
+			const bar = await this._ensureFilterBar(filterBar);
+			bar?.openAddPopover?.();
+		}
+	}
+
+	async _ensureFilterBar(filterBarEl: HTMLElement) {
+		const component = this.getComponent(filterBarEl);
+		if (!component) return null;
+		const existing = component.widgets.FilterBar as
+			| {
+					openAddPopover?: () => void;
+					toggleAddPopover?: () => void;
+					toggleSavedPopover?: () => Promise<void>;
+			  }
+			| undefined;
+		if (existing) return existing;
+		return (await component.loadWidget("FilterBar")) as {
+			openAddPopover?: () => void;
+			toggleAddPopover?: () => void;
+			toggleSavedPopover?: () => Promise<void>;
+		} | null;
+	}
+
+	_handleCategoryHeaderClick(target: Element, e: MouseEvent): boolean {
+		const categoryAction = target.closest<HTMLElement>(
+			"[data-category-action]",
+		);
+		if (
+			categoryAction?.dataset.categoryAction &&
+			this.elt.contains(categoryAction)
+		) {
+			const action = categoryAction.dataset.categoryAction;
+			e.preventDefault();
+			e.stopPropagation();
+			void import("../../widgets/categoryHeader.ts").then((mod) => {
+				if (this._destroyed) return;
+				if (action === "rename") mod.startCategoryRename(this);
+				else if (action === "description")
+					mod.startCategoryDescriptionEdit(this);
+				else if (action === "default-form")
+					mod.startCategoryDefaultFormEdit(this);
+			});
+			return true;
+		}
+
+		const editableDescription = target.closest<HTMLElement>(
+			"[data-role='description'][data-editable='true']",
+		);
+		if (
+			editableDescription &&
+			this.elt.contains(editableDescription) &&
+			!target.closest("a, button, input, textarea, form")
+		) {
+			e.preventDefault();
+			e.stopPropagation();
+			void import("../../widgets/categoryHeader.ts").then((mod) => {
+				if (!this._destroyed) mod.startCategoryDescriptionEdit(this);
+			});
+			return true;
+		}
+
+		const editableDefaultForm = target.closest<HTMLElement>(
+			"[data-role='default-form'][data-editable='true']",
+		);
+		if (
+			editableDefaultForm &&
+			this.elt.contains(editableDefaultForm) &&
+			!target.closest("a, button, input, textarea, form")
+		) {
+			e.preventDefault();
+			e.stopPropagation();
+			void import("../../widgets/categoryHeader.ts").then((mod) => {
+				if (!this._destroyed) mod.startCategoryDefaultFormEdit(this);
+			});
+			return true;
+		}
+
+		return false;
 	}
 
 	_click(e: MouseEvent) {
 		const { target } = e;
 		if (!(target instanceof Element)) return;
+
+		if (this._handleCategoryHeaderClick(target, e)) return;
+
+		const filterBarTrigger = target.closest<HTMLElement>(
+			"#filter-bar [data-role='add-trigger'], #filter-bar [data-role='saved-trigger']",
+		);
+		if (filterBarTrigger && this.elt.contains(filterBarTrigger)) {
+			const filterBarEl = filterBarTrigger.closest<HTMLElement>("#filter-bar");
+			const component = filterBarEl ? this.getComponent(filterBarEl) : null;
+			if (filterBarEl && component && !component.widgets.FilterBar) {
+				e.preventDefault();
+				e.stopPropagation();
+				const role = filterBarTrigger.dataset.role;
+				void this.runColdAction(
+					filterBarTrigger,
+					() => this._ensureFilterBar(filterBarEl),
+					(bar) => {
+						if (role === "saved-trigger") {
+							void bar?.toggleSavedPopover?.();
+						} else {
+							bar?.toggleAddPopover?.();
+						}
+					},
+					filterBarTrigger,
+				);
+				return;
+			}
+		}
+
+		const createPageBtn = target.closest("button[lp-show='tools:CreatePage']");
+		if (this.mobile && createPageBtn) {
+			const mobileControls =
+				this.elt.querySelector<HTMLElement>("#mobile-controls");
+			const table = this.getComponent(this.elt.querySelector("#table"));
+			if (table?.active?.name === "MobileTableControls") {
+				table.deactivate(false);
+			} else if (mobileControls) {
+				mobileControls.dataset.visible = "false";
+			}
+		}
 		const toolsTrigger = target.closest("[data-role='tools-dropdown']");
 		if (this.mobile && toolsTrigger && !this.dropdown) {
 			e.preventDefault();

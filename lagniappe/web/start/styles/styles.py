@@ -262,7 +262,9 @@ STYLES = {
 	},
 	"index": {
 		"header": {
-			"iconContext": "index-header-icon-context"
+			"iconContext": "index-header-icon-context",
+			"primaryAction": "inline-flex cursor-pointer items-center gap-1 rounded-md bg-kind-default px-2.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
+			"primaryActionIcon": "icon-sm"
 		},
 		"mobile": {
 			"controls": "rounded-md bg-kind-bg p-4 text-base flex flex-col gap-2 font-semibold mt-4",
@@ -270,6 +272,7 @@ STYLES = {
 		},
 		"tools": {
 			"container": "mx-auto w-full flex flex-row gap-4",
+			"single": "mx-auto w-full rounded-md bg-kind-bg p-4",
 			"main": "flex-1 rounded-md bg-kind-bg p-4",
 			"navigation": "shrink-0 flex-col gap-2 rounded-md bg-kind-bg p-2 sm:flex sm:min-w-64 sm:p-4",
 			"toggle": "w-full flex flex-row items-center justify-end gap-2 rounded-md bg-kind-bg px-2 py-1.5 font-semibold text-kind-default text-right focus:outline-kind-default hover:outline-kind-default hover:outline-2 focus:outline-2 data-[selected=true]:bg-kind-light data-[selected=true]:text-kind-dark",
@@ -557,5 +560,41 @@ STYLES = {
 		"photo": {
 			"chip": "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/70 bg-white px-2.5 py-1.5 text-sm font-semibold text-base-dark shadow-xs transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
 		}
+	},
+	"category": {
+		"defaultForm": {
+			"display": "mt-2 inline-flex w-fit max-w-full items-center gap-1.5 rounded-md bg-kind-bg px-3 py-1.5 text-sm empty:hidden",
+			"icon": "icon-sm text-kind-default",
+			"editor": "mt-2 flex w-full max-w-md flex-col gap-2"
+		}
+	},
+	"filterBar": {
+		"container": "mt-3 mb-2",
+		"row": "flex flex-row flex-wrap items-center justify-between gap-2",
+		"chipsGroup": "flex min-w-0 flex-1 flex-row flex-wrap items-center gap-2",
+		"chips": "contents",
+		"savedButton": "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/80 bg-white px-2.5 py-1 text-sm font-medium text-base-dark transition-colors hover:border-base-medium hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
+		"addButton": "inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-base-medium/70 bg-white px-2.5 py-1 text-sm font-medium text-base-medium transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
+		"icon": "icon-sm text-base-medium",
+		"chevron": "icon-xs text-base-medium",
+		"actions": "flex shrink-0 flex-row items-center gap-2",
+		"status": "text-xs font-medium text-base-medium",
+		"saveButton": "inline-flex cursor-pointer items-center rounded-md border border-kind-default/40 bg-kind-bg px-2.5 py-1 text-xs font-semibold text-kind-dark transition-colors hover:bg-kind-light disabled:pointer-events-none disabled:opacity-50",
+		"clearButton": "cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-base-medium transition-colors hover:bg-base-bg hover:text-base-dark disabled:pointer-events-none disabled:opacity-50",
+		"savedPopover": "absolute left-0 top-full z-40 mt-1.5 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-md bg-white p-1.5 shadow-lg outline outline-base-light/60",
+		"addPopover": "absolute left-0 top-full z-40 mt-1.5 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-md bg-white p-3 shadow-lg outline outline-base-light/60",
+		"chipRemove": "ml-0.5 inline-flex cursor-pointer items-center justify-center rounded-sm p-0.5 text-base-medium transition-colors hover:bg-base-light/40 hover:text-base-dark",
+		"searchInput": "form-input w-full rounded-md px-2.5 py-1.5 text-sm",
+		"sectionHeading": "px-2 pt-1.5 pb-0.5 text-xs font-semibold uppercase tracking-wide text-base-medium",
+		"fieldList": "flex max-h-64 flex-col gap-0.5 overflow-y-auto",
+		"fieldOption": "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-base-dark transition-colors hover:bg-base-bg focus-visible:bg-base-bg focus-visible:outline-none",
+		"stepHeader": "flex items-center justify-between gap-2 border-b border-base-light/60 pb-2",
+		"backButton": "inline-flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium text-base-medium transition-colors hover:bg-base-bg hover:text-base-dark",
+		"stepBody": "flex flex-col gap-3",
+		"error": "rounded-md bg-error-bg px-2.5 py-1.5 text-xs font-medium text-error-dark",
+		"empty": "px-2.5 py-2 text-sm italic text-base-medium",
+		"savedRow": "flex items-center justify-between gap-2 rounded-sm p-1.5 transition-colors hover:bg-base-bg",
+		"savedApply": "flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-1 text-left",
+		"savedDelete": "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-sm p-1 text-base-medium transition-colors hover:bg-delete-bg hover:text-delete-default"
 	}
 }

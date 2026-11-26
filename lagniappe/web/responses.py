@@ -843,6 +843,41 @@ def new_filter(filter: models.Filter) -> tuple[str, int]:
     return template(filter), 200
 
 
+def _serialize_bar_filter(filter_entity: models.Filter) -> dict[str, object]:
+    badge_template = get_template_attribute("badge.html", "badge")
+    unavailable = bool(getattr(filter_entity, "unavailable", False))
+    conditions: list[dict[str, object]] = []
+    if not unavailable:
+        for condition in filter_entity.conditions:
+            conditions.append(
+                {
+                    "badge": str(badge_template(condition.details)),
+                    "definition": condition.contract_condition,
+                }
+            )
+    return {
+        "key": filter_entity.urlsafe_key,
+        "fingerprint": filter_entity.fingerprint,
+        "url": url_for("filters.run", key=filter_entity.urlsafe_key),
+        "unavailable": unavailable,
+        "can_edit": filter_entity.allowed(Action.EDIT),
+        "conditions": conditions,
+    }
+
+
+def saved_filter_bar_item(filter_entity: models.Filter) -> tuple[Response, int]:
+    return jsonify({"filter": _serialize_bar_filter(filter_entity)}), 200
+
+
+def saved_filters_bar(
+    filters: Iterable[models.Filter],
+) -> tuple[Response, int]:
+    return (
+        jsonify({"filters": [_serialize_bar_filter(f) for f in filters]}),
+        200,
+    )
+
+
 def saved_filters(
     entity: models.Project | models.Category, filters: Iterable[models.Filter]
 ) -> tuple[str, int]:

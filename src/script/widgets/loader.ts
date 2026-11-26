@@ -51,6 +51,7 @@ const WIDGETS = {
 	FileInfo: () => import("./fileInfo.ts"),
 	PDFPreview: () => import("./filePdfPreview.ts"),
 	FileUpload: () => import("./uploadFile.ts"),
+	FilterBar: () => import("./filterBar.ts"),
 	Filters: () => import("./filters.ts"),
 	FilterResults: () => import("./filterResults.ts"),
 	GroupPermissions: () => import("./userPermissions.ts"),

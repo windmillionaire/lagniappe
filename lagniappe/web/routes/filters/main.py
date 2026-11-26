@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
 
+from types import SimpleNamespace
 from flask import request
 from flask_login import current_user
 
@@ -64,6 +65,31 @@ def _filter_results_response(entity, compiled):
     cache = FilterCache(new_filter.parent)
     cache.update(queue=False)
     results = cache.query(compiled)
+
+    if request.values.get("mode") == "rows":
+        if isinstance(entity, Entities.CATEGORY):
+            category_index = entity.index()
+            table_parent = SimpleNamespace(
+                table=category_index.table,
+                is_filter=True,
+                route=category_index.route,
+                append=None,
+            )
+            pages = [item for item in results if isinstance(item, Entities.PAGE)]
+            return responses.rows(pages, table_parent)
+        if isinstance(entity, Entities.PROJECT):
+            new_filter.table.embedded = False
+            tasks = sort_tasks(
+                [item for item in results if isinstance(item, Entities.TASK)]
+            )
+            table_parent = SimpleNamespace(
+                table=new_filter.table,
+                is_filter=True,
+                route=None,
+                append=None,
+            )
+            return responses.rows(tasks, table_parent)
+
     new_filter.table.embedded = True
 
     return responses.table(results, new_filter)
@@ -132,6 +158,8 @@ def save(key: str, **kwargs: Unpack[EntityContext[models.Category | models.Proje
     new_filter = Entities.FILTER.create(entity, compiled)
     Entities.save(new_filter, entity)
 
+    if request.values.get("format") == "bar":
+        return responses.saved_filter_bar_item(new_filter)
     return responses.new_filter(new_filter)
 
 
@@ -157,6 +185,8 @@ def get(
                 entity_filter.unavailable = True
                 filters.append(entity_filter)
 
+    if request.values.get("format") == "bar":
+        return responses.saved_filters_bar(filters)
     return responses.saved_filters(entity, filters)
 
 

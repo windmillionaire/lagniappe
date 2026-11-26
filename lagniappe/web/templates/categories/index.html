@@ -2,11 +2,11 @@
 {% set view_entry = "index" %}
 {% import 'controls.html' as controls %}
 {% import 'menus.html' as menus %}
-{% from 'filters.html' import filtered_conditions %}
+{% from 'filters.html' import filter_bar, filtered_conditions %}
 {% from 'table.html' import table, mobile_toggles %}
 {% import 'categories/tools.html' as tools %}
 
-{% macro view_header(category) %}
+{% macro view_header(category, can_edit, can_view_forms) %}
   <nav class="{{ styles.layout.view.title }} {{ styles.index.header.iconContext }}" data-nav="view">
     <div>
       {% if filtered %}
@@ -18,6 +18,13 @@
         <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
           <span data-role="title" class="text-kind-default" data-kind="category">{{ category.name }}</span>
           {% call menus.title("Category actions") %}
+            {% if can_edit %}
+              {{ menus.category_action("Rename", "edit", "rename", "category") }}
+              {{ menus.category_action("Edit description" if category.description else "Add description", "textarea", "description", "category", "description-action-label") }}
+              {% if can_view_forms %}
+                {{ menus.category_action("Change default form" if category.form else "Set default form", "form", "default-form", "form", "default-form-action-label") }}
+              {% endif %}
+            {% endif %}
             {{ menus.star(is_starred(category)) }}
             {% if category.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
           {% endcall %}
@@ -32,27 +39,23 @@
               aria-label="Table controls"
               title="Table controls">{{ render_icon("column") }}</button>
       {% if not filtered %}
-        {% if category.allowed(Action.EDIT) %}
+        {% if can_edit %}
           <button type="button"
                   class="{{ styles.nav.desktopButton }}"
                   lp-show="table:TableEditor"
                   data-toggle="true"
                   aria-label="Edit table"
                   title="Edit table">{{ render_icon("tableEdit") }}</button>
-        {% endif %}
-        {% if category.allowed(Action.EDIT) or category.allowed(Action.VIEW) %}
           <button type="button"
-                  class="{{ styles.nav.desktopButton }}"
-                  lp-show="tools:default"
+                  class="{{ styles.index.header.primaryAction }}"
+                  lp-show="tools:CreatePage"
                   data-toggle="true"
-                  aria-label="Category tools"
-                  title="Category tools">{{ render_icon("indexTools") }}</button>
-          <button type="button"
-                  class="{{ styles.nav.mobileButton }}"
-                  data-role="tools-dropdown"
-                  data-kind="category"
-                  aria-label="Category tools"
-                  title="Category tools">{{ render_icon("columns") }}</button>
+                  data-kind="page"
+                  aria-label="New Page"
+                  title="New Page">
+            {{ render_icon("add", styles.index.header.primaryActionIcon) }}
+            <span class="hidden sm:inline">New Page</span>
+          </button>
         {% endif %}
       {% endif %}
     </div>
@@ -62,49 +65,31 @@
 {% macro tools_section(category) %}
   <div id="tools"
        lp-component
-       data-default="{{ 'CreatePage' if category.allowed(Action.EDIT) else 'CategoryInfo' }}"
+       data-default="CreatePage"
        data-visible="false"
        class="group/tools mt-4">
-    <div class="{{ styles.index.tools.container }}">
-      <div class="{{ styles.index.tools.main }}">
-        <div lp-nav
-             class="{{ styles.form.header.container }} group/form mb-6"
-             data-nav="tools">
-          <div data-role="header" class="{{ styles.layout.nav.header }}">
-            <h2 class="{{ styles.form.header.title }}" data-role="title"></h2>
-            <div class="{{ styles.form.header.controls }}" data-role="controls">
-              {{ controls.filter_list() }}
-              {{ controls.help() }}
-              {{ controls.reset() }}
-              {{ controls.close() }}
-            </div>
+    <div class="{{ styles.index.tools.single }}">
+      <div lp-nav
+           class="{{ styles.form.header.container }} group/form mb-6"
+           data-nav="tools">
+        <div data-role="header" class="{{ styles.layout.nav.header }}">
+          <h2 class="{{ styles.form.header.title }}" data-role="title"></h2>
+          <div class="{{ styles.form.header.controls }}" data-role="controls">
+            {{ controls.help() }}
+            {{ controls.close() }}
           </div>
         </div>
-        {% if category.allowed(Action.EDIT) %}
-          {{ tools.create_page(category) }}
-        {% endif %}
-        {% if category.allowed(Action.VIEW) %}{{ tools.category_info(category) }}{% endif %}
-        {{ tools.page_filters(category) }}
-        {{ tools.saved_filters(category) }}
       </div>
-      <nav class="{{ styles.index.tools.navigation }}"
-           data-persistent="true"
-           data-nav="tools">
-        {% if category.allowed(Action.EDIT) %}
-          <button type="button" class="{{ styles.index.tools.toggle }}" lp-show="tools:CreatePage">New Page</button>
-        {% endif %}
-        {% if category.allowed(Action.VIEW) %}
-          <button type="button" class="{{ styles.index.tools.toggle }}" lp-show="tools:CategoryInfo">Category Settings</button>
-        {% endif %}
-        <button type="button" class="{{ styles.index.tools.toggle }}" lp-show="filters:Filters">Filter Pages</button>
-        <button type="button" class="{{ styles.index.tools.toggle }}" lp-show="tools:SavedFilters">Saved Filters</button>
-      </nav>
+      {{ tools.create_page(category) }}
     </div>
   </div>
 {% endmacro %}
 
 {% macro view() %}
   {% set category = index.entity if index else filtered.parent %}
+  {% set can_edit = category.allowed(Action.EDIT) %}
+  {% set can_view_forms = Resource.FORMS.allowed(Action.VIEW) %}
+  {% set form_preload = category.properties.form.column_value if category.form else none %}
   <div lp-view
        data-authorization="{{ current_user.authorization_fingerprint }}"
        lp-entity
@@ -117,15 +102,33 @@
          data-poll-revision="{{ poll_revision }}"
        {% endif %}
        data-hash="{{ filtered.hash if filtered else category.hash }}"
+       data-can-edit="{{ can_edit|yesno }}"
+       data-can-view-forms="{{ can_view_forms|yesno }}"
        class="group/view">
     <div class="{{ styles.layout.view.header }}">
-      {{ view_header(category) }}
+      {{ view_header(category, can_edit, can_view_forms) }}
       {% if not filtered %}
-        {% if category.allowed(Action.EDIT) or category.allowed(Action.VIEW) %}{{ tools_section(category) }}{% endif %}
+        <div data-role="description"
+             data-editable="{{ can_edit|yesno }}"
+             {% if can_edit %}title="Click to edit description"{% endif %}
+             class="{{ styles.entity.description }}">{%- if category.description -%}<span>{{- category.description -}}</span>{%- endif -%}</div>
+        {% if can_view_forms %}
+          <div data-role="default-form"
+               data-editable="{{ can_edit|yesno }}"
+               data-kind="form"
+               {% if form_preload %}data-preload='{{ form_preload|tojson }}'{% endif %}
+               {% if can_edit %}title="Click to change default form"{% endif %}
+               class="{{ styles.category.defaultForm.display }}">{%- if form_preload -%}{{ render_icon("form", styles.category.defaultForm.icon) }}<span class="text-base-medium">Default form:</span><span data-role="default-form-name" class="font-medium text-kind-default">{{- form_preload.name -}}</span>{%- endif -%}</div>
+        {% endif %}
+        {% if can_edit %}{{ tools_section(category) }}{% endif %}
       {% endif %}
       {{ mobile_toggles((index or filtered).table.columns) }}
     </div>
-    {% if filtered %}{{ filtered_conditions(filtered) }}{% endif %}
+    {% if filtered %}
+      {{ filtered_conditions(filtered) }}
+    {% else %}
+      {{ filter_bar(category) }}
+    {% endif %}
     {{ table(pages, index or filtered) }}
   </div>
 {% endmacro %}

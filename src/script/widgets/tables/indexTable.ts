@@ -21,6 +21,7 @@ interface IndexTableComponent extends TableComponent {
 	loadWidget(
 		name: "TableSorting",
 	): Promise<{ init?(): void | Promise<void> } | null>;
+	load(widget: unknown, route?: string | null): Promise<unknown>;
 }
 
 interface IndexTableDelta {
@@ -32,12 +33,14 @@ interface IndexTableDelta {
 
 export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 	declare refreshScope: "collection";
+	declare route?: string | null;
 	declare loading: boolean;
 	declare loaded: boolean;
 	declare _empty: boolean;
 	declare _updated: HTMLTableRowElement[];
 	declare _created: HTMLTableRowElement[];
 	declare _finishLoading?: boolean;
+	declare _filtered: boolean;
 	declare _completedSaves: Set<HTMLTableCellElement>;
 	declare _completedTimers: Map<
 		HTMLTableCellElement,
@@ -55,6 +58,7 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 		this._empty = false;
 		this._updated = [];
 		this._created = [];
+		this._filtered = false;
 		this._completedSaves = new Set();
 		this._completedTimers = new Map();
 		this._onDirectCompletedChange = (event) =>
@@ -204,6 +208,7 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 
 	refreshDescriptor() {
 		if (
+			this._filtered ||
 			this.component.name !== "table" ||
 			!this.target.hasAttribute("loaded")
 		) {
@@ -334,6 +339,107 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 				});
 		}
 
+		this.setEmptyRowVisibility();
+		this.sortingWidget?.refreshRows?.();
+		void editor?.refreshCheckboxes().catch(captureError);
+	}
+
+	applyFilteredRows(html: Document): number {
+		const editor = this.component?.widgets?.TableEditor;
+		const currentRows = Array.from(
+			this.target.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),
+		);
+		editor?.releaseRows(currentRows);
+
+		for (const row of this.target.querySelectorAll(
+			"tr[lp-entity], tr[data-role='empty'], tr[lp-load]",
+		)) {
+			row.remove();
+		}
+
+		const incomingRows = Array.from(
+			html.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),
+		);
+		if (incomingRows.length) {
+			this.target.append(...incomingRows);
+		} else {
+			const emptyRow = html.querySelector<HTMLTableRowElement>(
+				"tr[data-role='empty']",
+			);
+			if (emptyRow) this.target.append(emptyRow);
+		}
+
+		this._filtered = true;
+		this._updated = [];
+		this.loading = false;
+		this.loaded = true;
+		this.target.setAttribute("loaded", "");
+		this.setEmptyRowVisibility();
+		this.sortingWidget?.refreshRows?.();
+		void editor?.refreshCheckboxes().catch(captureError);
+		return incomingRows.length;
+	}
+
+	async clearFilteredRows() {
+		if (!this._filtered) return;
+		this._filtered = false;
+
+		const editor = this.component?.widgets?.TableEditor;
+		const currentRows = Array.from(
+			this.target.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),
+		);
+		editor?.releaseRows(currentRows);
+
+		for (const row of this.target.querySelectorAll(
+			"tr[lp-entity], tr[data-role='empty'], tr[lp-load]",
+		)) {
+			row.remove();
+		}
+
+		this._updated = [];
+		this.target.removeAttribute("loaded");
+		this.loaded = false;
+		this.loading = true;
+
+		let route: string | null | undefined =
+			this.route || this.target.dataset.route;
+		if (!route) {
+			this.loading = false;
+			this.loaded = true;
+			this.target.setAttribute("loaded", "");
+			this.setEmptyRowVisibility();
+			return;
+		}
+
+		const { request } = await import("../../shared/request.ts");
+		while (route) {
+			const response: RequestResult | undefined = await request.get(route);
+			if (this._filtered || !this.target.isConnected) return;
+			const html: Document | null =
+				response?.html instanceof Document ? response.html : null;
+			if (!html) break;
+
+			const incomingRows = Array.from(
+				html.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),
+			);
+			if (incomingRows.length) {
+				this.target.append(...incomingRows);
+			} else if (!this.target.querySelector("tr[lp-entity]")) {
+				const emptyRow = html.querySelector<HTMLTableRowElement>(
+					"tr[data-role='empty']",
+				);
+				if (emptyRow) this.target.append(emptyRow);
+			}
+
+			const continuation: HTMLTableRowElement | null =
+				html.querySelector<HTMLTableRowElement>("tr[lp-load]");
+			route = continuation?.dataset.route || null;
+		}
+
+		if (this._filtered || !this.target.isConnected) return;
+		this.loading = false;
+		this.loaded = true;
+		this.target.setAttribute("loaded", "");
 		this.setEmptyRowVisibility();
 		this.sortingWidget?.refreshRows?.();
 		void editor?.refreshCheckboxes().catch(captureError);
