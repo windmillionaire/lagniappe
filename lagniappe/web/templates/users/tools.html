@@ -1,7 +1,7 @@
 {% import 'controls.html' as controls %}
 {% import 'users/permissions.html' as permissions %}
 
-{% macro create_user() %}
+{% macro create_user(form_class=None) %}
   <form lp-create
         data-widget="CreateUser"
         data-route="{{ url_for('users.create') }}"
@@ -13,7 +13,7 @@
         data-can-edit-ai="{{ (CONFIG.AI_ENABLED and current_user.is_admin)|yesno }}"
         data-nav="true"
         data-controls="true"
-        class="{{ styles.form.tools }}">
+        class="{{ form_class or styles.form.tools }}">
     <button type="submit" class="{{ styles.button.submit }}"></button>
   </form>
 {% endmacro %}
@@ -33,7 +33,7 @@
         data-visible="false"
         data-nav="false"
         data-controls="true"
-        class="{{ styles.form.tools }}">
+        class="{{ styles.form.default }}">
     {% if sections is not none %}
       {{ permissions.sections(sections) }}
     {% endif %}
@@ -50,11 +50,12 @@
         data-route="{{ url_for('users.create_group') }}"
         data-destination="user-groups"
         data-help="create_user_group"
+        data-title="New User Group"
         data-reset="user-groups:nav"
         data-visible="false"
         data-nav="false"
         data-controls="true"
-        class="{{ styles.form.tools }}">
+        class="{{ styles.form.default }}">
     <button type="submit" class="{{ styles.button.submit }}"></button>
   </form>
 {% endmacro %}
@@ -75,7 +76,7 @@
         data-nav="false"
         data-controls="true"
         data-help="permissions"
-        class="{{ styles.form.tools }}">
+        class="{{ styles.form.default }}">
     {% if sections is not none %}
       <label class="{{ styles.form.elementLabel }} flex-col">
         <span>Group Name</span>
@@ -130,23 +131,25 @@
        lp-component
        data-visible="false"
        data-nav="user-groups"
-       data-title="User Groups"
-       class="{{ styles.form.tools }}">
+       data-title="User Groups">
     <div lp-nav
-         class="{{ styles.form.header.container }}"
+         class="{{ styles.layout.nav.title }}"
          data-nav="user-groups">
-      <h2 class="{{ styles.form.header.title }}" data-role="title"></h2>
-      <div class="{{ styles.form.header.controls }}" data-role="controls">
-        {{ controls.help("user_groups") }}
-        {{ controls.close("tools") }}
-        {{ controls.reset() }}
-        {{ controls.delete() }}
+      <div data-role="header" class="{{ styles.layout.nav.header }}">
+        <span class="text-default-dark" data-role="title"></span>
+        <div class="{{ styles.form.header.controls }}" data-role="controls">
+          {{ controls.help("user_groups") }}
+          {{ controls.close("tools") }}
+          {{ controls.reset() }}
+          {{ controls.delete() }}
+        </div>
       </div>
     </div>
-    <nav class="flex flex-col gap-6"
+    <nav class="{{ styles.form.default }}"
          data-standalone="true"
          data-nav="user-groups"
          data-close="tools"
+         data-help="user_groups"
          data-controls="true">
       <div class="flex flex-col gap-6 group/form">{{ group_nav(groups) }}</div>
     </nav>

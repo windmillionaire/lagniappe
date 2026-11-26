@@ -1,6 +1,6 @@
 {% import 'controls.html' as controls %}
 
-{% macro create_form() %}
+{% macro create_form(form_class=None) %}
   <form lp-create
         data-widget="CreateForm"
         data-route="{{ url_for('forms.create') }}"
@@ -12,7 +12,7 @@
         data-title="Create a Form"
         data-visible="false"
         data-kind="form"
-        class="{{ styles.form.tools }}">
+        class="{{ form_class or styles.form.tools }}">
     <button type="submit" class="{{ styles.button.submit }}"></button>
   </form>
 {% endmacro %}

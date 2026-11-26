@@ -269,10 +269,6 @@ const STYLES = {
       "row": "flex flex-row items-center justify-between gap-4 group/form"
     },
     "tools": {
-      "container": "mx-auto w-full flex flex-row gap-4",
-      "main": "flex-1 rounded-md bg-kind-bg p-4",
-      "navigation": "shrink-0 flex-col gap-2 rounded-md bg-kind-bg p-2 sm:flex sm:min-w-64 sm:p-4",
-      "toggle": "w-full flex flex-row items-center justify-end gap-2 rounded-md bg-kind-bg px-2 py-1.5 font-semibold text-kind-default text-right focus:outline-kind-default hover:outline-kind-default hover:outline-2 focus:outline-2 data-[selected=true]:bg-kind-light data-[selected=true]:text-kind-dark",
       "dropdown": {
         "toggle": "rounded-md px-2 py-1.5 font-semibold text-kind-default hover:bg-kind-light hover:text-kind-dark text-right",
         "panel": "outline-kind-light absolute z-101 flex min-w-37.5 flex-col gap-1 rounded-md outline-2 bg-kind-bg p-1 shadow-lg"

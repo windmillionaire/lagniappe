@@ -234,8 +234,10 @@ export default class EntityIndex extends Core {
 			}
 		}
 
-		const createPageBtn = target.closest("button[lp-show='tools:CreatePage']");
-		if (this.mobile && createPageBtn) {
+		const headerToolBtn = target.closest(
+			"button[lp-show^='tools:'], button[lp-show='user-groups:nav']",
+		);
+		if (this.mobile && headerToolBtn) {
 			const mobileControls =
 				this.elt.querySelector<HTMLElement>("#mobile-controls");
 			const table = this.getComponent(this.elt.querySelector("#table"));
@@ -284,8 +286,8 @@ export default class EntityIndex extends Core {
 		const tool = this._defaultToolSlug();
 		if (!tool) return null;
 
-		const buttons = tools.querySelectorAll(
-			"nav[data-nav='tools'] button[lp-show]",
+		const buttons = this.elt.querySelectorAll(
+			"nav[data-nav='tools'] button[lp-show], nav[data-nav='view'] button[lp-show]",
 		);
 		for (const button of buttons) {
 			const attribute = button.getAttribute("lp-show");
@@ -296,6 +298,7 @@ export default class EntityIndex extends Core {
 				widgetName,
 				attribute.replace(":", "-"),
 				button.textContent,
+				button.getAttribute("aria-label"),
 			];
 
 			if (candidates.some((candidate) => this.querySlug(candidate) === tool)) {

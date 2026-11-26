@@ -5,7 +5,7 @@
 {% import 'controls.html' as controls %}
 
 {% macro view_header() %}
-  <nav class="{{ styles.layout.view.title }} {{ styles.index.header.iconContext }}">
+  <nav class="{{ styles.layout.view.title }} {{ styles.index.header.iconContext }}" data-nav="view">
     <span data-role="title">Form Index</span>
     <div data-role="actions">
       <button type="button"
@@ -18,19 +18,12 @@
       </button>
       {% if Resource.FORMS.allowed(Action.CREATE) %}
         <button type="button"
-                class="{{ styles.nav.desktopButton }}"
-                lp-show="tools:default"
-                aria-label="Form tools"
-                title="Form tools">
-          {{ render_icon("indexTools") }}
-        </button>
-        <button type="button"
-                class="{{ styles.nav.mobileButton }}"
-                data-role="tools-dropdown"
-                data-kind="form"
-                aria-label="Form tools"
-                title="Form tools">
-          {{ render_icon("columns") }}
+                class="{{ styles.nav.button }}"
+                lp-show="tools:CreateForm"
+                data-toggle="true"
+                aria-label="New Form"
+                title="New Form">
+          {{ render_icon("add") }}
         </button>
       {% endif %}
     </div>
@@ -43,27 +36,14 @@
        data-default="CreateForm"
        data-visible="false"
        class="group/tools mt-4">
-    <div class="{{ styles.index.tools.container }}">
-      <div class="{{ styles.index.tools.main }}">
-        <div lp-nav
-             class="{{ styles.form.header.container }} group/form mb-6"
-             data-nav="tools">
-          <div data-role="header"
-               class="{{ styles.layout.nav.header }}">
-            <h2 class="{{ styles.form.header.title }}" data-role="title"></h2>
-            <div class="{{ styles.form.header.controls }}" data-role="controls">
-              {{ controls.help() }}
-              {{ controls.close() }}
-            </div>
-          </div>
+    <div class="{{ styles.card.primary }}">
+      <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="tools">
+        <div data-role="header" class="{{ styles.layout.nav.header }}">
+          <span class="text-default-dark" data-role="title"></span>
+          {{ controls.page_controls() }}
         </div>
-        {{ create_form() }}
       </div>
-      <nav class="{{ styles.index.tools.navigation }}" data-nav="tools">
-        <button type="button"
-                class="{{ styles.index.tools.toggle }}"
-                lp-show="tools:CreateForm">New Form</button>
-      </nav>
+      {{ create_form(form_class=styles.form.default) }}
     </div>
   </div>
 {% endmacro %}
@@ -79,9 +59,9 @@
        class="group/view">
     <div class="{{ styles.layout.view.header }}">
       {{ view_header() }}
-      {% if Resource.FORMS.allowed(Action.CREATE) %}{{ tools_section() }}{% endif %}
       {{ mobile_toggles(index.table.columns) }}
     </div>
+    {% if Resource.FORMS.allowed(Action.CREATE) %}{{ tools_section() }}{% endif %}
     {{ table(forms, index) }}
   </div>
 {% endmacro %}

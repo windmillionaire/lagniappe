@@ -43,6 +43,24 @@ export default class Users extends EntityIndex {
 			}
 		}
 
+		const groupsToggle = target?.closest?.<HTMLElement>(
+			"button[data-role='user-groups-toggle']",
+		);
+		if (groupsToggle && this.elt.contains(groupsToggle)) {
+			const toolsElt = this.elt.querySelector<HTMLElement>("#tools");
+			const groupsElt = this.elt.querySelector<HTMLElement>("#user-groups");
+			if (
+				toolsElt?.dataset.visible === "true" &&
+				groupsElt?.dataset.visible === "true"
+			) {
+				e.preventDefault();
+				e.stopPropagation();
+				this._replaceGroupUrl();
+				this.getComponent(toolsElt)?.deactivate(false);
+				return;
+			}
+		}
+
 		const closeTools = target?.closest?.("button[lp-close='tools']");
 		if (closeTools && this.elt.contains(closeTools)) this._replaceGroupUrl();
 
