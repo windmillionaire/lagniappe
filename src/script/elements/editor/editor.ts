@@ -121,6 +121,11 @@ export const collaborativeEditor = (
 		element: target,
 		injectCSS: false,
 		editable,
+		editorProps: {
+			attributes: {
+				"aria-label": "Document editor",
+			},
+		},
 		extensions,
 	});
 
@@ -146,6 +151,11 @@ export const independentEditor = (
 		element: target,
 		injectCSS: false,
 		editable: true,
+		editorProps: {
+			attributes: {
+				"aria-label": "Document editor",
+			},
+		},
 		content,
 		extensions,
 	});

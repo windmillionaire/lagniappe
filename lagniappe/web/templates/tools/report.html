@@ -236,7 +236,7 @@
 
 {% block content %}
   {% if not report.available %}
-    <main lp-view lp-entity data-key="{{ report.urlsafe_key }}" data-name="{{ report.name }}"
+    <div lp-view lp-entity data-key="{{ report.urlsafe_key }}" data-name="{{ report.name }}"
           data-kind="report" data-fingerprint="{{ report.fingerprint }}" data-status="unavailable" data-pending="false"
           class="group/view max-w-5xl mx-auto">
       <div class="{{ styles.card.primary }} p-5">
@@ -244,7 +244,7 @@
         <p data-role="report-unavailable" class="my-4">this plan is no longer available</p>
         {{ controls.delete(label='Delete ' ~ report.name) }}
       </div>
-    </main>
+    </div>
   {% else %}
   {% set has_actions = report.proposal and report.proposal.actions %}
   {% set executable_actions = report.proposal.actions|rejectattr("type", "equalto", "needs_review")|rejectattr("type", "equalto", "skip")|list if has_actions else [] %}
@@ -261,7 +261,7 @@
   {% set revise_heading = "Create a corrective plan" if creates_correction else ("Revise Response" if is_ask else "Revise Proposal") %}
   {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
   {% set operation_status = report._operation_status|default(none) %}
-  <main lp-view
+  <div lp-view
         lp-entity
         data-key="{{ report.urlsafe_key }}"
         data-fingerprint="{{ report.fingerprint }}"
@@ -658,6 +658,6 @@
         </section>
       </div>
     </div>
-  </main>
+  </div>
   {% endif %}
 {% endblock content %}

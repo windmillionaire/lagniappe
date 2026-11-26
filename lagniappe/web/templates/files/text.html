@@ -9,7 +9,7 @@
     <div data-widget="TextContent"
          data-title="Text Content"
          data-visible="false"
-         class="p-4 sm:p-6 border-t border-base-light/50 h-screen overflow-y-auto html-content">
+         class="p-4 sm:p-6 border-t border-base-light/50 html-content">
       {% set markup = file.properties.text.markup %}
       {% if markup %}{{ markup|safe_html }}{% endif %}
     </div>

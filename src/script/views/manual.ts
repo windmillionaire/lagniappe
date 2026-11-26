@@ -143,6 +143,14 @@ export default class Manual extends ShellView {
 			await withTransition(
 				() => {
 					if (newTarget) target?.replaceChildren(newTarget);
+					this.elt
+						.querySelectorAll<HTMLButtonElement>("[data-section]")
+						.forEach((button) => {
+							const active = button.dataset.section === key;
+							button.dataset.active = active ? "true" : "false";
+							if (active) button.setAttribute("aria-current", "page");
+							else button.removeAttribute("aria-current");
+						});
 					const metadata = this._updateMetadata(key);
 					if (pushState) {
 						const url = metadata?.path || `/manual/${key}`;

@@ -6,7 +6,7 @@
        data-role="analytics-stat"
        data-kind="{{ kind }}">
     <div class="text-sm font-semibold text-base-medium">{{ label }}</div>
-    <div class="mt-1 text-2xl font-bold text-kind-default">{{ value }}</div>
+    <div class="mt-1 text-2xl font-bold tabular-nums text-kind-default">{{ "{:,}".format(value) if value is number else value }}</div>
   </div>
 {% endmacro %}
 
@@ -93,13 +93,13 @@
                 {% for row in group.rows %}
                   <tr>
                     <td class="px-3 py-2 font-semibold text-base-dark">{{ row.value }}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{{ row.count }}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{{ "{:,}".format(row.count) if row.count is number else row.count }}</td>
                     <td class="px-3 py-2 text-right tabular-nums">{{ row.success_rate }}%</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{{ row.requests }}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{{ row.tokens }}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{{ "{:,}".format(row.requests) if row.requests is number else row.requests }}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{{ "{:,}".format(row.tokens) if row.tokens is number else row.tokens }}</td>
                     <td class="px-3 py-2 text-base-medium">
                       {% for outcome in row.outcomes %}
-                        <span class="mr-2 whitespace-nowrap">{{ outcome.name }}: {{ outcome.count }}</span>
+                        <span class="mr-2 whitespace-nowrap">{{ outcome.name }}: {{ "{:,}".format(outcome.count) if outcome.count is number else outcome.count }}</span>
                       {% endfor %}
                     </td>
                   </tr>
@@ -234,7 +234,7 @@
       {{ stat("Generations", ai_dashboard.generation_count) }}
       {{ stat("Success Rate", ai_dashboard.success_rate ~ "%", "success") }}
       {{ stat("Provider Requests", ai_dashboard.provider_requests) }}
-      {{ stat("Tool Rounds / Calls", ai_dashboard.tool_rounds ~ " / " ~ ai_dashboard.tool_calls) }}
+      {{ stat("Tool Rounds / Calls", ("{:,}".format(ai_dashboard.tool_rounds) if ai_dashboard.tool_rounds is number else ai_dashboard.tool_rounds) ~ " / " ~ ("{:,}".format(ai_dashboard.tool_calls) if ai_dashboard.tool_calls is number else ai_dashboard.tool_calls)) }}
       {{ stat("Total Tokens", ai_dashboard.token_total) }}
       {{ stat("Quota Errors", ai_dashboard.quota_errors, "delete") }}
     </section>
@@ -243,7 +243,7 @@
       {{ stat("Calls / Round", ai_dashboard.calls_per_round) }}
       {{ stat("Sequential Round Rate", ai_dashboard.sequential_round_rate ~ "%") }}
       {{ stat("Exact Cache Hits", ai_dashboard.cache_hits) }}
-      {{ stat("Average Duration", ai_dashboard.average_duration_ms ~ " ms") }}
+      {{ stat("Average Duration", ("{:,}".format(ai_dashboard.average_duration_ms) if ai_dashboard.average_duration_ms is number else ai_dashboard.average_duration_ms) ~ " ms") }}
       {{ stat("Provider Result Chars", ai_dashboard.provider_result_chars) }}
       {{ stat("Validated Result Chars", ai_dashboard.validated_result_chars) }}
       {{ stat("Original Files", ai_dashboard.original_file_count, "file") }}
@@ -321,7 +321,7 @@
               <div class="truncate font-semibold text-base-dark">{{ page.title }}</div>
               <div class="truncate text-sm text-base-medium">{{ page.path }}</div>
             </div>
-            <span class="shrink-0 text-lg font-bold tabular-nums text-page-default">{{ page.count }}</span>
+            <span class="shrink-0 text-lg font-bold tabular-nums text-page-default">{{ "{:,}".format(page.count) if page.count is number else page.count }}</span>
           </li>
         {% endfor %}
       </ol>
@@ -345,7 +345,7 @@
             <summary class="{{ styles.disclosure.summary }} px-3 py-2 font-semibold text-base-dark">
               <span>
                 {{ group.label }}
-                <span class="ml-2 tabular-nums text-kind-default">{{ group.count }}</span>
+                <span class="ml-2 tabular-nums text-kind-default">{{ "{:,}".format(group.count) if group.count is number else group.count }}</span>
               </span>
               {{ render_icon("down", styles.disclosure.chevron) }}
             </summary>

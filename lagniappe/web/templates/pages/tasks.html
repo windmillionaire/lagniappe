@@ -138,6 +138,7 @@
       <div class="{{ styles.task.complete }} {{ 'opacity-50' if t.readonly }}">
         <input type="checkbox"
                data-role="complete-toggle"
+               aria-label="{{ ('Reopen ' if t.completed else 'Complete ') ~ t.name }}"
                {% if t.completed %}checked{% endif %}
                {% if t.readonly %}disabled{% endif %}
                class="{{ styles.checkbox.default }} {{ 'outline-none' if t.readonly }}">

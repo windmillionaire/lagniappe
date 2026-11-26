@@ -276,12 +276,15 @@ test("test_notifications_empty_popover_opens_for_zero_notifications", async (t) 
 	const notifications = new Notifications({ online: true });
 	notifications.init();
 	try {
-		// Zero notifications & no messaging permission: popover opens with status message.
+		// Zero notifications & no messaging permission: popover opens with dialog semantics and status message.
 		const openedEmpty = await notifications.dropdown.showPanel();
 		assert.equal(openedEmpty, true);
+		assert.equal(notifications.button?.getAttribute("role"), null);
+		assert.equal(notifications.button?.getAttribute("aria-haspopup"), "dialog");
+		assert.equal(notifications.dropdown.panel?.getAttribute("role"), "dialog");
 		assert.equal(notifications.dropdown.panel?.dataset.visible, "true");
 		assert.equal(
-			notifications.dropdown.panel?.querySelectorAll("[role='option']").length,
+			notifications.dropdown.panel?.querySelectorAll("[role='group']").length,
 			0,
 		);
 		assert.equal(
@@ -295,7 +298,7 @@ test("test_notifications_empty_popover_opens_for_zero_notifications", async (t) 
 			'<button role="option" type="button" data-key="__message_user__" data-action="message-user">Message a user</button>';
 		await notifications.refresh();
 		assert.equal(
-			notifications.dropdown.panel?.querySelectorAll("[role='option']").length,
+			notifications.dropdown.panel?.querySelectorAll("[role='group']").length,
 			1,
 		);
 		assert.equal(

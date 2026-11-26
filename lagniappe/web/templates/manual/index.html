@@ -21,6 +21,8 @@
         <li>
           <button type="button"
                   data-section="{{ section.key }}"
+                  data-active="{{ (section.key == active_section)|yesno }}"
+                  {% if section.key == active_section %}aria-current="page"{% endif %}
                   class="{{ styles.manual.navButton }}">
             {{ render_icon((section.icon), "text-kind-default", section.kind) }}
             <span>{{ section.name }}</span>

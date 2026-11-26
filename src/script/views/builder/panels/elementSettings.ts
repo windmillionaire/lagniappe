@@ -36,6 +36,7 @@ const _toggle = (
 	role: string,
 	kind = "form",
 	disabled = false,
+	label?: string,
 ) => {
 	const toggle = primitives.toggle({
 		icon: icon,
@@ -49,6 +50,10 @@ const _toggle = (
 	});
 	toggle.type = "button";
 	toggle.dataset.kind = kind;
+	if (label) {
+		toggle.setAttribute?.("aria-label", label);
+		toggle.title = label;
+	}
 	if (disabled) {
 		toggle.disabled = true;
 		toggle.classList.add("opacity-50", "pointer-events-none");
@@ -80,7 +85,13 @@ const _condition = (condition: FieldCondition, index: number) => {
 		? "checked"
 		: (condition.label ?? null);
 
-	const remove = _toggle("trash.inactive", "remove", "delete");
+	const remove = _toggle(
+		"trash.inactive",
+		"remove",
+		"delete",
+		false,
+		"Remove condition",
+	);
 
 	elt.append(wrapper, remove);
 	return elt;
@@ -101,11 +112,15 @@ const _option = (option: FieldOption, index: number, length: number) => {
 	toggles.className = `flex shrink-0 flex-row items-center gap-1`;
 	if (length > 1) {
 		toggles.appendChild(
-			_toggle("down", "moveDown", "form", index === length - 1),
+			_toggle("down", "moveDown", "form", index === length - 1, "Move down"),
 		);
-		toggles.appendChild(_toggle("up", "moveUp", "form", index === 0));
+		toggles.appendChild(
+			_toggle("up", "moveUp", "form", index === 0, "Move up"),
+		);
 	}
-	toggles.appendChild(_toggle("trash.inactive", "remove", "delete"));
+	toggles.appendChild(
+		_toggle("trash.inactive", "remove", "delete", false, "Remove item"),
+	);
 
 	wrapper.append(name, toggles);
 
@@ -133,11 +148,15 @@ const _column = (column: FormFieldSchema, index: number, length: number) => {
 	toggles.className = `flex shrink-0 flex-row items-center gap-1`;
 	if (length > 1) {
 		toggles.appendChild(
-			_toggle("down", "moveDown", "form", index === length - 1),
+			_toggle("down", "moveDown", "form", index === length - 1, "Move down"),
 		);
-		toggles.appendChild(_toggle("up", "moveUp", "form", index === 0));
+		toggles.appendChild(
+			_toggle("up", "moveUp", "form", index === 0, "Move up"),
+		);
 	}
-	toggles.appendChild(_toggle("trash.inactive", "remove", "delete"));
+	toggles.appendChild(
+		_toggle("trash.inactive", "remove", "delete", false, "Remove item"),
+	);
 
 	wrapper.append(name, toggles);
 	return wrapper;

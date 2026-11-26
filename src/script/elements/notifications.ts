@@ -75,6 +75,9 @@ export class Notifications {
 		this.state = window.__NOTIFICATION_STATE__ || null;
 		this.dropdown = new Dropdown(this.button).init({
 			items: [],
+			triggerRole: null,
+			popupRole: "dialog",
+			optionRole: "group",
 			loadOptions: async () => {
 				await this._ensureLoaded();
 				return this._dropdownItems();
@@ -175,8 +178,9 @@ export class Notifications {
 
 	_optionsFromHtml(html: ParentNode) {
 		return Array.from(
-			html.querySelectorAll<HTMLElement>("[role='option']"),
+			html.querySelectorAll<HTMLElement>("[role='option'], [role='group']"),
 		).map((option) => {
+			option.setAttribute("role", "group");
 			return this._notificationOption(option.outerHTML, option.dataset.key);
 		});
 	}
@@ -221,7 +225,7 @@ export class Notifications {
 		return {
 			key: CLEAR_ALL_KEY,
 			html: `
-				<button role="option"
+				<button role="group"
 					type="button"
 					data-action="clear-notifications"
 					class="${STYLES.dropdown.option.action} border-y border-base-light !rounded-none bg-base-bg text-delete-default">
@@ -237,7 +241,11 @@ export class Notifications {
 	_htmlOption(html: string) {
 		const template = document.createElement("template");
 		template.innerHTML = String(html || "").trim();
-		return template.content.querySelector<HTMLElement>("[role='option']");
+		const element = template.content.querySelector<HTMLElement>(
+			"[role='option'], [role='group']",
+		);
+		element?.setAttribute("role", "group");
+		return element;
 	}
 
 	async _selectNotification(

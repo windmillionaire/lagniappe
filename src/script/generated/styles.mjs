@@ -368,7 +368,7 @@ const STYLES = {
     "content": "sm:rounded-lg sm:shadow-sm w-full sm:border bg-white sm:border-base-light/50 sm:p-6",
     "heading": "flex items-center gap-3 text-2xl font-semibold text-base-dark mb-4",
     "conceptTitle": "flex items-center gap-2.5 text-lg font-semibold mb-2",
-    "navButton": "flex items-center gap-3 rounded-md px-3 py-1.5 font-semibold shadow-sm outline w-full focus-visible:outline-2 hover:outline-2 bg-white hover:bg-page-bg outline-base-light text-base-dark focus-visible:outline-page-default hover:outline-page-default"
+    "navButton": "flex items-center gap-3 rounded-md px-3 py-1.5 font-semibold shadow-sm outline w-full focus-visible:outline-2 hover:outline-2 bg-white hover:bg-page-bg outline-base-light text-base-dark focus-visible:outline-page-default hover:outline-page-default data-[active=true]:bg-page-bg data-[active=true]:outline-2 data-[active=true]:outline-page-default data-[active=true]:text-page-dark"
   },
   "message": "w-full sm:text-sm italic rounded-md px-3 py-2 outline-kind-default bg-kind-bg",
   "messages": {

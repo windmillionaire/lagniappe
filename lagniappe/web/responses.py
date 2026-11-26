@@ -1137,6 +1137,7 @@ def manual_index(section: str, index: Iterable[Mapping[str, str]]) -> Response:
 
     context = {
         "content_template": content_template,
+        "active_section": section,
         "sections": sections,
         "search_metadata": search_metadata,
         "public_page": public_page,

@@ -27,6 +27,8 @@ export class SelectBox extends Submitter(Combobox) {
 		this.select.name = String(this.name);
 		this.select.multiple = multiple;
 		this.select.style.display = "none";
+		this.select.setAttribute("aria-hidden", "true");
+		this.select.tabIndex = -1;
 
 		const input = document.createElement("input");
 		this.element = input;

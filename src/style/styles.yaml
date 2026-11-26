@@ -1212,7 +1212,7 @@ manual:
     intent: concept card title with vertically centered leading icon
     surfaces: [server]
   navButton:
-    classes: flex items-center gap-3 rounded-md px-3 py-1.5 font-semibold shadow-sm outline w-full focus-visible:outline-2 hover:outline-2 bg-white hover:bg-page-bg outline-base-light text-base-dark focus-visible:outline-page-default hover:outline-page-default
+    classes: "flex items-center gap-3 rounded-md px-3 py-1.5 font-semibold shadow-sm outline w-full focus-visible:outline-2 hover:outline-2 bg-white hover:bg-page-bg outline-base-light text-base-dark focus-visible:outline-page-default hover:outline-page-default data-[active=true]:bg-page-bg data-[active=true]:outline-2 data-[active=true]:outline-page-default data-[active=true]:text-page-dark"
     intent: sidebar section navigation button with centered icon and label
     surfaces: [server]
 

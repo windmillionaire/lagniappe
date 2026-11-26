@@ -9,8 +9,13 @@
              height="32">
       </a>
       {% if login_url %}
-        <a class="action-button inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold"
-           href="{{ login_url }}">Sign in</a>
+        {% if current_user.is_authenticated %}
+          <a class="action-button inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold"
+             href="{{ url_for('home.home_page') }}">Home</a>
+        {% else %}
+          <a class="action-button inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold"
+             href="{{ login_url }}">Sign in</a>
+        {% endif %}
       {% elif share %}
         <div class="relative ml-auto" data-role="public-share">
           <button type="button"

@@ -41,6 +41,8 @@
     <div class="{{ styles.layout.nav.group }}" data-role="actions">
       <a href="{{ url_for('files.download', key=file.urlsafe_key) }}"
          data-kind="file"
+         aria-label="Download {{ file.name }}"
+         title="Download {{ file.name }}"
          class="{{ styles.toggle.container }}">
         {{ render_icon("download") }}
       </a>
