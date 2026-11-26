@@ -262,9 +262,7 @@ const STYLES = {
   },
   "index": {
     "header": {
-      "iconContext": "index-header-icon-context",
-      "primaryAction": "index-primary-action inline-flex h-8 cursor-pointer items-center gap-1 rounded-md bg-kind-default px-2.5 text-sm font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
-      "primaryActionIcon": "icon-sm"
+      "iconContext": "index-header-icon-context"
     },
     "mobile": {
       "controls": "rounded-md bg-kind-bg p-4 text-base flex flex-col gap-2 font-semibold mt-4",
@@ -473,7 +471,7 @@ const STYLES = {
         "inactive": "[grid-area:1/1] invisible text-kind-default group-data-[sorting=true]/header:visible hover:text-delete-default"
       }
     },
-    "editStatus": "table-edit-status hidden sm:inline-flex h-8 items-center rounded-md px-2.5 text-xs font-semibold text-project-dark whitespace-nowrap",
+    "editStatus": "table-edit-status hidden sm:inline-flex h-7 items-center rounded-md px-2.5 text-xs font-semibold text-project-dark whitespace-nowrap",
     "loading": {
       "cell": "py-4 text-center text-sm italic text-base-medium"
     }
@@ -582,7 +580,7 @@ const STYLES = {
     "savedPopover": "absolute left-0 top-full z-40 mt-1.5 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-md bg-white p-1.5 shadow-lg outline outline-base-light/60",
     "addPopover": "absolute left-0 top-full z-40 mt-1.5 flex w-88 max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-md bg-white p-3 shadow-lg outline outline-base-light/60",
     "chip": "lp-filter-chip",
-    "chipRemove": "ml-1.5 -my-1 inline-flex self-stretch cursor-pointer items-center justify-center border-l border-kind-light px-2 text-base-medium transition-colors hover:bg-delete-bg hover:text-delete-default focus-visible:bg-delete-bg focus-visible:text-delete-default focus-visible:outline-none",
+    "chipRemove": "ml-1.5 -my-1 inline-grid w-7 self-stretch cursor-pointer place-items-center border-l border-kind-light text-base-medium transition-colors hover:bg-delete-bg hover:text-delete-default focus-visible:bg-delete-bg focus-visible:text-delete-default focus-visible:outline-none",
     "searchInput": "form-input w-full rounded-md px-2.5 py-1.5 text-sm",
     "sectionHeading": "px-2 pt-1.5 pb-0.5 text-xs font-semibold uppercase tracking-wide text-base-medium",
     "fieldList": "flex max-h-64 flex-col gap-0.5 overflow-y-auto",
@@ -594,7 +592,7 @@ const STYLES = {
     "empty": "px-2.5 py-2 text-sm italic text-base-medium",
     "savedRow": "flex items-center justify-between gap-2 rounded-sm p-1.5 transition-colors hover:bg-base-bg",
     "savedApply": "flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-1 text-left",
-    "savedDelete": "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-sm p-1 text-base-medium transition-colors hover:bg-delete-bg hover:text-delete-default"
+    "savedDelete": "group/toggle action-icon-button size-7 shrink-0 cursor-pointer transition-colors duration-100 hover:bg-white"
   }
 };
 export { STYLES };

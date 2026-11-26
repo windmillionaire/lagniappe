@@ -802,9 +802,9 @@ export class TableEditor {
 					this._savedToggleIcons.set(button, Array.from(button.childNodes));
 				}
 				const icon = document.createElement("span");
-				setIcon(icon, "x", "icon-xs text-delete-default");
+				setIcon(icon, "check", "icon-xs text-success");
 				const text = document.createElement("span");
-				text.textContent = "Close";
+				text.textContent = "Done";
 				button.replaceChildren(icon, text);
 			} else {
 				const original = this._savedToggleIcons.get(button);
@@ -866,9 +866,9 @@ export class TableEditor {
 		closeBtn.setAttribute("aria-label", "Done editing table");
 		closeBtn.title = "Done editing table";
 		const icon = document.createElement("span");
-		setIcon(icon, "x", "icon-xs text-delete-default");
+		setIcon(icon, "check", "icon-xs text-success");
 		const text = document.createElement("span");
-		text.textContent = "Close";
+		text.textContent = "Done";
 		closeBtn.append(icon, text);
 
 		actions.prepend(pill, closeBtn);

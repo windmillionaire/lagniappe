@@ -297,7 +297,7 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 	}
 
 	refresh(response: RequestResult | undefined) {
-		if (!response?.html) return;
+		if (this._filtered || !response?.html) return;
 		const editor = this.component?.widgets?.TableEditor;
 		const newRows = [
 			...response.html.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),

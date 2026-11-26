@@ -51,15 +51,11 @@
               title="Table controls">{{ render_icon("column") }}</button>
       {% if not filtered and can_edit %}
         <button type="button"
-                class="{{ styles.index.header.primaryAction }}"
+                class="{{ styles.nav.button }}"
                 lp-show="tools:CreatePage"
                 data-toggle="true"
-                data-kind="page"
                 aria-label="New Page"
-                title="New Page">
-          {{ render_icon("add", styles.index.header.primaryActionIcon) }}
-          <span class="hidden sm:inline">New Page</span>
-        </button>
+                title="New Page">{{ render_icon("add") }}</button>
       {% endif %}
     </div>
   </nav>

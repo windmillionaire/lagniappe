@@ -866,7 +866,25 @@ def _serialize_bar_filter(filter_entity: models.Filter) -> dict[str, object]:
 
 
 def saved_filter_bar_item(filter_entity: models.Filter) -> tuple[Response, int]:
-    return jsonify({"filter": _serialize_bar_filter(filter_entity)}), 200
+    parent = filter_entity.parent
+    return (
+        jsonify(
+            {
+                "filter": _serialize_bar_filter(filter_entity),
+                "fingerprint": parent.fingerprint if parent else None,
+            }
+        ),
+        200,
+    )
+
+
+def saved_filter_bar_deleted(
+    parent: models.Project | models.Category | None,
+) -> tuple[Response, int]:
+    return (
+        jsonify({"fingerprint": parent.fingerprint if parent else None}),
+        200,
+    )
 
 
 def saved_filters_bar(

@@ -48,6 +48,11 @@ interface SavedFiltersBarResponse {
 
 interface SavedFilterBarCreateResponse {
 	filter?: SavedFilterItem;
+	fingerprint?: string | null;
+}
+
+interface SavedFilterBarDeleteResponse {
+	fingerprint?: string | null;
 }
 
 interface ActiveChip {
@@ -229,6 +234,7 @@ export class FilterBar {
 	_handleDocumentKeydown(event: KeyboardEvent) {
 		if (event.key !== "Escape" || !this._openPopover) return;
 		if (document.querySelector(".lp-dp-popover")) return;
+		if (this._optionSelect?.panelOpen) return;
 		event.preventDefault();
 		const was = this._openPopover;
 		this.closePopovers();
@@ -309,10 +315,16 @@ export class FilterBar {
 			if (item.can_edit) {
 				const delBtn = document.createElement("button");
 				delBtn.type = "button";
+				delBtn.dataset.role = "saved-delete";
+				delBtn.dataset.kind = "delete";
+				delBtn.dataset.active = "false";
 				delBtn.className = STYLES.filterBar.savedDelete;
 				delBtn.setAttribute("aria-label", "Delete saved filter");
 				delBtn.title = "Delete saved filter";
-				delBtn.appendChild(createIcon("delete", "icon-xs"));
+				delBtn.append(
+					createIcon("trash.active", STYLES.toggle.icon.active),
+					createIcon("trash.inactive", STYLES.toggle.icon.inactive),
+				);
 				delBtn.addEventListener("click", (e) => {
 					e.preventDefault();
 					e.stopPropagation();
@@ -339,8 +351,13 @@ export class FilterBar {
 
 	async _deleteSavedFilter(item: SavedFilterItem, button: HTMLButtonElement) {
 		button.disabled = true;
-		const response = await request.delete(`/filters/${item.key}/delete`);
+		const response = await request.delete<SavedFilterBarDeleteResponse>(
+			`/filters/${item.key}/delete?format=bar`,
+		);
 		if (response?.ok) {
+			if (response.fingerprint) {
+				this.view.elt.dataset.fingerprint = response.fingerprint;
+			}
 			this._savedFilters = (this._savedFilters ?? []).filter(
 				(entry) => entry.key !== item.key,
 			);
@@ -848,6 +865,9 @@ export class FilterBar {
 				data,
 			);
 			if (response?.ok) {
+				if (response.fingerprint) {
+					this.view.elt.dataset.fingerprint = response.fingerprint;
+				}
 				if (response.filter && this._savedFilters !== null) {
 					this._savedFilters = [response.filter, ...this._savedFilters];
 				}

@@ -67,8 +67,6 @@ tbody[data-editing="true"]
 	outline-offset: -3px;
 	&:hover {
 		background-color: white;
-		outline: 2px solid var(--kind-default);
-		outline-offset: -2px;
 	}
 }
 
@@ -124,7 +122,7 @@ button[lp-show="table:TableEditor"][data-editing="true"] {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.25rem;
-	height: 2rem;
+	height: 1.75rem;
 	padding: 0 0.625rem;
 	border-radius: var(--radius-md);
 	background-color: var(--color-base-bg);
@@ -152,6 +150,9 @@ button[lp-show="table:TableEditor"][data-editing="true"] {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.5rem;
+	& > button[lp-show="tools:CreatePage"] {
+		display: none;
+	}
 }
 
 /* @style table.default table.embedded */
@@ -323,7 +324,7 @@ td [data-role="quick-edit-error"] {
 }
 
 /* @style table.default */
-@media (min-width: 769px) {
+@media (min-width: 640px) {
 	table#table:not([data-embedded]) {
 		margin-inline: -0.75rem;
 		width: calc(100% + 1.5rem);
@@ -331,7 +332,7 @@ td [data-role="quick-edit-error"] {
 }
 
 /* @style table.default table.embedded */
-@media (max-width: 768px) {
+@media (max-width: 639.98px) {
 	table#table:not([data-embedded]) {
 		&,
 		& > thead,

@@ -128,23 +128,32 @@
 	}
 }
 
-/* @style toggle.container */
-.action-icon-button[lp-control="delete"] {
+/* @style filterBar.savedDelete toggle.container */
+.action-icon-button[lp-control="delete"],
+.action-icon-button[data-role="saved-delete"] {
 	color: var(--color-base-medium);
 	opacity: 0.65;
 	&:focus-visible {
 		color: var(--color-delete-default);
-		background-color: var(--color-delete-bg);
+		background-color: white;
 		outline-color: var(--color-delete-default);
 		opacity: 1;
 	}
 	@media (hover: hover) {
 		&:hover {
 			color: var(--color-delete-default);
-			background-color: var(--color-delete-bg);
+			background-color: white;
 			outline-color: var(--color-delete-default);
 			opacity: 1;
 		}
+	}
+}
+
+/* @style index.mobile.controls */
+#mobile-controls .action-icon-button {
+	&:hover {
+		background-color: transparent;
+		outline: none;
 	}
 }
 

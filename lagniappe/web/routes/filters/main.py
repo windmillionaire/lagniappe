@@ -462,4 +462,6 @@ def delete(
     if parent is not None:
         Entities.save(parent)
 
+    if request.values.get("format") == "bar":
+        return responses.saved_filter_bar_deleted(parent)
     return responses.ok()

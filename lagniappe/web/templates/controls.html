@@ -60,7 +60,7 @@
 
 {% macro column_visibility(label="Toggle column visibility") %}
   <button type="button"
-          class="{{ styles.toggle.container }} hover:outline-2 hover:outline-kind-default"
+          class="{{ styles.toggle.container }}"
           data-active="false"
           data-toggle="visibility"
           aria-label="{{ label }}"
@@ -72,7 +72,7 @@
 
 {% macro filter(label="Sort or filter column", visible=true) %}
   <button type="button"
-          class="{{ styles.toggle.container }} hover:outline-2 hover:outline-kind-default"
+          class="{{ styles.toggle.container }}"
           data-active="false"
           data-visible="{{ visible|yesno }}"
           data-toggle="filter"

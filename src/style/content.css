@@ -237,7 +237,16 @@
 
 /* @style filterBar.chip */
 .lp-badge.lp-filter-chip {
+	position: relative;
 	padding-right: 0;
+	&::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		box-shadow: inset 0 0 0 1px var(--kind-light);
+	}
 	& > button {
 		flex-shrink: 0;
 		overflow: visible;

@@ -874,23 +874,12 @@ index:
       surfaces: [server]
       hooks: [index-header-icon-context]
       css: [src/style/icons.css]
-    primaryAction:
-      classes: index-primary-action inline-flex h-8 cursor-pointer items-center gap-1 rounded-md bg-kind-default px-2.5 text-sm font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
-      intent: direct primary creation action button in an entity index header
-      surfaces: [server]
-      hooks: [index-primary-action]
-      css: [src/style/navigation.css]
-    primaryActionIcon:
-      classes: icon-sm
-      intent: compact leading icon inside a primary index header action button
-      surfaces: [server]
-      hooks: [icon-sm]
-      css: [src/style/icons.css]
   mobile:
     controls:
       classes: rounded-md bg-kind-bg p-4 text-base flex flex-col gap-2 font-semibold mt-4
       intent: controls presentation within index mobile
       surfaces: [server]
+      css: [src/style/buttons.css]
     row:
       classes: flex flex-row items-center justify-between gap-4 group/form
       intent: row presentation within index mobile
@@ -1547,7 +1536,7 @@ table:
         intent: clear-filter action shown on actively filtered table columns
         surfaces: [server]
   editStatus:
-    classes: table-edit-status hidden sm:inline-flex h-8 items-center rounded-md px-2.5 text-xs font-semibold text-project-dark whitespace-nowrap
+    classes: table-edit-status hidden sm:inline-flex h-7 items-center rounded-md px-2.5 text-xs font-semibold text-project-dark whitespace-nowrap
     intent: compact borderless green chip matching editable table cells as a visual key
     surfaces: [frontend]
     hooks: [table-edit-status]
@@ -1908,7 +1897,7 @@ filterBar:
     hooks: [lp-filter-chip]
     css: [src/style/content.css]
   chipRemove:
-    classes: ml-1.5 -my-1 inline-flex self-stretch cursor-pointer items-center justify-center border-l border-kind-light px-2 text-base-medium transition-colors hover:bg-delete-bg hover:text-delete-default focus-visible:bg-delete-bg focus-visible:text-delete-default focus-visible:outline-none
+    classes: ml-1.5 -my-1 inline-grid w-7 self-stretch cursor-pointer place-items-center border-l border-kind-light text-base-medium transition-colors hover:bg-delete-bg hover:text-delete-default focus-visible:bg-delete-bg focus-visible:text-delete-default focus-visible:outline-none
     intent: divided right-hand remove segment inside an active filter condition chip
     surfaces: [frontend]
   searchInput:
@@ -1960,6 +1949,8 @@ filterBar:
     intent: clickable badge summary applying a saved filter in place
     surfaces: [frontend]
   savedDelete:
-    classes: inline-flex shrink-0 cursor-pointer items-center justify-center rounded-sm p-1 text-base-medium transition-colors hover:bg-delete-bg hover:text-delete-default
-    intent: trailing delete button for removing a saved filter from the dropdown
+    classes: group/toggle action-icon-button size-7 shrink-0 cursor-pointer transition-colors duration-100 hover:bg-white
+    intent: trailing delete button for removing a saved filter matching standard trash icon hover
     surfaces: [frontend]
+    hooks: [action-icon-button]
+    css: [src/style/buttons.css]
