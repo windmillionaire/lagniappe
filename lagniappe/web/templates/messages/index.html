@@ -7,6 +7,7 @@
   <div lp-view
        data-kind="messages"
        data-current-user="{{ current_user.urlsafe_key }}"
+       data-empty="false"
        {% if initial_conversation %}data-initial-conversation="{{ initial_conversation }}"{% endif %}
        class="group/view mx-auto max-w-7xl">
     <div class="{{ styles.layout.view.header }}">
@@ -16,7 +17,7 @@
     </div>
     <div id="layout" class="{{ styles.entity.cards }} sm:mt-4">
       <aside data-kind="user"
-             class="{{ styles.card.secondary }} overflow-hidden">
+             class="{{ styles.card.secondary }} overflow-hidden group-data-[empty=true]/view:hidden sm:group-data-[empty=true]/view:hidden">
         <div class="{{ styles.layout.nav.mobile }} mt-4 h-16 py-3 font-semibold md:mt-0 md:h-auto md:border-0 md:bg-white md:px-6 md:py-5">
           <span data-role="title" class="hidden md:inline">Conversations</span>
           <button type="button"
@@ -63,14 +64,14 @@
         </button>
       </aside>
       <section data-kind="user"
-               class="{{ styles.card.primary }} -mt-px flex min-h-[32rem] flex-col overflow-hidden md:mt-0">
-        <div class="hidden md:block">
+               class="{{ styles.card.primary }} -mt-px flex min-h-[32rem] flex-col overflow-hidden md:mt-0 group-data-[empty=true]/view:min-h-[18rem]">
+        <div class="hidden md:group-data-[empty=false]/view:block">
           <div data-role="message-header" class="{{ styles.layout.nav.title }}">
             <span class="font-medium">Choose a conversation</span>
           </div>
         </div>
         <div data-role="message-history"
-             class="flex flex-1 flex-col gap-3 overflow-y-auto border-t border-base-light/50 p-4 sm:p-6"
+             class="flex flex-1 flex-col gap-3 overflow-y-auto border-t border-base-light/50 p-4 sm:p-6 group-data-[empty=true]/view:border-t-0"
              aria-live="polite"></div>
         <button type="button"
                 data-action="load-messages"

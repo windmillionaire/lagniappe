@@ -296,7 +296,8 @@ export default class Messages extends Core {
 
 		this.current = null;
 		this.messageCursor = null;
-		this.header.textContent = "Choose a conversation";
+		this.header.textContent =
+			this.conversations.size > 0 ? "Choose a conversation" : "Messages";
 		this.renderEmptyHistory();
 		this.renderReply();
 		this.rememberConversation(null);
@@ -378,6 +379,7 @@ export default class Messages extends Core {
 
 	renderConversations() {
 		const conversations = Array.from(this.conversations.values());
+		this.elt.dataset.empty = conversations.length === 0 ? "true" : "false";
 		if (conversations.length === 0 && typeof document !== "undefined") {
 			const empty = document.createElement("p");
 			empty.dataset.role = "empty";
@@ -618,6 +620,7 @@ export default class Messages extends Core {
 		container.className = STYLES.messages?.empty?.container || "";
 
 		const hasConversations = this.conversations.size > 0;
+		this.elt.dataset.empty = hasConversations ? "false" : "true";
 		const title = document.createElement("p");
 		title.className = STYLES.messages?.empty?.title || "";
 		title.textContent = hasConversations

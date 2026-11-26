@@ -370,7 +370,15 @@ const STYLES = {
       "container": "flex flex-1 flex-col items-center justify-center gap-2 py-12 px-4 text-center",
       "title": "text-base font-semibold text-base-dark",
       "body": "max-w-sm text-sm text-base-medium",
-      "action": "mt-2 inline-flex items-center gap-1.5 rounded-md bg-user-default px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-user-dark hover:outline-2 hover:outline-offset-2 hover:outline-user-dark focus-visible:bg-user-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-dark"
+      "action": "mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-user-default px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-user-dark hover:outline-2 hover:outline-offset-2 hover:outline-user-dark focus-visible:bg-user-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-dark"
+    }
+  },
+  "files": {
+    "empty": {
+      "container": "flex flex-1 flex-col items-center justify-center gap-2 py-12 px-4 text-center",
+      "title": "text-base font-semibold text-base-dark",
+      "body": "max-w-sm text-sm text-base-medium",
+      "action": "mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-kind-default px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-kind-dark hover:outline-2 hover:outline-offset-2 hover:outline-kind-dark focus-visible:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-dark"
     }
   },
   "modal": {

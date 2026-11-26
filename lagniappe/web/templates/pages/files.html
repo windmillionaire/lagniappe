@@ -16,9 +16,22 @@
   </form>
 {% endmacro %}
 
-{% macro empty_file_list_item() %}
-  <li class="text-kind-default font-semibold italic text-center py-4 text-lg"
-      data-role="empty">No files have been uploaded to this page</li>
+{% macro empty_file_list_item(can_upload=False) %}
+  <li class="{{ styles.files.empty.container }}" data-role="empty">
+    <p class="{{ styles.files.empty.title }}">No files attached yet</p>
+    <p class="{{ styles.files.empty.body }}">
+      {% if can_upload %}Upload images, PDFs, or documents to attach them to this page.{% else %}Files attached to this page will appear here.{% endif %}
+    </p>
+    {% if can_upload %}
+      <button type="button"
+              lp-show="files:FileUpload"
+              data-kind="file"
+              class="{{ styles.files.empty.action }}">
+        {{ render_icon("add") }}
+        <span>Upload file</span>
+      </button>
+    {% endif %}
+  </li>
 {% endmacro %}
 
 {% macro file_list_item(file, page) %}
@@ -58,13 +71,12 @@
       lp-load
       data-persistent="true"
       data-visible="true"
-      {% if can_upload %}data-if-empty="FileUpload"{% endif %}
       data-route="{{ url_for('pages.files', key=page.urlsafe_key) }}"
       class="{{ styles.list.container }}">
     {%- if files -%}
       {% for file in files %}{{ file_list_item(file, page) }}{% endfor %}
-    {%- elif files is not none and not can_upload -%}
-      {{ empty_file_list_item() }}
+    {%- elif files is not none -%}
+      {{ empty_file_list_item(can_upload) }}
     {%- endif -%}
   </ul>
 {% endmacro %}

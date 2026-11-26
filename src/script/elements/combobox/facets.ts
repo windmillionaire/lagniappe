@@ -26,6 +26,7 @@ export function isFacetOption(value: unknown): value is ComboboxOption {
 export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 	declare endpoint: string;
 	declare indexArgs: FacetIndexArgs;
+	declare _onBrowseFocus?: () => void;
 
 	constructor(element: HTMLElement, args: FacetIndexArgs = {}) {
 		super(element);
@@ -52,9 +53,31 @@ export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 		this.results = new Results(index);
 	}
 
+	init() {
+		const res = super.init();
+		if (this.element.dataset.browse === "true") {
+			this._onBrowseFocus = () => {
+				if (!this.element.value.trim() && !this.panelOpen) {
+					void this._browse();
+				}
+			};
+			this.element.addEventListener("focus", this._onBrowseFocus);
+		}
+		return res;
+	}
+
+	destroy() {
+		if (this._onBrowseFocus) {
+			this.element.removeEventListener("focus", this._onBrowseFocus);
+			this._onBrowseFocus = undefined;
+		}
+		super.destroy();
+	}
+
 	_input(event: RemoteInputEvent) {
 		const query = event.target.value.trim();
 		if (query) return this._search(query);
+		if (this.element.dataset.browse === "true") return this._browse();
 
 		this.settleQueryInput();
 		this.updatePanel(this.results.create());
@@ -62,8 +85,17 @@ export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 	}
 
 	elementClick(event: MouseEvent) {
+		if (this.element.dataset.browse === "true" && !this.element.value.trim()) {
+			super.elementClick(event, false);
+			if (!this.panelOpen) void this._browse();
+			return;
+		}
 		super.elementClick(event);
 		this.showPanel();
+	}
+
+	_browse() {
+		return this._search("", { browse: true });
 	}
 
 	selectOption(option: ComboboxOptionElement) {
@@ -83,10 +115,13 @@ export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 		);
 	}
 
-	_search(query: string) {
+	_search(query: string, { browse = false } = {}) {
 		const params = new URLSearchParams();
 		params.set("q", query);
-		if (this.creatable === "true") {
+		if (browse) {
+			params.set("browse", "true");
+		}
+		if (this.creatable === "true" && query) {
 			params.set("creatable", "true");
 		}
 		Object.entries(this.indexArgs).forEach(([key, value]) => {

@@ -22,6 +22,7 @@
       <h3 class="{{ styles.label.sectionHeading }}">Category</h3>
       <input data-index="category"
              data-permission="edit"
+             data-browse="true"
              data-creatable="{{ Resource.MODELS.allowed(Action.CREATE)|yesno }}"
              data-placeholder="{{ 'choose or create a category...' if Resource.MODELS.allowed(Action.CREATE) else 'choose a category...' }}"
              name="category"

@@ -244,18 +244,24 @@ export default class Home extends Core {
 		if (
 			e &&
 			target instanceof Element &&
-			target.closest("[data-role='dismiss-task-feedback']")
+			target.closest(
+				"[data-role='dismiss-task-feedback'], [data-role='dismiss-page-feedback']",
+			)
 		) {
 			e.preventDefault();
+			const isPage = Boolean(
+				target.closest("[data-role='dismiss-page-feedback']"),
+			);
+			const role = isPage ? "page-feedback" : "task-feedback";
 			const feedback = this.elt?.querySelector?.<HTMLElement>(
-				"[data-role='task-feedback']",
+				`[data-role='${role}']`,
 			);
 			if (feedback) {
 				void withTransition(
 					() => {
 						feedback.dataset.visible = "false";
 					},
-					{ label: "home:dismiss-task-feedback" },
+					{ label: `home:dismiss-${role}` },
 				);
 			}
 			return;
@@ -301,6 +307,12 @@ export default class Home extends Core {
 		if (sectionId === "tasks" && component.active?.name === "CreateUserTask") {
 			const feedback = component.elt.querySelector<HTMLElement>(
 				"[data-role='task-feedback']",
+			);
+			if (feedback) feedback.dataset.visible = "false";
+		}
+		if (sectionId === "pages" && component.active?.name === "CreatePage") {
+			const feedback = component.elt.querySelector<HTMLElement>(
+				"[data-role='page-feedback']",
 			);
 			if (feedback) feedback.dataset.visible = "false";
 		}

@@ -1217,9 +1217,28 @@ messages:
       intent: empty-state explanation inside the Messages history pane
       surfaces: [frontend]
     action:
-      classes: mt-2 inline-flex items-center gap-1.5 rounded-md bg-user-default px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-user-dark hover:outline-2 hover:outline-offset-2 hover:outline-user-dark focus-visible:bg-user-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-dark
+      classes: mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-user-default px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-user-dark hover:outline-2 hover:outline-offset-2 hover:outline-user-dark focus-visible:bg-user-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-dark
       intent: primary call-to-action button inside the Messages empty pane
       surfaces: [frontend]
+
+files:
+  empty:
+    container:
+      alias: messages.empty.container
+      intent: centered empty-state wrapper inside an empty Page Files tab
+      surfaces: [server]
+    title:
+      alias: messages.empty.title
+      intent: empty-state heading inside an empty Page Files tab
+      surfaces: [server]
+    body:
+      alias: messages.empty.body
+      intent: empty-state explanation inside an empty Page Files tab
+      surfaces: [server]
+    action:
+      classes: mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-kind-default px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-kind-dark hover:outline-2 hover:outline-offset-2 hover:outline-kind-dark focus-visible:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-dark
+      intent: primary upload call-to-action inside an empty Page Files tab
+      surfaces: [server]
 
 modal:
   wrapper:

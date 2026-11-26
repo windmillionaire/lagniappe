@@ -128,6 +128,39 @@ export class HomeCategoryList extends LoadedHomeList {
 export class HomePageList extends LoadedHomeList {
 	static unlockToggleWhenPopulated = true;
 	static disableToggleWhenUnavailable = true;
+
+	created(response: unknown) {
+		super.created(response);
+		const created = this._created[0];
+		if (!created) return;
+		const link = created.querySelector<HTMLAnchorElement>(
+			"a[data-kind='page'][href], a[href^='/pages/']",
+		);
+		const name = link?.textContent?.trim() || "";
+		const href = link?.getAttribute("href") || "";
+		this._setPageFeedback(name, href);
+	}
+
+	_setPageFeedback(name: string, href: string) {
+		const banner = this.component.elt.querySelector<HTMLElement>(
+			"[data-role='page-feedback']",
+		);
+		if (!banner) return;
+		const text = banner.querySelector<HTMLElement>(
+			"[data-role='page-feedback-text']",
+		);
+		const link = banner.querySelector<HTMLAnchorElement>(
+			"[data-role='page-feedback-link']",
+		);
+		if (!name || !href) {
+			banner.dataset.visible = "false";
+			if (text) text.textContent = "";
+			return;
+		}
+		if (text) text.textContent = `Created "${name}".`;
+		if (link) link.href = href;
+		banner.dataset.visible = "true";
+	}
 }
 
 export class DirectoryList extends LoadedHomeList {

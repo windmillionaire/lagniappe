@@ -150,7 +150,14 @@ def index(kind: str) -> ResponseReturnValue:
     g.NO_CACHE = True
     preloaded_hashes = set(request.values.getlist("preload"))
     query = request.values.get("q", "")
-    if len(query) < 1:
+    browse = request.values.get("browse") == "true" and kind in {
+        "category",
+        "form",
+        "project",
+        "group",
+        "user",
+    }
+    if len(query) < 1 and not browse:
         return responses.index_results([])
 
     search_kind = "user" if kind == "administrator" else kind
