@@ -400,7 +400,7 @@ test("test_home_persists_user_toggles_including_empty_selection_and_restores_sav
 	assert.equal(third.root.querySelector("#tasks").dataset.open, "false");
 });
 
-test("remembered panels become visible inside transition updates as their loads finish", async (t) => {
+test("test_home_reveals_remembered_panels_in_transitions_as_loads_finish", async (t) => {
 	const projects = deferred();
 	const directoryOpened = deferred();
 	const opened = (root) =>
