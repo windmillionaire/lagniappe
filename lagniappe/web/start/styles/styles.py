@@ -459,8 +459,8 @@ STYLES = {
 			"default": "max-w-48 py-3.5 px-3 text-left font-medium",
 			"action": "w-px px-3 py-2.5 text-right text-lg font-medium whitespace-nowrap",
 			"compact": {
-				"th": "group/header w-28 min-w-24 max-w-32 py-2.5 px-3 text-left font-medium leading-snug whitespace-normal data-[active=false]:border-b-2",
-				"default": "w-28 min-w-24 max-w-32 py-3.5 px-3 text-left font-medium whitespace-nowrap"
+				"th": "group/header w-36 min-w-32 max-w-44 py-2.5 px-3 text-left font-medium leading-snug whitespace-nowrap data-[active=false]:border-b-2",
+				"default": "w-36 min-w-32 max-w-44 py-3.5 px-3 text-left font-medium whitespace-nowrap"
 			}
 		},
 		"filters": {
@@ -547,7 +547,7 @@ STYLES = {
 		},
 		"description": {
 			"editor": "mt-4 flex w-full flex-col gap-2",
-			"input": "form-input block w-full resize-none overflow-hidden rounded-md px-3 py-2 text-sm leading-relaxed disabled:opacity-60",
+			"input": "form-input block w-full resize-none overflow-hidden rounded-md px-4 py-3 text-sm disabled:opacity-60",
 			"actions": "flex flex-row items-center justify-between gap-2",
 			"buttons": "ml-auto flex flex-row items-center gap-1.5",
 			"remove": "cursor-pointer text-xs font-medium text-base-medium transition-colors hover:text-delete-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default disabled:pointer-events-none disabled:opacity-50",

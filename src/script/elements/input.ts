@@ -1,7 +1,7 @@
 import { STYLES } from "../generated/styles.mjs";
 import { BaseElement } from "./base/baseElement.ts";
 import { formatting } from "./formatting.ts";
-import { primitives } from "./primitives.ts";
+import { primitives, wrapDateInput } from "./primitives.ts";
 
 export class InputElement extends BaseElement {
 	get value() {
@@ -79,7 +79,7 @@ export class InputElement extends BaseElement {
 	get edit() {
 		if (this._edit) return this._edit;
 
-		this._edit = primitives.input({
+		const raw = primitives.input({
 			label: this.label,
 			name: this.schema.id || this.schema.name,
 			type: this.schema.input || "text",
@@ -87,12 +87,20 @@ export class InputElement extends BaseElement {
 			value: this.submission,
 			disabled: this.renderer.readonly,
 		});
+		this._edit =
+			!this.label &&
+			this.schema.input === "date" &&
+			!this.renderer.readonly &&
+			raw instanceof HTMLInputElement
+				? wrapDateInput(raw)
+				: raw;
 
-		const control =
-			this._edit.querySelector("[data-role='date-input-wrap']") ||
-			(this._edit.matches?.("input")
-				? this._edit
-				: this._edit.querySelector("input"));
+		const control = this._edit.matches?.("[data-role='date-input-wrap']")
+			? this._edit
+			: this._edit.querySelector("[data-role='date-input-wrap']") ||
+				(this._edit.matches?.("input")
+					? this._edit
+					: this._edit.querySelector("input"));
 		control?.classList.add("group-data-[mode=read]/element:hidden");
 
 		return this._edit;

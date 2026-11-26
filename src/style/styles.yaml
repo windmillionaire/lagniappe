@@ -1509,11 +1509,11 @@ table:
       surfaces: [server]
     compact:
       th:
-        classes: group/header w-28 min-w-24 max-w-32 py-2.5 px-3 text-left font-medium leading-snug whitespace-normal data-[active=false]:border-b-2
+        classes: group/header w-36 min-w-32 max-w-44 py-2.5 px-3 text-left font-medium leading-snug whitespace-nowrap data-[active=false]:border-b-2
         intent: th presentation within table cell compact
         surfaces: [server]
       default:
-        classes: w-28 min-w-24 max-w-32 py-3.5 px-3 text-left font-medium whitespace-nowrap
+        classes: w-36 min-w-32 max-w-44 py-3.5 px-3 text-left font-medium whitespace-nowrap
         intent: default presentation within table cell compact
         surfaces: [server]
   filters:
@@ -1786,8 +1786,8 @@ page:
       intent: borderless inline header editor wrapper for adding or editing a page description
       surfaces: [frontend]
     input:
-      classes: form-input block w-full resize-none overflow-hidden rounded-md px-3 py-2 text-sm leading-relaxed disabled:opacity-60
-      intent: form-styled auto-sizing textarea inside the inline page description editor
+      classes: form-input block w-full resize-none overflow-hidden rounded-md px-4 py-3 text-sm disabled:opacity-60
+      intent: form-styled auto-sizing textarea matching read-mode description padding inside the inline page description editor
       surfaces: [frontend]
       hooks: [form-input]
       css: [src/style/forms.css]
