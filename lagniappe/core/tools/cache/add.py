@@ -11,7 +11,7 @@ import json
 
 from .core import cache, filter_cache
 from .keys import SEARCH_SCORE_FIELD, Keys, Search
-from .project_filters import record_task_changes
+from .filter_publication import MEMBER_HISTORIES, record_changes
 from ...definitions.fingerprints import base_fingerprint
 from ..auth.restrictions import normalize_restrictions
 
@@ -49,15 +49,18 @@ def invalidate_revisions(*entities: Entity) -> None:
     owners = {entity.hash: entity for entity in entities if entity.hash}
     if not owners:
         return
-    record_task_changes([h for h, entity in owners.items() if entity.kind == "task"])
-    parents = filter_cache.get_existing_parents(owners.keys())
+    # A User and its personal Page can share a hash. A Page filter marker must
+    # always point to the Page's Datastore key.
+    members = {e.hash: e for e in entities if e.hash and e.kind in MEMBER_HISTORIES}
+    record_changes(members.values())
+    parents = filter_cache.get_existing_parents(members.keys()) if members else {}
     with cache.pipeline() as pipe:
         pipe.eval(_INVALIDATE_REVISIONS, 1, Keys.ENTITY_HASHES.value, *owners)
         for entity_hash, indexes in parents.items():
             for index in indexes:
                 pipe.json().set(
                     index, f"$.{entity_hash}",
-                    {"refresh": 1, "id": owners[entity_hash].urlsafe_key, "cache_key": entity_hash},
+                    {"refresh": 1, "id": members[entity_hash].urlsafe_key, "cache_key": entity_hash},
                     xx=True,
                 )
         pipe.execute()
@@ -118,11 +121,12 @@ def delete_entity_from_search(kind: str, entity: Entity) -> None:
 
 def update(*entities: Entity, update: bool = True) -> None:
     """Write entity data to the hash cache and update JSON indexes."""
+    if update:
+        # Filter membership also applies to Pages without a searchable hash row.
+        update_json_index([entity for entity in entities if entity.kind in MEMBER_HISTORIES and entity.hash])
     cacheable = [e for e in entities if getattr(e, "to_cache", None)]
     if not cacheable:
         return
-
-    update_json = []
 
     with cache.pipeline() as pipe:
         for entity in cacheable:
@@ -134,8 +138,6 @@ def update(*entities: Entity, update: bool = True) -> None:
                 continue
             pipe.delete(key)
 
-            if entity.kind == "task" and update:
-                update_json.append(entity)
             if getattr(entity, "searchable", True) is False:
                 if entity.hash:
                     pipe.hset(
@@ -168,12 +170,7 @@ def update(*entities: Entity, update: bool = True) -> None:
                     json.dumps(_redis_details(entity)),
                 )
 
-            if entity.kind == "page" and update:
-                update_json.append(entity)
-
         pipe.execute()
-
-    update_json_index(update_json)
 
 
 def update_json_index(entities: Collection[Entity]) -> None:
@@ -183,19 +180,19 @@ def update_json_index(entities: Collection[Entity]) -> None:
 
     entity_hash_map = {entity.hash: entity for entity in entities}
     members: dict[str, set[str]] = {}
-    tasks = []
-    projects = set()
+    destinations: dict[str, set[str]] = {}
     for entity in entities:
         if entity.kind == "task":
-            tasks.append(entity.hash)
-            if project := getattr(entity, "project", None):
-                projects.add(project.hash)
-                members.setdefault(project.hash, set()).add(entity.hash)
-        elif entity.kind == "page":
-            for category in getattr(entity, "categories", ()):
-                members.setdefault(category.hash, set()).add(entity.hash)
+            project = getattr(entity, "project", None)
+            parents = (project,) if project else ()
+        else:
+            # Page.categories includes its model Category and additional Categories.
+            parents = getattr(entity, "categories", ()) if entity.db.get("active") else ()
+        destinations[entity.hash] = {parent.hash for parent in parents}
+        for parent_hash in destinations[entity.hash]:
+            members.setdefault(parent_hash, set()).add(entity.hash)
 
-    record_task_changes(tasks, projects)
+    record_changes(entities, destinations)
     existing = filter_cache.get_existing_parents(entity_hash_map.keys())
     indexes = set(filter_cache.get_new_parents(members))
     for keys in existing.values():

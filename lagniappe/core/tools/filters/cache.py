@@ -18,15 +18,14 @@ if TYPE_CHECKING:
     from lagniappe.core.entities.project import Project
     from lagniappe.core.entities.user import User
 
-from ..cache import Keys, filter_cache, project_filters
+from ..cache import Keys, filter_cache, filter_publication
 from ..services.task_queue import create_task
 from .build import FilterExpression
 from .contract import CompiledFilter
 
 
-# Rebuild indexes populated before task updates tracked project membership.
-FILTER_CACHE_SCOPE = "all-v3"
-PROJECT_FILTER_CACHE_SCOPE = "all-v4"
+# Rebuild older indexes that could contain a snapshot published over an edit.
+FILTER_CACHE_SCOPE = "all-v4"
 
 
 def _entity_ids(value: object) -> TypeGuard[list[str]]:
@@ -65,14 +64,11 @@ class FilterCache:
     def __init__(self, entity: Category | Project, user: User | None = None) -> None:
         self.entity = entity
         self.user = current_context_user(user)
-        scope = PROJECT_FILTER_CACHE_SCOPE if entity.kind == "project" else FILTER_CACHE_SCOPE
-        self.cache_key = Keys.FILTER.value.format(self.entity.hash, scope)
-
-        self._to_cache = {}
+        self.cache_key = Keys.FILTER.value.format(self.entity.hash, FILTER_CACHE_SCOPE)
 
     def _query_index(self, expression: str) -> JsonType:
         result = filter_cache.query(self.cache_key, expression)
-        if result is None and self.entity.kind == "project":
+        if result is None:
             # The root can expire between update() and the actual filter read.
             self.cache()
             result = filter_cache.query(self.cache_key, expression)
@@ -133,12 +129,11 @@ class FilterCache:
     def _entity_map(self, entities):
         return {e.hash: cast("JsonType", escape_for_filter(e.to_filter_index())) for e in entities}
 
-    def _load(self, cursor=None):
-        if self.entity.kind != "category":
-            return
-
+    def _load_category_pages(self) -> dict[str, JsonType]:
         category_key = self.entity.key
         assert category_key is not None
+        rows: dict[str, JsonType] = {}
+        cursor = None
         while True:
             index = database_get.pages(
                 category_key,
@@ -146,11 +141,11 @@ class FilterCache:
                 limit=100,
                 hashes=Restriction.UNRESTRICTED,
             )
-            self._to_cache.update(
+            rows.update(
                 self._entity_map(Entities.fetch(*index.results, request=Fetch.direct()))
             )
             if not index.next_cursor:
-                return
+                return rows
             cursor = index.next_cursor
 
     def _load_project_tasks(self) -> dict[str, JsonType]:
@@ -177,24 +172,28 @@ class FilterCache:
     def cache(self) -> None:
         """Build or incrementally refresh the filter cache."""
         if self.entity.kind == "project":
-            project_filters.ensure(
-                self.cache_key, self.entity.hash, self._load_project_tasks,
+            filter_publication.ensure(
+                self.cache_key, self.entity.hash, Keys.PROJECT_FILTER_CHANGES.value, self._load_project_tasks,
                 self._refresh_project_tasks, force=CONFIG.local,
             )
-            return
-
-        if not filter_cache.exists(self.cache_key):
-            self._load()
-            filter_cache.create(self.cache_key, self._to_cache)
         else:
-            to_refresh = filter_cache.refresh_needed(self.cache_key)
-            if not to_refresh:
-                return
+            filter_publication.ensure(
+                self.cache_key, self.entity.hash, Keys.CATEGORY_FILTER_CHANGES.value, self._load_category_pages,
+                self._refresh_category_pages, force=False,
+            )
 
-            if not _entity_ids(to_refresh):
-                raise TypeError("Expected an array of entity IDs requiring a refresh")
-            refreshed = Entities.fetch(*to_refresh, request=Fetch.direct())
-            filter_cache.set(self.cache_key, self._entity_map(refreshed))
+    def _refresh_category_pages(self, ids: list[str]) -> dict[str, JsonType]:
+        # Match the active Page and either membership field in database_get.pages().
+        category = self.entity.key
+        assert category is not None
+        members = []
+        for page in Entities.fetch(*ids, request=Fetch.direct()):
+            if page.kind != "page" or not page.db.get("active"):
+                continue
+            categories = page.db.get("categories")
+            if page.db.get("model") == category or (isinstance(categories, list) and category in categories):
+                members.append(page)
+        return self._entity_map(members)
 
     def _refresh_project_tasks(self, ids: list[str]) -> dict[str, JsonType]:
         tasks = Entities.fetch(

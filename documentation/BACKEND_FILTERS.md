@@ -167,31 +167,31 @@ Caches entity filter indices in Redis JSON for fast querying.
 
 ### Cache Key
 
-The shared cache key uses the parent hash and a format scope. Projects use
-`all-v4` and Categories use `all-v3`. Each query checks the viewer's permissions
-after loading the matching entities. A new Project scope lets the first read
-rebuild older projections that may contain stale Task values.
+Projects and Categories use the parent hash and the `all-v4` format scope.
+The first read rebuilds projections from older scopes. Each query checks the
+viewer's permissions after loading the matching entities.
 
 ### Building the Cache
 
-Categories page through their Pages. A cold Project reads all its Tasks,
-including completed Tasks, and their filterable relations. Both use
-`entity.to_filter_index()` to build the RedisJSON document.
+Categories fetch active Pages in batches of 100. A Page can belong through its
+model Category, its additional Categories, or both. Projects fetch all their
+Tasks, including completed Tasks, and their filterable relations. Both use
+`entity.to_filter_index()` to build the RedisJSON document. A Page's own task
+list uses `database_get.page_tasks()` and applies the viewer's permissions.
 
-One worker holds a renewable Redis lease while building a Project. Other
-readers reuse its published index. Task cache writers record the changed
-Task hashes and destination Project hashes before looking up existing
-projections. The builder checks those changes back to the start of its read.
-Checking both kinds of hash covers Tasks arriving in a Project and Tasks
-leaving one whose old index was absent. If the change history no longer
-covers the read, the builder reloads. A Redis transaction verifies ownership
-and publishes the complete document with its expiry.
+One worker holds a renewable Redis lease per parent. Concurrent readers share
+its published index. After a committed edit, writers record the member hash
+and its current parent hashes before looking up published indexes. Page and
+Task changes have independent bounded histories. A builder reloads if its
+parent or a member changed, or if its history no longer covers the scan.
+Each Category retry starts at the first page with an empty result. A Redis
+transaction verifies ownership and publishes the complete index with its expiry.
 
-A clean Project needs one RedisJSON read to check for refresh markers.
-Incremental refresh watches the existing document, reloads marked Tasks and
-removes entries for Tasks that left the Project. A racing edit or an expired
-document causes a retry. If a builder stops, its lease expires and a waiting
-reader can take over.
+A clean index needs one RedisJSON read to check for refresh markers. An
+incremental refresh watches the document and reloads marked members. It removes
+deleted members, Tasks that moved to another Project, and Pages that became
+inactive or left this Category. A racing edit or expiry causes a retry.
+If a builder stops, its lease expires and a waiting reader can take over.
 
 ### Querying
 

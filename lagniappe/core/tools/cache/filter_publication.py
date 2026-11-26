@@ -1,6 +1,6 @@
-"""Coordinate Project filter builders and detect Task edits during materialization."""
+"""Coordinate filter builders and detect changes to their members during a scan."""
 
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from contextlib import suppress
 import json
 from threading import Event, Thread
@@ -15,12 +15,15 @@ from .core import filter_cache
 from .keys import Keys
 
 if TYPE_CHECKING:
+    from redis.client import Pipeline
     from redis.commands.json._util import JsonType
     from redis.lock import Lock
+    from ...entities.entity import Entity
 
 
-# One short, bounded history also covers moves out of a Project that had no
-# published index when the write ran. Store identifiers only.
+# A history per collection type also covers moves out of a parent whose index
+# did not exist when the write ran. Unrelated Task traffic cannot trim Page history.
+MEMBER_HISTORIES = {"task": Keys.PROJECT_FILTER_CHANGES.value, "page": Keys.CATEGORY_FILTER_CHANGES.value}
 CHANGE_WINDOW = 128
 LEASE_SECONDS = 15
 WAIT_SECONDS = 30
@@ -32,41 +35,52 @@ class RefreshMarker(TypedDict):
     cache_key: str
 
 
-def _record(affected: set[str]) -> bytes:
+def _append(pipe: Pipeline, history: str, affected: set[str]) -> bytes:
     # A unique checkpoint survives neither eviction nor trimming. A builder
     # that cannot find its checkpoint must read Datastore again.
     members = sorted(affected) if len(affected) <= CHANGE_WINDOW else ["*"]
     event = json.dumps([uuid4().hex, members], separators=(",", ":")).encode()
-    key = Keys.PROJECT_FILTER_CHANGES.value
-    with filter_cache.redis.pipeline() as pipe:
-        pipe.lpush(key, event)
-        pipe.ltrim(key, 0, CHANGE_WINDOW - 1)
-        pipe.execute()
+    pipe.lpush(history, event)
+    pipe.ltrim(history, 0, CHANGE_WINDOW - 1)
     return event
 
 
-def record_task_changes(tasks: Collection[str], projects: Collection[str] = ()) -> None:
-    """Signal committed Task changes before discovering existing JSON parents."""
-    if tasks:
-        _record(set(tasks).union(projects))
+def record_changes(entities: Collection[Entity], destinations: Mapping[str, Collection[str]] | None = None) -> None:
+    """Signal committed edits before discovering existing JSON parents."""
+    changes: dict[str, set[str]] = {}
+    for entity in entities:
+        history = MEMBER_HISTORIES.get(entity.kind)
+        if history and entity.hash:
+            affected = changes.setdefault(history, set())
+            affected.add(entity.hash)
+            if destinations:
+                affected.update(destinations.get(entity.hash, ()))
+    if changes:
+        with filter_cache.redis.pipeline() as pipe:
+            for history, affected in changes.items():
+                _append(pipe, history, affected)
+            pipe.execute()
 
 
-def _head() -> bytes:
+def _head(history: str) -> bytes:
     # This synchronous client returns bytes. Seed an empty history so a later
     # eviction is distinguishable from a quiet interval.
-    event = cast("bytes | None", filter_cache.redis.lindex(Keys.PROJECT_FILTER_CHANGES.value, 0))
-    return event or _record(set())
+    event = cast("bytes | None", filter_cache.redis.lindex(history, 0))
+    if event is None:
+        with filter_cache.redis.pipeline() as pipe:
+            event = _append(pipe, history, set())
+            pipe.execute()
+    return event
 
 
-def _affected(start: bytes, project: str, rows: dict[str, JsonType]) -> bool:
-    key = Keys.PROJECT_FILTER_CHANGES.value
-    if filter_cache.redis.lindex(key, 0) == start:
+def _affected(history: str, start: bytes, parent: str, rows: dict[str, JsonType]) -> bool:
+    if filter_cache.redis.lindex(history, 0) == start:
         return False
-    for event in filter_cache.redis.lrange(key, 0, CHANGE_WINDOW - 1):
+    for event in filter_cache.redis.lrange(history, 0, CHANGE_WINDOW - 1):
         if event == start:
             return False
         _, members = json.loads(event)
-        if "*" in members or project in members or any(member in rows for member in members):
+        if "*" in members or parent in members or any(member in rows for member in members):
             return True
     return True
 
@@ -81,16 +95,15 @@ def _renew(lease: Lock, stop: Event) -> None:
             return
 
 
-def _publish(key: str, project: str, rows: dict[str, JsonType], start: bytes, lease: Lock) -> bool:
+def _publish(key: str, parent: str, history: str, rows: dict[str, JsonType], start: bytes, lease: Lock) -> bool:
     redis = filter_cache.redis
-    change_key = Keys.PROJECT_FILTER_CHANGES.value
-    document = json.dumps({**rows, "access": {"hash": project}}, separators=(",", ":"))
+    document = json.dumps({**rows, "access": {"hash": parent}}, separators=(",", ":"))
     deadline = monotonic() + WAIT_SECONDS
     while monotonic() < deadline:
         with redis.pipeline() as pipe:
             try:
-                pipe.watch(lease.name, change_key)
-                if not lease.owned() or _affected(start, project, rows):
+                pipe.watch(lease.name, history)
+                if not lease.owned() or _affected(history, start, parent, rows):
                     return False
                 pipe.multi()
                 pipe.execute_command("JSON.SET", key, "$", document)
@@ -98,13 +111,13 @@ def _publish(key: str, project: str, rows: dict[str, JsonType], start: bytes, le
                 pipe.execute()
                 return True
             except WatchError:
-                # A write to another Project or a lease renewal can reuse these rows.
+                # An unrelated edit or a lease renewal can reuse these rows.
                 continue
-    raise ServiceUnavailable("Project filter publication is busy. Please retry.")
+    raise ServiceUnavailable("Filter publication is busy. Please retry.")
 
 
 def _rebuild(
-    key: str, project: str, load: Callable[[], dict[str, JsonType]], *,
+    key: str, parent: str, history: str, load: Callable[[], dict[str, JsonType]], *,
     force: bool, wait: float,
 ) -> bool:
     """Publish a fresh snapshot or join an already finished build."""
@@ -122,9 +135,9 @@ def _rebuild(
         heartbeat = Thread(target=_renew, args=(lease, stopped), daemon=True)
         heartbeat.start()
         try:
-            start = _head()
+            start = _head(history)
             rows = load()
-            return _publish(key, project, rows, start, lease)
+            return _publish(key, parent, history, rows, start, lease)
         finally:
             stopped.set()
             heartbeat.join()
@@ -163,18 +176,18 @@ def _refresh(key: str, load: Callable[[list[str]], dict[str, JsonType]]) -> bool
 
 
 def ensure(
-    key: str, project: str, load: Callable[[], dict[str, JsonType]],
+    key: str, parent: str, history: str, load: Callable[[], dict[str, JsonType]],
     refresh: Callable[[list[str]], dict[str, JsonType]], *, force: bool,
 ) -> None:
-    """Serve complete Project indexes and preserve concurrent incremental edits."""
+    """Serve complete indexes and preserve concurrent incremental edits."""
     deadline = monotonic() + WAIT_SECONDS
     pending = _pending(key)
     force = force and pending is not None
     while (remaining := deadline - monotonic()) > 0:
         if pending is None or force:
-            if _rebuild(key, project, load, force=force, wait=remaining):
+            if _rebuild(key, parent, history, load, force=force, wait=remaining):
                 return
         elif not pending or _refresh(key, refresh):
             return
         pending = _pending(key)
-    raise ServiceUnavailable("Project filter is changing. Please retry.")
+    raise ServiceUnavailable("Filter is changing. Please retry.")

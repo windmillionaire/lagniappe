@@ -578,7 +578,10 @@ def test_cache_delete_removes_page_and_user_search_projections(monkeypatch):
         urlsafe_key="deleted-user-page-key",
     )
 
+    signaled = []
+    monkeypatch.setattr(utility, "record_changes", lambda members: signaled.extend(members))
     utility.delete([page])
+    assert signaled == [page]
 
     assert set(deleted) == {
         Search.page.key(page),

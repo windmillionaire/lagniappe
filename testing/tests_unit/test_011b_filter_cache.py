@@ -45,7 +45,7 @@ def test_filter_cache_uses_shared_cache_key_without_user_restrictions():
     restricted_cache = FilterCache(parent, user=_user(models=["category-a"]))
 
     assert owner_cache.cache_key == restricted_cache.cache_key
-    assert owner_cache.cache_key.endswith(":all-v3")
+    assert owner_cache.cache_key.endswith(":all-v4")
 
 
 @pytest.mark.unit
@@ -93,10 +93,11 @@ def test_filter_cache_rejects_uncompiled_query_definitions():
         )
 
 
-def test_project_filter_recovers_when_root_expires_between_update_and_query(monkeypatch):
+@pytest.mark.parametrize("kind", ["category", "project"])
+def test_filter_recovers_when_root_expires_between_update_and_query(monkeypatch, kind):
     from lagniappe.core.tools.filters import cache as module
 
-    reader = FilterCache(_parent("project"), user=_user())
+    reader = FilterCache(_parent(kind), user=_user())
     rebuild = MagicMock()
     monkeypatch.setattr(reader, "cache", rebuild)
     monkeypatch.setattr(module.filter_cache, "query", MagicMock(side_effect=[None, ["task-id"]]))
@@ -150,13 +151,15 @@ def test_filter_cache_loads_category_pages_without_restrictions():
         side_effect=[
             SimpleNamespace(results=["page-key-1"], next_cursor="cursor-2"),
             SimpleNamespace(results=["page-key-2"], next_cursor=None),
+            SimpleNamespace(results=["page-key-2"], next_cursor=None),
         ],
     ) as pages, patch(
         "lagniappe.core.tools.filters.cache.Entities.fetch",
         side_effect=lambda *keys, **_kwargs: [pages_by_key[key] for key in keys],
     ):
         cache = FilterCache(parent, user=_user(models=["restricted"]))
-        cache._load()
+        rows = cache._load_category_pages()
+        retry_rows = cache._load_category_pages()
 
     assert pages.call_args_list == [
         call(
@@ -171,11 +174,33 @@ def test_filter_cache_loads_category_pages_without_restrictions():
             limit=100,
             hashes=Restriction.UNRESTRICTED,
         ),
+        call(parent.key, start_cursor=None, limit=100, hashes=Restriction.UNRESTRICTED),
     ]
-    assert cache._to_cache == {
+    assert rows == {
         "page-hash-1": {"id": "page-key-1", "name": "Page 1"},
         "page-hash-2": {"id": "page-key-2", "name": "Page 2"},
     }
+    assert retry_rows == {"page-hash-2": {"id": "page-key-2", "name": "Page 2"}}
+
+
+def test_category_refresh_keeps_only_active_pages_with_current_membership(monkeypatch):
+    from lagniappe.core.tools.filters import cache as module
+
+    parent = _parent("category")
+
+    def page(name, **db):
+        return SimpleNamespace(kind="page", hash=name, db={"active": True, **db},
+                               to_filter_index=lambda: {"name": name})
+    pages = [
+        page("primary", model=parent.key), page("additional", model="other", categories=[parent.key]),
+        page("departed", model="other"), page("inactive", model=parent.key, active=False),
+    ]
+    fetch = MagicMock(return_value=pages)
+    monkeypatch.setattr(module.Entities, "fetch", fetch)
+    reader = FilterCache(parent, user=_user())
+    ids = [p.hash for p in pages] + ["deleted"]
+    assert reader._refresh_category_pages(ids) == {"primary": {"name": "primary"}, "additional": {"name": "additional"}}
+    fetch.assert_called_once_with(*ids, request=Fetch.direct())
 
 
 class _FakeFilter:
@@ -278,7 +303,7 @@ def test_edits_completion_and_project_moves_keep_actual_filter_members(monkeypat
     ]
     tasks[1].completed = True
     record_changes = MagicMock()
-    monkeypatch.setattr(add, "record_task_changes", record_changes)
+    monkeypatch.setattr(add, "record_changes", record_changes)
     pipe = MagicMock()
     commands = pipe.__enter__.return_value.json.return_value
     commands.set.side_effect = lambda key, path, value: rows[key].update({path[2:]: value})
@@ -293,7 +318,7 @@ def test_edits_completion_and_project_moves_keep_actual_filter_members(monkeypat
 
     add.update_json_index(tasks)
 
-    record_changes.assert_called_once_with(["edited", "completed", "new", "moved"], {project.hash})
+    record_changes.assert_called_once_with(tasks, {task.hash: {project.hash} for task in tasks})
     assert rows[former] == {}
     assert rows[current] == {
         name: {"id": f"id-{name}", "cache_key": name, "refresh": 1}
