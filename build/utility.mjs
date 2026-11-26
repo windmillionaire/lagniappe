@@ -204,6 +204,7 @@ const FEATURE_CHUNK_MODULES = {
 		"elements/buttons.mjs",
 		"elements/formatting.mjs",
 	],
+	"date-picker": ["elements/datePicker.mjs"],
 	permissions: [
 		"forms/controls/permissionSections.mjs",
 		"forms/controls/accessRestrictions.mjs",

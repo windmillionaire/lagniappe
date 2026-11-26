@@ -1,8 +1,25 @@
 import { STYLES } from "../generated/styles.mjs";
+import { setIcon } from "../shared/icons.ts";
 import { withTransition } from "../shared/transitions.ts";
-import { buttons } from "./buttons.ts";
-import { primitives } from "./primitives.ts";
+import { primitives, wrapDateInput } from "./primitives.ts";
 import type { SectionToggle } from "./sectionToggle.ts";
+
+function formatLocalIsoDate(date: Date) {
+	const y = String(date.getFullYear()).padStart(4, "0");
+	const m = String(date.getMonth() + 1).padStart(2, "0");
+	const d = String(date.getDate()).padStart(2, "0");
+	return `${y}-${m}-${d}`;
+}
+
+function todayIsoDate(now = new Date()) {
+	return formatLocalIsoDate(now);
+}
+
+function addDaysIsoDate(days: number, now = new Date()) {
+	return formatLocalIsoDate(
+		new Date(now.getFullYear(), now.getMonth(), now.getDate() + days),
+	);
+}
 
 interface RepeatDetails {
 	description?: string | null;
@@ -93,9 +110,52 @@ function isScheduleGroup(
 	return group === "weekly" || group === "monthly" || group === "yearly";
 }
 
+function segmentedOption(options: {
+	type: "checkbox" | "radio";
+	name: string;
+	label: string;
+	value?: string;
+	checked?: boolean;
+}) {
+	const label = document.createElement("label");
+	label.className = "lp-schedule-seg-option";
+	const input = document.createElement("input");
+	input.type = options.type;
+	input.name = options.name;
+	input.className = "lp-schedule-sr-input";
+	if (options.value !== undefined) input.value = options.value;
+	if (options.checked) input.checked = true;
+	const text = document.createElement("span");
+	text.textContent = options.label;
+	label.append(input, text);
+	return label;
+}
+
+function quickChip(options: {
+	text: string;
+	role: string;
+	accent?: boolean;
+	icon?: string;
+}) {
+	const button = document.createElement("button");
+	button.type = "button";
+	button.className = "lp-schedule-quick";
+	button.dataset.role = options.role;
+	if (options.accent) button.dataset.accent = "true";
+	if (options.icon) {
+		const icon = document.createElement("span");
+		setIcon(icon, options.icon, "icon-xs");
+		button.appendChild(icon);
+	}
+	const label = document.createElement("span");
+	label.textContent = options.text;
+	button.appendChild(label);
+	return button;
+}
+
 export class DueDate {
 	declare destroy?: never;
-	declare widget?: { readonly?: boolean };
+	declare widget?: { readonly?: boolean; inline?: boolean };
 	declare button: HTMLButtonElement;
 	declare action?: string;
 	declare kind: "task";
@@ -104,12 +164,17 @@ export class DueDate {
 	declare container: HTMLDivElement | null;
 	declare groups: Partial<Record<DueGroup, HTMLDivElement>>;
 	declare toggles: Partial<Record<RepeatGroup, HTMLElement>>;
+	declare noneButton: HTMLButtonElement | null;
+	declare clearDueButton: HTMLButtonElement | null;
 	declare error: HTMLDivElement | null;
 	declare open: boolean;
 	declare closed?: boolean;
 	declare toggle?: SectionToggle;
 
-	constructor(button: HTMLButtonElement, widget?: { readonly?: boolean }) {
+	constructor(
+		button: HTMLButtonElement,
+		widget?: { readonly?: boolean; inline?: boolean },
+	) {
 		this.widget = widget;
 		this.action = button.dataset.action;
 		this.button = button;
@@ -124,6 +189,8 @@ export class DueDate {
 		this.container = null;
 		this.groups = {};
 		this.toggles = {};
+		this.noneButton = null;
+		this.clearDueButton = null;
 		this.error = null;
 		this.open = false;
 
@@ -158,6 +225,37 @@ export class DueDate {
 		} else if (this.aiEnabled && this.schedule.periodic) {
 			container.appendChild(this.periodic);
 		}
+		this._syncNoneButton();
+		this._syncClearDueButton();
+	}
+
+	_syncNoneButton() {
+		if (!this.noneButton) return;
+		const hasRepeat = Boolean(
+			this.schedule.recurring ||
+				this.schedule.scheduled ||
+				this.schedule.periodic,
+		);
+		this.noneButton.dataset.active = hasRepeat ? "false" : "true";
+		this.noneButton.setAttribute("aria-pressed", hasRepeat ? "false" : "true");
+	}
+
+	_syncClearDueButton() {
+		if (!this.clearDueButton) return;
+		const input = this.groups.dueDate?.querySelector<HTMLInputElement>(
+			"input[name='due-date']",
+		);
+		const hasValue = Boolean(input?.value || this.schedule.due);
+		this.clearDueButton.hidden = !hasValue;
+	}
+
+	_setDueInputValue(value: string) {
+		const input = this.groups.dueDate?.querySelector<HTMLInputElement>(
+			"input[name='due-date']",
+		);
+		if (input) input.value = value;
+		this.schedule.due = value || null;
+		this._syncClearDueButton();
 	}
 
 	_click(e: MouseEvent) {
@@ -166,16 +264,29 @@ export class DueDate {
 				? e.target.closest<HTMLElement>("[data-role]")?.dataset.role
 				: undefined;
 		if (!role) return;
-		const input = this.groups.dueDate?.querySelector("input");
 
 		switch (role) {
 			case "today":
-				this.schedule.due = new Date().toLocaleDateString("sv-SE");
-				if (input) input.value = this.schedule.due;
+				this._setDueInputValue(todayIsoDate());
+				break;
+			case "tomorrow":
+				this._setDueInputValue(addDaysIsoDate(1));
+				break;
+			case "next-week":
+				this._setDueInputValue(addDaysIsoDate(7));
 				break;
 			case "remove-due-date":
-				if (input) input.value = "";
-				this.schedule.due = null;
+				this._setDueInputValue("");
+				break;
+			case "repeat-none":
+				[
+					this.groups.recurring,
+					this.groups.scheduled,
+					this.groups.periodic,
+				].forEach((group) => {
+					this.clearGroup(group);
+				});
+				this._syncNoneButton();
 				break;
 		}
 	}
@@ -196,7 +307,8 @@ export class DueDate {
 				this.schedule.periodic.description = target.value;
 			return;
 		} else if (target.name === "due-date") {
-			this.schedule.due = target.value;
+			this.schedule.due = target.value || null;
+			this._syncClearDueButton();
 			return;
 		} else if (target.name === "interval") {
 			this.schedule.recurring ??= {};
@@ -208,23 +320,32 @@ export class DueDate {
 	_change(e: Event) {
 		const { target } = e;
 		if (!(target instanceof HTMLInputElement) || !this.container) return;
+		if (target.name === "due-date") {
+			this.schedule.due = target.value || null;
+			this._syncClearDueButton();
+			return;
+		}
 		if (target.name === "recurring") {
-			this.schedule.recurring ??= {};
-			this.container.appendChild(this.recurring);
-			if (!target.checked) {
-				this.clearGroup(this.recurring);
+			if (target.checked) {
+				this.schedule.recurring ??= {};
+				this.container.appendChild(this.recurring);
+			} else {
+				this.clearGroup(this.groups.recurring);
 			}
+			this._syncNoneButton();
 			return;
 		} else if (target.name === "unit") {
 			this.schedule.recurring ??= {};
 			this.schedule.recurring.unit = target.value;
 			return;
 		} else if (target.name === "scheduled") {
-			this.schedule.scheduled ??= {};
-			this.container.appendChild(this.scheduled);
-			if (!target.checked) {
+			if (target.checked) {
+				this.schedule.scheduled ??= {};
+				this.container.appendChild(this.scheduled);
+			} else {
 				this.clearGroup(this.groups.scheduled);
 			}
+			this._syncNoneButton();
 			return;
 		} else if (target.name === "schedule-type") {
 			this.schedule.scheduled ??= {};
@@ -254,11 +375,13 @@ export class DueDate {
 			return;
 		} else if (target.name === "periodic") {
 			if (!this.aiEnabled) return;
-			this.schedule.periodic ??= {};
-			this.container.appendChild(this.periodic);
-			if (!target.checked) {
+			if (target.checked) {
+				this.schedule.periodic ??= {};
+				this.container.appendChild(this.periodic);
+			} else {
 				this.clearGroup(this.groups.periodic);
 			}
+			this._syncNoneButton();
 			return;
 		}
 	}
@@ -270,7 +393,7 @@ export class DueDate {
 	showError(message: string) {
 		if (!this.error) {
 			this.error = primitives.error();
-			this.error.classList.add("mb-3");
+			this.error.classList.add("mb-2");
 			this.container?.prepend(this.error);
 		}
 		this.error.textContent = message;
@@ -353,8 +476,11 @@ export class DueDate {
 	}
 
 	createOptionGroups() {
+		const containerStyle = this.widget?.inline
+			? STYLES.task.schedule.root
+			: `${STYLES.section} mt-2 ${STYLES.task.schedule.root}`;
 		this.container = primitives.div({
-			style: `${STYLES.section} mt-2`,
+			style: containerStyle,
 			data: {
 				visible: this.open ? "true" : "false",
 				role: "date-form",
@@ -365,37 +491,57 @@ export class DueDate {
 			this.button.closest("[data-role='section-toggle-row']") ?? this.button;
 		anchor.after(this.container);
 
-		const choices = this.container.appendChild(
-			primitives.div({
-				style: "flex flex-col gap-3 pt-3",
-			}),
-		);
+		const repeatSection = primitives.div({
+			style: "flex flex-col gap-2",
+		});
+		const repeatLabel = primitives.span({
+			style: "text-sm font-semibold text-base-dark",
+			text: "Repeat",
+		});
+
+		const segBar = primitives.div({
+			style: "lp-schedule-seg",
+			role: "repeat-modes",
+		});
+
+		const noneBtn = document.createElement("button");
+		noneBtn.type = "button";
+		noneBtn.className = "lp-schedule-seg-option";
+		noneBtn.dataset.role = "repeat-none";
+		noneBtn.textContent = "Doesn't repeat";
+		this.noneButton = noneBtn;
 
 		const toggles = {
-			recurring: primitives.checkbox({
+			recurring: segmentedOption({
+				type: "checkbox",
 				name: "recurring",
-				label: "This task repeats when completed",
+				label: "After completion",
 				checked: !!this.schedule.recurring,
 			}),
-			scheduled: primitives.checkbox({
+			scheduled: segmentedOption({
+				type: "checkbox",
 				name: "scheduled",
-				label: "This task repeats on a schedule",
+				label: "On a schedule",
 				checked: !!this.schedule.scheduled,
 			}),
-			periodic: primitives.checkbox({
+			periodic: segmentedOption({
+				type: "checkbox",
 				name: "periodic",
-				label: "This task repeats periodically",
+				label: "Periodically",
 				checked: !!this.schedule.periodic,
 			}),
 		};
 
 		this.toggles = toggles;
-		choices.append(
-			this.dueDate,
+		segBar.append(
+			noneBtn,
 			toggles.recurring,
 			toggles.scheduled,
 			...(this.aiEnabled ? [toggles.periodic] : []),
 		);
+		repeatSection.append(repeatLabel, segBar);
+
+		this.container.append(this.dueDate, repeatSection);
 	}
 
 	clearGroup(container?: HTMLDivElement | null) {
@@ -406,6 +552,7 @@ export class DueDate {
 			delete this.schedule.due;
 			const input = this.groups.dueDate?.querySelector("input");
 			if (input) input.value = "";
+			this._syncClearDueButton();
 		} else {
 			container.remove();
 			if (isRepeatGroup(group)) {
@@ -422,48 +569,62 @@ export class DueDate {
 	get dueDate() {
 		if (!this.groups.dueDate) {
 			this.groups.dueDate = this._createDueDate();
-			return this.groups.dueDate;
 		}
 		return this.groups.dueDate;
 	}
 
 	_createDueDate() {
 		const dueDateGroup = primitives.div({
-			style: "pb-1",
+			style: "flex flex-col gap-2",
 			role: "due-date",
 		});
 
-		dueDateGroup.appendChild(
-			primitives.input({
-				name: "due-date",
-				type: "date",
-				value: this.schedule.due || "",
-				label: "Due Date",
-				data: {
-					role: "set-due-date",
-				},
-			}),
+		const inputId = `lp-due-date-${Math.random().toString(36).slice(2, 8)}`;
+
+		const labelRow = dueDateGroup.appendChild(
+			primitives.div({ style: "lp-schedule-label-row" }),
+		);
+		const dueLabel = document.createElement("label");
+		dueLabel.htmlFor = inputId;
+		dueLabel.className = "text-sm font-semibold text-base-dark";
+		dueLabel.textContent = "Due Date";
+
+		const sep = document.createElement("span");
+		sep.className = "lp-schedule-sep";
+		sep.setAttribute("aria-hidden", "true");
+
+		const todayBtn = quickChip({ text: "Today", role: "today", accent: true });
+		const tomorrowBtn = quickChip({ text: "Tomorrow", role: "tomorrow" });
+		const nextWeekBtn = quickChip({ text: "Next week", role: "next-week" });
+		const clearBtn = quickChip({
+			text: "Clear",
+			role: "remove-due-date",
+			icon: "x",
+		});
+		clearBtn.hidden = !this.schedule.due;
+		this.clearDueButton = clearBtn;
+
+		labelRow.append(
+			dueLabel,
+			sep,
+			todayBtn,
+			tomorrowBtn,
+			nextWeekBtn,
+			clearBtn,
 		);
 
-		const buttonRow = dueDateGroup.appendChild(
-			primitives.div({
-				style: "flex flex-col sm:flex-row gap-2 mt-3",
-			}),
-		);
-
-		buttonRow.appendChild(
-			buttons.default({
-				text: "Today",
-				role: "today",
-			}),
-		);
-
-		buttonRow.appendChild(
-			buttons.default({
-				text: "Remove",
-				role: "remove-due-date",
-			}),
-		);
+		const input = primitives.input({
+			id: inputId,
+			name: "due-date",
+			type: "date",
+			value: this.schedule.due || "",
+			data: {
+				role: "set-due-date",
+			},
+		});
+		const dateWrap = wrapDateInput(input);
+		dateWrap.classList.add("lp-schedule-date-field");
+		dueDateGroup.appendChild(dateWrap);
 
 		return dueDateGroup;
 	}
@@ -480,67 +641,87 @@ export class DueDate {
 
 	_createRecurring() {
 		const recurringOptions = primitives.div({
-			style: "flex flex-col gap-4 border-t border-base-medium mt-4",
+			style: "lp-schedule-sub",
 			role: "recurring",
 			data: {
 				visible: this.schedule.recurring ? "true" : "false",
 			},
 		});
 
-		const afterRow = recurringOptions.appendChild(
-			primitives.div({ style: "flex flex-row items-center gap-2 mt-4" }),
+		const row = recurringOptions.appendChild(
+			primitives.div({ style: "flex flex-wrap items-end gap-3" }),
 		);
 
-		afterRow.appendChild(
-			primitives.span({ style: STYLES.label.default, text: "After" }),
+		const everyCol = row.appendChild(
+			primitives.div({ style: "flex flex-col gap-1 w-24" }),
 		);
-
-		afterRow.appendChild(
-			primitives.input({
-				name: "interval",
-				type: "number",
-				value: this.schedule.recurring?.interval || "1",
+		everyCol.appendChild(
+			primitives.span({
+				style: "text-xs font-semibold text-base-dark",
+				text: "Every",
 			}),
 		);
+		const intervalInput = primitives.input({
+			name: "interval",
+			type: "number",
+			value: this.schedule.recurring?.interval || "1",
+		});
+		intervalInput.min = "1";
+		everyCol.appendChild(intervalInput);
 
-		const unitWrapper = recurringOptions.appendChild(
-			primitives.div({ style: "flex flex-col gap-2" }),
+		const unitCol = row.appendChild(
+			primitives.div({ style: "flex flex-col gap-1" }),
+		);
+		unitCol.appendChild(
+			primitives.span({
+				style: "text-xs font-semibold text-base-dark",
+				text: "Unit",
+			}),
 		);
 
 		const units = [
 			{
-				label: "day",
+				label: "Days",
 				value: "day",
-				name: "unit",
 				checked:
 					this.schedule.recurring?.unit === "day" ||
 					!this.schedule.recurring?.unit,
 			},
 			{
-				label: "week",
+				label: "Weeks",
 				value: "week",
-				name: "unit",
 				checked: this.schedule.recurring?.unit === "week",
 			},
 			{
-				label: "month",
+				label: "Months",
 				value: "month",
-				name: "unit",
 				checked: this.schedule.recurring?.unit === "month",
 			},
 			{
-				label: "year",
+				label: "Years",
 				value: "year",
-				name: "unit",
 				checked: this.schedule.recurring?.unit === "year",
 			},
 		];
-		const unitRow = unitWrapper.appendChild(document.createElement("fieldset"));
-		unitRow.className = STYLES.radio.fieldset.grid;
-
+		const unitBar = unitCol.appendChild(document.createElement("fieldset"));
+		unitBar.className = "lp-schedule-seg";
 		units.forEach((unit) => {
-			unitRow.appendChild(primitives.radio(unit));
+			unitBar.appendChild(
+				segmentedOption({
+					type: "radio",
+					name: "unit",
+					label: unit.label,
+					value: unit.value,
+					checked: unit.checked,
+				}),
+			);
 		});
+
+		const hint = document.createElement("p");
+		hint.className = "text-xs text-base-medium";
+		hint.textContent =
+			"Next due date is scheduled after you mark this task complete.";
+		recurringOptions.appendChild(hint);
 
 		return recurringOptions;
 	}
@@ -587,60 +768,45 @@ export class DueDate {
 
 	_createSchedule() {
 		const scheduledOptions = primitives.div({
-			style: "flex flex-col gap-4 border-t border-base-medium mt-4",
+			style: "lp-schedule-sub",
 			role: "scheduled",
 			data: { visible: this.schedule.scheduled ? "true" : "false" },
 		});
 
-		const scheduleType = scheduledOptions.appendChild(
-			document.createElement("div"),
-		);
-		scheduleType.className = "flex flex-row items-center gap-2";
-
 		const currentMode = this.schedule.scheduled?.mode || "daily";
 		const scheduleTypes = [
-			{
-				label: "Daily",
-				value: "daily",
-				name: "schedule-type",
-				checked: currentMode === "daily",
-			},
-			{
-				label: "Weekly",
-				value: "weekly",
-				name: "schedule-type",
-				checked: currentMode === "weekly",
-			},
+			{ label: "Daily", value: "daily", checked: currentMode === "daily" },
+			{ label: "Weekly", value: "weekly", checked: currentMode === "weekly" },
 			...(this.aiEnabled
 				? [
 						{
 							label: "Monthly",
 							value: "monthly",
-							name: "schedule-type",
 							checked: currentMode === "monthly",
 						},
 						{
 							label: "Yearly",
 							value: "yearly",
-							name: "schedule-type",
 							checked: currentMode === "yearly",
 						},
 					]
 				: []),
 		];
 
-		const scheduleTypeWrapper = scheduledOptions.appendChild(
-			document.createElement("div"),
-		);
-		scheduleTypeWrapper.className = "flex flex-col gap-2";
-
-		const scheduleSettings = scheduleTypeWrapper.appendChild(
+		const scheduleBar = scheduledOptions.appendChild(
 			document.createElement("fieldset"),
 		);
-		scheduleSettings.className = STYLES.radio.fieldset.grid;
-
+		scheduleBar.className = "lp-schedule-seg";
 		scheduleTypes.forEach((type) => {
-			scheduleSettings.appendChild(primitives.radio(type));
+			scheduleBar.appendChild(
+				segmentedOption({
+					type: "radio",
+					name: "schedule-type",
+					label: type.label,
+					value: type.value,
+					checked: type.checked,
+				}),
+			);
 		});
 
 		return scheduledOptions;
@@ -648,7 +814,7 @@ export class DueDate {
 
 	_createWeeklySchedule() {
 		const weeklyOptions = primitives.div({
-			style: STYLES.checkbox.grid,
+			style: "lp-schedule-days",
 			role: "weekly",
 			data: {
 				visible: this.schedule.scheduled?.mode === "weekly" ? "true" : "false",
@@ -657,23 +823,32 @@ export class DueDate {
 		this.groups.scheduled?.appendChild(weeklyOptions);
 
 		const weekDays = [
-			"Monday",
-			"Tuesday",
-			"Wednesday",
-			"Thursday",
-			"Friday",
-			"Saturday",
-			"Sunday",
-		];
-		weekDays.forEach((day, index) => {
-			weeklyOptions.appendChild(
-				primitives.checkbox({
-					label: day,
-					value: index,
-					name: `weekly-day-${index}`,
-					checked: this.schedule.scheduled?.days?.includes(index) || false,
-				}),
-			);
+			["Mon", "Monday"],
+			["Tue", "Tuesday"],
+			["Wed", "Wednesday"],
+			["Thu", "Thursday"],
+			["Fri", "Friday"],
+			["Sat", "Saturday"],
+			["Sun", "Sunday"],
+		] as const;
+		const selectedDays = new Set(
+			(this.schedule.scheduled?.days || []).map((d) => String(d)),
+		);
+		weekDays.forEach(([shortLabel, fullLabel], index) => {
+			const pill = document.createElement("label");
+			pill.className = "lp-schedule-day";
+			pill.title = fullLabel;
+			const input = document.createElement("input");
+			input.type = "checkbox";
+			input.className = "lp-schedule-sr-input";
+			input.name = `weekly-day-${index}`;
+			input.value = String(index);
+			input.setAttribute("aria-label", fullLabel);
+			if (selectedDays.has(String(index))) input.checked = true;
+			const span = document.createElement("span");
+			span.textContent = shortLabel;
+			pill.append(input, span);
+			weeklyOptions.appendChild(pill);
 		});
 
 		return weeklyOptions;
@@ -681,7 +856,7 @@ export class DueDate {
 
 	_createMonthlySchedule() {
 		const monthlyOptions = primitives.div({
-			style: "flex flex-col gap-2",
+			style: "flex flex-col gap-1.5",
 			role: "monthly",
 			data: {
 				visible: this.schedule.scheduled?.mode === "monthly" ? "true" : "false",
@@ -698,16 +873,20 @@ export class DueDate {
 					this.schedule.scheduled?.mode === "monthly"
 						? this.schedule.scheduled?.description || ""
 						: "",
-				label: "Describe when this repeats (description will be parsed by AI)",
+				label: "When each month?",
 			}),
 		);
+		const hint = document.createElement("p");
+		hint.className = "text-xs text-base-medium";
+		hint.textContent = "Parsed by AI when you save.";
+		monthlyOptions.appendChild(hint);
 
 		return monthlyOptions;
 	}
 
 	_createYearlySchedule() {
 		const yearlyOptions = primitives.div({
-			style: "flex flex-col gap-2",
+			style: "flex flex-col gap-1.5",
 			role: "yearly",
 			data: {
 				visible: this.schedule.scheduled?.mode === "yearly" ? "true" : "false",
@@ -724,9 +903,13 @@ export class DueDate {
 					this.schedule.scheduled?.mode === "yearly"
 						? this.schedule.scheduled?.description || ""
 						: "",
-				label: "Describe when this repeats (description will be parsed by AI)",
+				label: "When each year?",
 			}),
 		);
+		const hint = document.createElement("p");
+		hint.className = "text-xs text-base-medium";
+		hint.textContent = "Parsed by AI when you save.";
+		yearlyOptions.appendChild(hint);
 
 		return yearlyOptions;
 	}
@@ -743,7 +926,7 @@ export class DueDate {
 
 	_createPeriodic() {
 		const periodicOptions = primitives.div({
-			style: "flex flex-col gap-2 border-t border-base-medium mt-4 pt-4",
+			style: "lp-schedule-sub",
 			role: "periodic",
 			data: { visible: this.schedule.periodic ? "true" : "false" },
 		});
@@ -752,12 +935,13 @@ export class DueDate {
 			primitives.input({
 				name: "start-date",
 				type: "date",
-				value:
-					this.schedule.start_date || new Date().toLocaleDateString("sv-SE"),
+				value: this.schedule.start_date || todayIsoDate(),
 				label: "Start Date",
 			}),
 		);
-		startDate.classList.add("mb-2");
+		startDate
+			.querySelector("[data-role='date-input-wrap']")
+			?.classList.add("lp-schedule-date-field");
 
 		periodicOptions.appendChild(
 			primitives.input({
@@ -765,10 +949,14 @@ export class DueDate {
 				type: "text",
 				placeholder: "e.g., every 3 days, every 2 weeks, biweekly, quarterly",
 				value: this.schedule.periodic?.description || "",
-				label:
-					"Describe how often this repeats (description will be parsed by AI)",
+				label: "How often does it repeat?",
 			}),
 		);
+
+		const hint = document.createElement("p");
+		hint.className = "text-xs text-base-medium";
+		hint.textContent = "Parsed by AI when you save.";
+		periodicOptions.appendChild(hint);
 
 		return periodicOptions;
 	}
@@ -779,6 +967,8 @@ export class DueDate {
 				this.clearGroup(group);
 			});
 			this.schedule = {};
+			this._syncNoneButton();
+			this._syncClearDueButton();
 		}
 		this.open = false;
 		this._reconcile();

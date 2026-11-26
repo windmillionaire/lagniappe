@@ -219,10 +219,26 @@ checkbox:
     classes: flex flex-row items-start gap-2 font-semibold text-base-dark sm:text-sm py-1
     intent: label presentation within checkbox
     surfaces: [server, frontend]
-  grid:
-    classes: "grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] lg:grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-x-4 gap-y-2 sm:text-sm border-t border-base-medium pt-4"
-    intent: grid presentation within checkbox
+
+datePicker:
+  wrap:
+    classes: lp-date-wrap relative inline-flex w-full items-center
+    intent: relative wrapper pairing a native date input with Lagniappe's desktop calendar trigger
     surfaces: [frontend]
+    hooks: [lp-date-wrap]
+    css: [src/style/forms.css]
+  trigger:
+    classes: lp-date-trigger
+    intent: right-aligned calendar icon button opening Lagniappe's anchored date popover on desktop
+    surfaces: [frontend]
+    hooks: [lp-date-trigger]
+    css: [src/style/forms.css]
+  popover:
+    classes: lp-dp-popover
+    intent: floating single-date calendar dialog anchored directly beneath the date trigger button
+    surfaces: [frontend]
+    hooks: [lp-dp-popover]
+    css: [src/style/forms.css]
 
 dropdown:
   menu:
@@ -1579,39 +1595,13 @@ task:
       surfaces: [server]
       hooks: [task-chip-add]
       css: [src/style/content.css]
-    trayToggle:
-      classes: task-chip-tray-toggle inline-flex h-7 min-w-7 cursor-pointer items-center justify-center rounded-md border border-dashed border-base-light/80 bg-transparent px-1.5 text-sm font-semibold text-base-medium transition-colors hover:border-solid hover:border-base-light hover:bg-base-bg hover:text-base-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-default
-      intent: compact plus button toggling the faded inactive task chips inline
-      surfaces: [server]
-      hooks: [task-chip-tray-toggle]
-      css: [src/style/content.css]
     drawer:
-      classes: mx-4 mb-4 flex flex-col gap-3 rounded-lg border border-base-light/60 bg-base-bg/60 p-3 sm:mx-6 sm:p-4
-      intent: inline editor drawer displayed beneath a task chip row
+      classes: px-4 pb-4 flex flex-col gap-3 sm:px-6
+      intent: borderless inline editor area displayed beneath a task chip row
       surfaces: [server]
-    drawerHeader:
-      classes: flex flex-row items-center justify-between gap-2
-      intent: header row inside an inline task chip editor drawer
-      surfaces: [frontend]
-    drawerTitle:
-      classes: text-xs font-bold uppercase tracking-wide text-base-medium
-      intent: uppercase section label inside an inline task chip editor drawer
-      surfaces: [frontend]
-    drawerActions:
+    inlineRow:
       classes: flex flex-row items-center gap-1.5
-      intent: inline action controls inside a task chip editor drawer header or footer
-      surfaces: [frontend]
-    actionBtn:
-      classes: inline-flex cursor-pointer items-center gap-1 rounded-md border border-base-light/70 bg-white px-2.5 py-1 text-xs font-semibold text-base-default transition-colors hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-default
-      intent: secondary action button inside an inline task chip drawer
-      surfaces: [frontend]
-    actionPrimary:
-      classes: inline-flex cursor-pointer items-center gap-1 rounded-md bg-task-default px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-task-dark disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-task-default
-      intent: primary confirm button inside an inline task chip drawer
-      surfaces: [frontend]
-    actionDanger:
-      classes: inline-flex cursor-pointer items-center gap-1 rounded-md border border-delete-light bg-white px-2.5 py-1 text-xs font-semibold text-delete-default transition-colors hover:bg-delete-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default
-      intent: destructive clear action button inside an inline task chip drawer
+      intent: horizontal row pairing an inline task chip combobox with quiet icon actions
       surfaces: [frontend]
   rename:
     form:
@@ -1622,6 +1612,13 @@ task:
       classes: min-w-0 flex-1 rounded-md border border-task-default bg-white px-2 py-0.5 text-base font-medium text-base-dark focus:outline-none focus:ring-2 focus:ring-task-default/20
       intent: inline text input for renaming a task
       surfaces: [frontend]
+  schedule:
+    root:
+      classes: lp-schedule flex flex-col gap-4
+      intent: borderless redesigned task schedule picker root with segmented repeat controls
+      surfaces: [frontend]
+      hooks: [lp-schedule]
+      css: [src/style/forms.css]
   home:
     complete:
       classes: float-left mt-0.5 mr-2 grid size-5 place-items-center

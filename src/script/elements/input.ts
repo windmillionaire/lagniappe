@@ -88,10 +88,12 @@ export class InputElement extends BaseElement {
 			disabled: this.renderer.readonly,
 		});
 
-		const input = this._edit.matches?.("input")
-			? this._edit
-			: this._edit.querySelector("input");
-		input?.classList.add("group-data-[mode=read]/element:hidden");
+		const control =
+			this._edit.querySelector("[data-role='date-input-wrap']") ||
+			(this._edit.matches?.("input")
+				? this._edit
+				: this._edit.querySelector("input"));
+		control?.classList.add("group-data-[mode=read]/element:hidden");
 
 		return this._edit;
 	}

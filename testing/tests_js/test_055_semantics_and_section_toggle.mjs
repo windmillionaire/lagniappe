@@ -208,11 +208,11 @@ test("test_task_chips_tray_toggle_and_apply_update_preserves_open_form", async (
 			<div lp-nav data-nav="task-1">
 				<span data-role="title">Before</span>
 				<button data-role="save-toggle" data-saved="false" data-visible="true"></button>
-				<div data-role="task-chips" data-tray-open="false">
-					<button data-role="chip-tray-toggle" aria-expanded="false">
-						<span class="icon" data-icon="plus"></span>
-					</button>
-				</div>
+				<button data-role="chip-tray-toggle" data-active="false" aria-expanded="false">
+					<span class="icon" data-icon="plus"></span>
+				</button>
+				<button data-role="chip-close" data-visible="false"></button>
+				<div data-role="task-chips" data-tray-open="false"></div>
 			</div>
 			<form data-widget="TaskForm"><input name="notes" value="unsaved draft"></form>
 		</li>
@@ -251,11 +251,11 @@ test("test_task_chips_tray_toggle_and_apply_update_preserves_open_form", async (
 			<div lp-nav data-nav="task-1">
 				<span data-role="title">After</span>
 				<button data-role="save-toggle" data-saved="true" data-visible="false"></button>
-				<div data-role="task-chips" data-tray-open="false">
-					<button data-role="chip-tray-toggle" aria-expanded="false">
-						<span class="icon" data-icon="plus"></span>
-					</button>
-				</div>
+				<button data-role="chip-tray-toggle" data-active="false" aria-expanded="false">
+					<span class="icon" data-icon="plus"></span>
+				</button>
+				<button data-role="chip-close" data-visible="false"></button>
+				<div data-role="task-chips" data-tray-open="false"></div>
 			</div>
 			<form data-widget="TaskForm"><input name="notes" value="server value"></form>
 		</li>`,
@@ -290,4 +290,82 @@ test("test_task_chips_tray_toggle_and_apply_update_preserves_open_form", async (
 		"true",
 	);
 	assert.deepEqual(reconciledWith, ["TaskForm", "task-1"]);
+});
+
+test("test_date_picker_popover_calendar_and_selection", async (t) => {
+	createBrowser(t);
+	const { buildCalendarMonth, enhanceDateInput } = await esmock.strict(
+		"../../src/script/elements/datePicker.ts",
+		{
+			"@floating-ui/dom": {
+				autoUpdate: (_ref, _floating, cb) => {
+					cb();
+					return () => {};
+				},
+				computePosition: async () => ({ x: 120, y: 240 }),
+				flip: () => ({}),
+				offset: () => ({}),
+				shift: () => ({}),
+			},
+		},
+	);
+
+	// Feb 2026 starts on Sunday (0) and has 28 days -> exact 28 cells (4 rows).
+	const feb2026 = buildCalendarMonth(2026, 1);
+	assert.equal(feb2026.length, 28);
+	assert.equal(feb2026[0].iso, "2026-02-01");
+	assert.equal(feb2026[27].iso, "2026-02-28");
+
+	const input = document.createElement("input");
+	input.type = "date";
+	input.value = "2026-02-10";
+	const wrap = enhanceDateInput(input);
+	document.body.appendChild(wrap);
+
+	const trigger = wrap.querySelector("[data-role='date-picker-trigger']");
+	let inputEvents = 0;
+	let changeEvents = 0;
+	input.addEventListener("input", () => {
+		inputEvents += 1;
+	});
+	input.addEventListener("change", () => {
+		changeEvents += 1;
+	});
+
+	trigger.click();
+	const popover = document.querySelector("[data-role='date-picker-popover']");
+	assert.ok(popover, "Clicking trigger opens the calendar popover");
+	assert.equal(trigger.getAttribute("aria-expanded"), "true");
+
+	const dayBtn = popover.querySelector("button[data-date='2026-02-18']");
+	assert.ok(dayBtn);
+	dayBtn.click();
+
+	assert.equal(input.value, "2026-02-18");
+	assert.equal(inputEvents, 1);
+	assert.equal(changeEvents, 1);
+	assert.equal(
+		document.querySelector("[data-role='date-picker-popover']"),
+		null,
+		"Selecting a date closes the popover",
+	);
+	assert.equal(trigger.getAttribute("aria-expanded"), "false");
+
+	// Reopen and clear via footer Clear button.
+	trigger.click();
+	const clearBtn = document.querySelector("[data-role='dp-clear']");
+	assert.ok(clearBtn);
+	clearBtn.click();
+	assert.equal(input.value, "");
+	assert.equal(inputEvents, 2);
+	assert.equal(changeEvents, 2);
+
+	// Reopen and close via Escape.
+	trigger.click();
+	assert.ok(document.querySelector("[data-role='date-picker-popover']"));
+	document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+	assert.equal(
+		document.querySelector("[data-role='date-picker-popover']"),
+		null,
+	);
 });

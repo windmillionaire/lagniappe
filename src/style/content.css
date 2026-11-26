@@ -233,6 +233,13 @@
 	display: none;
 }
 
+/* @style task.chip.add */
+[data-role="task-chips"]:not([data-tray-open="true"]):not(
+	:has(> :not(.task-chip-add))
+) {
+	display: none;
+}
+
 /* @style task.chip.editable task.chip.add */
 .task-chip-editable[data-editing="true"],
 .task-chip-add[data-editing="true"] {
@@ -246,13 +253,6 @@
 li[data-open="TaskForm"] .task-chip-form {
 	background-color: white;
 	box-shadow: 0 0 0 2px var(--color-form-default);
-}
-
-/* @style task.chip.trayToggle */
-.task-chip-tray-toggle[aria-expanded="true"] {
-	background-color: var(--color-base-bg);
-	border-style: solid;
-	color: var(--color-base-dark);
 }
 
 /* @style task.description */
@@ -277,7 +277,7 @@ li[data-open="TaskForm"] .task-chip-form {
 }
 
 /* @style list.container */
-li[lp-component][data-open="false"] {
+li[lp-component][data-open="false"]:not([data-chip-open="true"]) {
 	@media (min-width: 640px) {
 		[lp-nav][data-toggle="true"]:hover {
 			background-color: var(--kind-bg);

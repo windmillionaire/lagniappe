@@ -276,9 +276,9 @@ def test_public_user_creates_task_with_reduced_schedule_options(
     drawer = task_elt.locator("[data-role='chip-drawer']")
     expect(drawer).to_be_visible()
     expect(drawer.locator("input[name='due-date']")).to_be_visible()
-    expect(drawer).to_contain_text("This task repeats when completed")
-    expect(drawer).to_contain_text("This task repeats on a schedule")
-    expect(drawer).not_to_contain_text("This task repeats periodically")
+    expect(drawer).to_contain_text("After completion")
+    expect(drawer).to_contain_text("On a schedule")
+    expect(drawer).not_to_contain_text("Periodically")
 
     drawer.locator("input[name='scheduled']").check()
     expect(

@@ -59,6 +59,14 @@ def test_page_task_add_due_date(get_admin, get_user):
 
     due_date = local_date_plus_days_iso(4)
     drawer = _open_schedule_drawer(task)
+    expect(task.element).to_have_attribute("data-chip-open", "true")
+    expect(task.element.locator("[data-role='chip-close']")).to_be_visible()
+    # Verify the native DatePicker popover opens from the right-aligned trigger and closes on Escape.
+    drawer.locator("[data-role='date-picker-trigger']").first.click()
+    popover = user.page.locator("[data-role='date-picker-popover']")
+    expect(popover).to_be_visible()
+    popover.locator("[data-role='dp-today']").click()
+    expect(popover).not_to_be_attached()
     drawer.locator("input[name='due-date']").fill(due_date)
     _save_schedule(task, drawer)
 
@@ -77,7 +85,7 @@ def test_page_task_remove_due_date(get_admin, get_user):
     user.go(task)
 
     drawer = _open_schedule_drawer(task)
-    drawer.get_by_role("button", name="Remove").click()
+    drawer.get_by_role("button", name="Clear").click()
     _save_schedule(task, drawer)
 
     expect(task.element.locator(DUE_DATE_BADGE)).not_to_be_attached()

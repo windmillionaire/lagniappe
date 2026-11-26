@@ -273,6 +273,22 @@ export class PageTaskList extends BaseList {
 			return;
 		}
 
+		const chipClose = target.closest<HTMLElement>("[data-role='chip-close']");
+		if (
+			chipClose?.dataset.role === "chip-close" &&
+			this.target.contains(chipClose)
+		) {
+			const taskRow = chipClose.closest<HTMLLIElement>(
+				"li[lp-component][data-kind='task']",
+			);
+			if (taskRow) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.chips?.closeChip(taskRow);
+			}
+			return;
+		}
+
 		const trayToggle = target.closest<HTMLElement>(
 			"[data-role='chip-tray-toggle']",
 		);
@@ -388,6 +404,13 @@ export class PageTaskList extends BaseList {
 				}>
 			).detail || {};
 		const task = component?.elt;
+		if (
+			e.target === task &&
+			task?.matches("li[lp-component][data-kind='task']") &&
+			this.target.contains(task)
+		) {
+			this.chips?.closeChip(task as HTMLLIElement);
+		}
 		if (
 			e.target !== task ||
 			!task?.matches("li[lp-component][data-kind='task']") ||

@@ -1,6 +1,35 @@
 import { STYLES } from "../generated/styles.mjs";
 import { setIcon } from "../shared/icons.ts";
 
+export function wrapDateInput(input: HTMLInputElement): HTMLSpanElement {
+	const wrap = document.createElement("span");
+	wrap.className = STYLES.datePicker.wrap;
+	wrap.dataset.role = "date-input-wrap";
+
+	const trigger = document.createElement("button");
+	trigger.type = "button";
+	trigger.className = STYLES.datePicker.trigger;
+	trigger.dataset.role = "date-picker-trigger";
+	trigger.setAttribute("aria-label", "Choose date");
+	trigger.setAttribute("aria-haspopup", "dialog");
+	trigger.setAttribute("aria-expanded", "false");
+	trigger.title = "Choose date";
+	if (input.disabled) trigger.disabled = true;
+	setIcon(trigger.appendChild(document.createElement("span")), "date");
+
+	trigger.addEventListener("click", (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (input.disabled || input.readOnly) return;
+		void import("./datePicker.ts").then(({ toggleDatePicker }) => {
+			toggleDatePicker(input, trigger);
+		});
+	});
+
+	wrap.append(input, trigger);
+	return wrap;
+}
+
 type DataAttributes = Record<
 	string,
 	string | number | boolean | null | undefined
@@ -181,7 +210,9 @@ export function input(attributes: InputAttributes) {
 
 	if (attributes.label) {
 		const container = label(attributes);
-		container.appendChild(elt);
+		const controlNode =
+			type === "date" && !attributes.disabled ? wrapDateInput(elt) : elt;
+		container.appendChild(controlNode);
 		container.classList.add("flex-col");
 		linkLabelToControl(container, elt);
 		return container;

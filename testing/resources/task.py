@@ -281,10 +281,10 @@ class Task(SiteResource):
     def expand_chips(self):
         self._wait_for_page_task_list()
         tray = self.element.locator(self.CHIP_TRAY)
-        expect(tray).to_be_visible()
         if tray.get_attribute("data-tray-open") != "true":
             self.element.locator(self.CHIP_TRAY_TOGGLE).click()
             expect(tray).to_have_attribute("data-tray-open", "true")
+        expect(tray).to_be_visible()
         return tray
 
     def open_chip(self, field):
@@ -296,9 +296,10 @@ class Task(SiteResource):
         ):
             return drawer
 
-        chip = self.element.locator(f"[data-chip='{field}']").first
-        if not chip.is_visible():
+        chip = self.element.locator(f"[data-chip='{field}']:visible").first
+        if chip.count() == 0:
             self.expand_chips()
+            chip = self.element.locator(f"[data-chip='{field}']:visible").first
         expect(chip).to_be_visible()
         chip.click()
         expect(drawer).to_be_visible()

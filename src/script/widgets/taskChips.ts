@@ -4,7 +4,7 @@ import { DueDate } from "../elements/dueDate.ts";
 import { formatting } from "../elements/formatting.ts";
 import { type TaskAsset, TaskUpload } from "../elements/taskUpload.ts";
 import { STYLES } from "../generated/styles.mjs";
-import { setIcon } from "../shared/icons.ts";
+import { createIcon, setIcon } from "../shared/icons.ts";
 import { request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
 import type { RequestResult } from "../types/api";
@@ -56,17 +56,40 @@ export function setTaskTrayOpen(taskRow: HTMLElement, open: boolean) {
 	const chips = taskRow.querySelector<HTMLElement>("[data-role='task-chips']");
 	if (!chips) return;
 	chips.dataset.trayOpen = open ? "true" : "false";
-	const toggle = chips.querySelector<HTMLButtonElement>(
+	const toggle = taskRow.querySelector<HTMLButtonElement>(
 		"[data-role='chip-tray-toggle']",
 	);
 	if (!toggle) return;
+	toggle.dataset.active = open ? "true" : "false";
 	toggle.setAttribute("aria-expanded", open ? "true" : "false");
 	const label = open ? "Hide task options" : "Add task details";
 	toggle.setAttribute("aria-label", label);
 	toggle.title = label;
 	const icon = toggle.querySelector<HTMLElement>(".icon");
 	if (icon) {
-		setIcon(icon, open ? "minus" : "plus", STYLES.badge.icon);
+		setIcon(icon, open ? "minus" : "plus");
+	}
+}
+
+function setChipHeaderControls(taskRow: HTMLElement, chipOpen: boolean) {
+	const toggle = taskRow.querySelector<HTMLElement>(
+		"[data-role='chip-tray-toggle']",
+	);
+	const closeBtn = taskRow.querySelector<HTMLElement>(
+		"[data-role='chip-close']",
+	);
+	if (chipOpen) {
+		taskRow.dataset.chipOpen = "true";
+		const hasOpenWidget =
+			Boolean(taskRow.dataset.open) && taskRow.dataset.open !== "false";
+		if (!hasOpenWidget) {
+			if (toggle) toggle.dataset.visible = "false";
+			if (closeBtn) closeBtn.dataset.visible = "true";
+		}
+	} else {
+		delete taskRow.dataset.chipOpen;
+		if (toggle) toggle.dataset.visible = "true";
+		if (closeBtn) closeBtn.dataset.visible = "false";
 	}
 }
 
@@ -187,6 +210,7 @@ export class TaskChipController {
 	}
 
 	closeChip(taskRow: HTMLLIElement) {
+		document.dispatchEvent(new CustomEvent("lp:close-date-picker"));
 		const existing = this.sessions.get(taskRow);
 		if (existing) {
 			existing.destroy();
@@ -200,6 +224,7 @@ export class TaskChipController {
 			drawer.removeAttribute("data-chip-field");
 			drawer.replaceChildren();
 		}
+		setChipHeaderControls(taskRow, false);
 		taskRow
 			.querySelectorAll<HTMLElement>("[data-chip][data-editing='true']")
 			.forEach((chip) => {
@@ -231,6 +256,7 @@ export class TaskChipController {
 		if (!drawer || !chips) return;
 
 		setTaskTrayOpen(taskRow, true);
+		setChipHeaderControls(taskRow, true);
 		this._markEditingChips(taskRow, field);
 		drawer.dataset.chipField = field;
 		drawer.dataset.visible = "true";
@@ -269,71 +295,6 @@ export class TaskChipController {
 			.forEach((chip) => {
 				chip.dataset.editing = "true";
 			});
-	}
-
-	_buildDrawerHeader(
-		taskRow: HTMLLIElement,
-		title: string,
-		options: {
-			openLink?: { href: string; label: string } | null;
-			clearLabel?: string | null;
-			onClear?: () => void;
-			closeLabel?: string;
-		} = {},
-	) {
-		const header = document.createElement("div");
-		header.className = STYLES.task.chip.drawerHeader;
-
-		const heading = document.createElement("span");
-		heading.className = STYLES.task.chip.drawerTitle;
-		heading.textContent = title;
-		header.appendChild(heading);
-
-		const actions = document.createElement("div");
-		actions.className = STYLES.task.chip.drawerActions;
-
-		if (options.openLink) {
-			const link = document.createElement("a");
-			link.href = options.openLink.href;
-			link.dataset.role = "open-link";
-			link.className = STYLES.task.chip.actionBtn;
-			link.textContent = "Open";
-			link.setAttribute("aria-label", options.openLink.label);
-			link.title = options.openLink.label;
-			const icon = document.createElement("span");
-			setIcon(icon, "out", "icon-xs");
-			link.appendChild(icon);
-			actions.appendChild(link);
-		}
-
-		if (options.clearLabel && options.onClear) {
-			const clearBtn = document.createElement("button");
-			clearBtn.type = "button";
-			clearBtn.dataset.role = "clear";
-			clearBtn.className = STYLES.task.chip.actionDanger;
-			clearBtn.textContent = options.clearLabel;
-			clearBtn.addEventListener("click", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				options.onClear?.();
-			});
-			actions.appendChild(clearBtn);
-		}
-
-		const closeBtn = document.createElement("button");
-		closeBtn.type = "button";
-		closeBtn.dataset.role = "close-drawer";
-		closeBtn.className = STYLES.task.chip.actionBtn;
-		closeBtn.textContent = options.closeLabel || "Close";
-		closeBtn.addEventListener("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			this.closeChip(taskRow);
-		});
-		actions.appendChild(closeBtn);
-
-		header.appendChild(actions);
-		return header;
 	}
 
 	_drawerErrorElement() {
@@ -412,29 +373,13 @@ export class TaskChipController {
 				}
 			: null;
 
-		const header = this._buildDrawerHeader(taskRow, config.title, {
-			openLink,
-			clearLabel: existingOption ? config.clearLabel : null,
-			onClear: () => {
-				const data = new FormData();
-				data.append("active", "TaskChip");
-				data.append("chip_field", field);
-				if (field === "project") {
-					data.append("project", "");
-					data.append("model", "");
-				} else {
-					data.append(config.name, "");
-				}
-				void this._saveChip(taskRow, drawer, data, {
-					chipField: field,
-					formChanged: field === "form",
-				});
-			},
-		});
-
 		const errorEl = this._drawerErrorElement();
 
+		const row = document.createElement("div");
+		row.className = STYLES.task.chip.inlineRow;
+
 		const wrapper = document.createElement("div");
+		wrapper.className = "min-w-0 flex-1";
 		wrapper.setAttribute("lp-select", "");
 		wrapper.dataset.kind = config.kind;
 		wrapper.dataset.role = `${field}-chip-select`;
@@ -456,8 +401,51 @@ export class TaskChipController {
 			input.dataset.permission = config.permission;
 		}
 		wrapper.appendChild(input);
+		row.appendChild(wrapper);
 
-		drawer.replaceChildren(header, errorEl, wrapper);
+		if (openLink) {
+			const link = document.createElement("a");
+			link.href = openLink.href;
+			link.dataset.role = "open-link";
+			link.dataset.kind = existingOption?.kind || config.kind;
+			link.className = STYLES.toggle.container;
+			link.setAttribute("aria-label", openLink.label);
+			link.title = openLink.label;
+			link.appendChild(createIcon("out"));
+			row.appendChild(link);
+		}
+
+		if (existingOption) {
+			const clearBtn = document.createElement("button");
+			clearBtn.type = "button";
+			clearBtn.dataset.role = "clear";
+			clearBtn.dataset.kind = "delete";
+			clearBtn.className = STYLES.toggle.container;
+			const clearText = `${config.clearLabel} ${config.title.toLowerCase()}`;
+			clearBtn.setAttribute("aria-label", clearText);
+			clearBtn.title = config.clearLabel;
+			clearBtn.appendChild(createIcon("clear"));
+			clearBtn.addEventListener("click", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				const data = new FormData();
+				data.append("active", "TaskChip");
+				data.append("chip_field", field);
+				if (field === "project") {
+					data.append("project", "");
+					data.append("model", "");
+				} else {
+					data.append(config.name, "");
+				}
+				void this._saveChip(taskRow, drawer, data, {
+					chipField: field,
+					formChanged: field === "form",
+				});
+			});
+			row.appendChild(clearBtn);
+		}
+
+		drawer.replaceChildren(errorEl, row);
 
 		const box = new FacetsBox(wrapper);
 		box.init();
@@ -513,25 +501,11 @@ export class TaskChipController {
 		chips: HTMLElement,
 		drawer: HTMLElement,
 	) {
-		const hasExisting = Boolean(
-			chips.dataset.dueDate || chips.dataset.schedule,
-		);
-		const header = this._buildDrawerHeader(taskRow, "Schedule", {
-			clearLabel: hasExisting ? "Clear" : null,
-			closeLabel: "Cancel",
-			onClear: () => {
-				const data = new FormData();
-				data.append("active", "TaskChip");
-				data.append("chip_field", "schedule");
-				data.append("due-date", "");
-				void this._saveChip(taskRow, drawer, data, { chipField: "schedule" });
-			},
-		});
-
 		const errorEl = this._drawerErrorElement();
 
 		const form = document.createElement("form");
 		form.dataset.role = "schedule-chip-form";
+		form.dataset.kind = "task";
 		form.className = "flex flex-col gap-3";
 
 		const anchor = document.createElement("button");
@@ -546,25 +520,22 @@ export class TaskChipController {
 		if (chips.dataset.dueDate) anchor.dataset.dueDate = chips.dataset.dueDate;
 		form.appendChild(anchor);
 
-		const footer = document.createElement("div");
-		footer.className = STYLES.task.chip.drawerActions;
 		const saveBtn = document.createElement("button");
 		saveBtn.type = "submit";
 		saveBtn.dataset.role = "save-schedule";
-		saveBtn.className = STYLES.task.chip.actionPrimary;
-		saveBtn.textContent = "Save schedule";
-		footer.appendChild(saveBtn);
+		saveBtn.className = STYLES.button.submit;
+		saveBtn.textContent = "Save Schedule";
 
-		drawer.replaceChildren(header, errorEl, form);
+		drawer.replaceChildren(errorEl, form);
 
-		const dueDate = new DueDate(anchor, { readonly: false });
+		const dueDate = new DueDate(anchor, { readonly: false, inline: true });
 		dueDate.init();
 		dueDate.open = true;
 		if (dueDate.container) {
 			dueDate.container.dataset.visible = "true";
 			dueDate.container.classList.remove("mt-2");
 		}
-		form.appendChild(footer);
+		form.appendChild(saveBtn);
 
 		const onSubmit = (e: Event) => {
 			e.preventDefault();
@@ -588,24 +559,11 @@ export class TaskChipController {
 
 	_mountDescriptionDrawer(taskRow: HTMLLIElement, drawer: HTMLElement) {
 		const current = taskRow.dataset.description || "";
-		const header = this._buildDrawerHeader(taskRow, "Description", {
-			clearLabel: current ? "Clear" : null,
-			closeLabel: "Cancel",
-			onClear: () => {
-				const data = new FormData();
-				data.append("active", "TaskChip");
-				data.append("chip_field", "description");
-				data.append("description", "");
-				void this._saveChip(taskRow, drawer, data, {
-					chipField: "description",
-				});
-			},
-		});
-
 		const errorEl = this._drawerErrorElement();
 
 		const form = document.createElement("form");
 		form.dataset.role = "description-chip-form";
+		form.dataset.kind = "task";
 		form.className = "flex flex-col gap-3";
 
 		const textarea = document.createElement("textarea");
@@ -615,17 +573,14 @@ export class TaskChipController {
 		textarea.value = current;
 		form.appendChild(textarea);
 
-		const footer = document.createElement("div");
-		footer.className = STYLES.task.chip.drawerActions;
 		const saveBtn = document.createElement("button");
 		saveBtn.type = "submit";
 		saveBtn.dataset.role = "save-description";
-		saveBtn.className = STYLES.task.chip.actionPrimary;
-		saveBtn.textContent = "Save description";
-		footer.appendChild(saveBtn);
-		form.appendChild(footer);
+		saveBtn.className = STYLES.button.submit;
+		saveBtn.textContent = "Save Description";
+		form.appendChild(saveBtn);
 
-		drawer.replaceChildren(header, errorEl, form);
+		drawer.replaceChildren(errorEl, form);
 
 		const submitDescription = () => {
 			const data = new FormData();
@@ -661,9 +616,6 @@ export class TaskChipController {
 		chips: HTMLElement,
 		drawer: HTMLElement,
 	) {
-		const header = this._buildDrawerHeader(taskRow, "Attachments", {
-			closeLabel: "Done",
-		});
 		const errorEl = this._drawerErrorElement();
 
 		const host = document.createElement("div");
@@ -681,7 +633,7 @@ export class TaskChipController {
 		anchor.dataset.preload = chips.dataset.filesPreload || "{}";
 		host.appendChild(anchor);
 
-		drawer.replaceChildren(header, errorEl, host);
+		drawer.replaceChildren(errorEl, host);
 
 		const upload = new TaskUpload(anchor, {
 			key: taskRow.dataset.key,
@@ -785,6 +737,7 @@ export class TaskChipController {
 			buttons.forEach((btn) => {
 				btn.disabled = false;
 			});
+			setChipHeaderControls(taskRow, true);
 			this._markEditingChips(taskRow, options.chipField);
 		} else {
 			this.closeChip(taskRow);

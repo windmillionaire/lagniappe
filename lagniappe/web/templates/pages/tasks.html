@@ -127,7 +127,7 @@
        data-role="error"></p>
     <p class="{{ styles.task.description }}"
        data-role="task-description"
-       {% if can_edit_chips %}data-chip="description" data-editable="true" tabindex="0" role="button" title="Click to edit description"{% endif %}
+       {% if can_edit_chips and t.description %}data-chip="description" data-editable="true" tabindex="0" role="button" title="Click to edit description"{% endif %}
        data-visible="{{ t.description|yesno }}">{{ t.description or '' }}</p>
     {{- task_details(t, page, can_edit_chips) -}}
   </div>
@@ -171,17 +171,39 @@
     </div>
     <div class="flex shrink-0 flex-row items-start gap-1 ml-auto">
       {% if show_form and can_edit_chips %}{{ controls.task_save(t.updated) }}{% endif %}
+      <nav class="{{ styles.task.controlGroup }} flex shrink-0 flex-row items-start gap-1"
+           data-role="nav-toggles"
+           data-nav="{{ t.hash }}">
+        {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
+      </nav>
+      {% if can_edit_chips %}
+        <button type="button"
+                class="{{ styles.toggle.container }}"
+                data-role="chip-tray-toggle"
+                data-kind="task"
+                data-active="false"
+                data-visible="true"
+                aria-expanded="false"
+                aria-label="Add task details"
+                title="Add task details">
+          {{ render_icon("plus") }}
+        </button>
+        <button type="button"
+                class="{{ styles.toggle.container }}"
+                data-role="chip-close"
+                data-kind="close"
+                data-visible="false"
+                aria-label="Close"
+                title="Close">
+          {{ render_icon("close") }}
+        </button>
+      {% endif %}
       <div class="{{ styles.form.header.controls }} {{ styles.task.controlGroup }}"
            data-role="controls"
            data-visible="false">
         {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
         {{ controls.close() }}
       </div>
-      <nav class="{{ styles.task.controlGroup }} flex shrink-0 flex-row items-start gap-1"
-           data-role="nav-toggles"
-           data-nav="{{ t.hash }}">
-        {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
-      </nav>
     </div>
   </div>
 {% endmacro %}
@@ -612,14 +634,6 @@
           <span>+ File</span>
         </button>
       {%- endif -%}
-      <button type="button"
-              data-role="chip-tray-toggle"
-              aria-expanded="false"
-              aria-label="Add task details"
-              title="Add task details"
-              class="{{ styles.task.chip.trayToggle }}">
-        {{ render_icon("plus", (styles.badge.icon)) }}
-      </button>
     {%- endif -%}
   </div>
 {% endmacro %}
