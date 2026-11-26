@@ -441,3 +441,50 @@ def test_external_api_bounds_json_without_a_declared_content_length(monkeypatch)
         "code": "request_too_large",
         "message": "Request body is too large.",
     }
+
+
+def test_home_tasks_etag_and_poll_revision_share_the_authenticated_snapshot(monkeypatch, http_client):
+    from datetime import UTC, datetime
+    from flask import g, url_for
+    from google.cloud.datastore import Entity, Key
+    from lagniappe.core.tools.database import utility
+    from lagniappe.core.tools.polling.projections import channel_revision
+    from lagniappe.web import auth, responses
+    from lagniappe.web.routes.home import main
+
+    actor = SimpleNamespace(
+        is_authenticated=True, is_public=False, modified=datetime(2026, 1, 1, tzinfo=UTC),
+        fingerprint="user-v1", authorization_fingerprint="permissions-v1",
+    )
+    with app.test_request_context():
+        route = url_for("internal.get", kind="tasks")
+    key = Key("site", "tasks", project="offline")
+    current = Entity(key=key)
+    current["fingerprint"] = "tasks-v1"
+    reads = []
+    monkeypatch.setattr(utility.DATA, "_datastore_client", SimpleNamespace(key=lambda kind, name: Key(kind, name, project="offline")))
+
+    def load(*, context_keys):
+        reads.append(context_keys)
+        g.request_context_records = {key: current}
+        return actor, None
+
+    monkeypatch.setattr(auth, "_load_request_context", load)
+    monkeypatch.setattr(auth, "authenticated_user", lambda: actor)
+    monkeypatch.setattr(main, "authenticated_user", lambda: actor)
+    monkeypatch.setattr(responses, "home_section", lambda section: ("rendered", 200))
+    with http_client.session_transaction() as client_session:
+        client_session[auth.LOGIN_USER_KEY] = "user"
+    first = http_client.get(route)
+    assert first.status_code == 200
+    assert first.headers["X-Lagniappe-Poll-Revision"] == channel_revision(
+        "tasks", actor, site_fingerprints={"/tasks/index": "tasks-v1"},
+    )
+    headers = {"If-None-Match": first.headers["ETag"]}
+    assert http_client.get(route, headers=headers).status_code == 304
+    current["fingerprint"] = "tasks-v2"
+    changed = http_client.get(route, headers=headers)
+    assert changed.status_code == 200
+    assert changed.headers["X-Lagniappe-Poll-Revision"] != first.headers["X-Lagniappe-Poll-Revision"]
+    # Every request, including the 304, rechecks the live record with auth.
+    assert reads == [(key,)] * 3

@@ -19,7 +19,6 @@ from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import notifications as database_notifications
 from lagniappe.core.tools.notifications import service as notification_service
 from lagniappe.core.tools.polling.projections import (
-    channel_revisions,
     render_operation_statuses,
 )
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
@@ -29,16 +28,22 @@ from lagniappe.web import responses
 from . import home, internal
 
 
+def _home_poll_channels(kind: str | None) -> tuple[str, ...]:
+    if kind is None:
+        return ("home-notes", "tasks")
+    return ({"notes": "home-notes", "tools": "tool-reports"}.get(kind, kind),)
+
+
 @home.route("/")
-@home_permission(anonymous_endpoint="home.public_directory")
-def home_page() -> ResponseReturnValue:
+@home_permission(anonymous_endpoint="home.public_directory", poll_channels=_home_poll_channels)
+def home_page(*, poll_revisions: dict[str, str]) -> ResponseReturnValue:
     home = Entities.HOME(user=authenticated_user())
-    return responses.home_page(home)
+    return responses.home_page(home, poll_revisions)
 
 
 @internal.route("/get/<kind>")
-@home_permission()
-def get(kind: str) -> ResponseReturnValue:
+@home_permission(poll_channels=_home_poll_channels)
+def get(kind: str, *, poll_revisions: dict[str, str]) -> ResponseReturnValue:
     if kind == "tools" and getattr(current_user, "is_public", False):
         abort(403)
     home = Entities.HOME(user=authenticated_user())
@@ -47,11 +52,7 @@ def get(kind: str) -> ResponseReturnValue:
         render_operation_statuses(section.list, authenticated_user())
 
     response = make_response(responses.home_section(section))
-    channel = {
-        "notes": "home-notes",
-        "tools": "tool-reports",
-    }.get(kind, kind)
-    revision = channel_revisions((channel,), authenticated_user())[channel]
+    (channel, revision), = poll_revisions.items()
     response.headers["X-Lagniappe-Poll-Channel"] = channel
     response.headers["X-Lagniappe-Poll-Revision"] = revision
     return response
