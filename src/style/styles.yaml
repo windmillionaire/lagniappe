@@ -1782,19 +1782,35 @@ page:
       surfaces: [frontend]
   description:
     editor:
-      classes: mt-4 flex w-full flex-col gap-2 rounded-md border border-kind-default bg-white p-3 shadow-xs
-      intent: inline header editor for adding or editing a page description
+      classes: mt-4 flex w-full flex-col rounded-lg border border-kind-default bg-kind-bg px-3.5 py-2.5 shadow-xs transition-shadow focus-within:ring-2 focus-within:ring-kind-default/20
+      intent: single-frame inline header editor for adding or editing a page description
+      surfaces: [frontend]
+    input:
+      classes: block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-relaxed text-base-dark placeholder:text-base-medium focus:outline-none disabled:opacity-60
+      intent: borderless auto-sizing textarea inside the inline page description editor
       surfaces: [frontend]
     actions:
-      classes: flex flex-row items-center justify-end gap-2
-      intent: action button row inside the inline page description editor
+      classes: mt-2 flex flex-row items-center justify-between gap-2 border-t border-kind-light/70 pt-2
+      intent: footer action bar inside the inline page description editor
+      surfaces: [frontend]
+    buttons:
+      classes: ml-auto flex flex-row items-center gap-1.5
+      intent: right-aligned cancel and save button group inside the inline page description editor
+      surfaces: [frontend]
+    remove:
+      classes: cursor-pointer text-xs font-medium text-base-medium transition-colors hover:text-delete-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default disabled:pointer-events-none disabled:opacity-50
+      intent: subtle remove link inside the inline page description editor
+      surfaces: [frontend]
+    cancel:
+      classes: cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-base-dark transition-colors hover:bg-kind-light/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50
+      intent: compact cancel button inside the inline page description editor
       surfaces: [frontend]
     save:
-      classes: inline-flex cursor-pointer items-center justify-center rounded-md bg-kind-default px-3 py-1.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50
+      classes: inline-flex cursor-pointer items-center justify-center rounded bg-kind-default px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50
       intent: compact primary save button inside the inline page description editor
       surfaces: [frontend]
   photo:
     chip:
       classes: inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/70 bg-white px-2.5 py-1.5 text-sm font-semibold text-base-dark shadow-xs transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50
       intent: labeled image action chip inside the page info header bar
-      surfaces: [server, frontend]
+      surfaces: [server]

@@ -416,11 +416,18 @@ export default class Page extends Entity {
 
 		const textarea = document.createElement("textarea");
 		textarea.name = "description";
-		textarea.rows = 2;
+		textarea.rows = 1;
 		textarea.value = original;
 		textarea.placeholder = "Describe this page...";
 		textarea.setAttribute("aria-label", "Page description");
-		textarea.className = STYLES.textarea;
+		textarea.className = STYLES.page.description.input;
+		const autoSize = () => {
+			textarea.style.height = "auto";
+			if (textarea.scrollHeight > 0) {
+				textarea.style.height = `${textarea.scrollHeight}px`;
+			}
+		};
+		textarea.addEventListener("input", autoSize);
 		form.appendChild(textarea);
 
 		const actions = document.createElement("div");
@@ -431,7 +438,7 @@ export default class Page extends Entity {
 			removeBtn.type = "button";
 			removeBtn.dataset.role = "description-remove";
 			removeBtn.dataset.kind = "delete";
-			removeBtn.className = STYLES.page.photo.chip;
+			removeBtn.className = STYLES.page.description.remove;
 			removeBtn.textContent = "Remove";
 			removeBtn.addEventListener("click", () => {
 				void save("");
@@ -439,23 +446,29 @@ export default class Page extends Entity {
 			actions.appendChild(removeBtn);
 		}
 
+		const buttonGroup = document.createElement("div");
+		buttonGroup.className = STYLES.page.description.buttons;
+
 		const cancelBtn = document.createElement("button");
 		cancelBtn.type = "button";
 		cancelBtn.dataset.role = "description-cancel";
-		cancelBtn.className = STYLES.page.photo.chip;
+		cancelBtn.className = STYLES.page.description.cancel;
 		cancelBtn.textContent = "Cancel";
-		actions.appendChild(cancelBtn);
+		buttonGroup.appendChild(cancelBtn);
 
 		const saveBtn = document.createElement("button");
 		saveBtn.type = "submit";
 		saveBtn.dataset.kind = "page";
 		saveBtn.className = STYLES.page.description.save;
 		saveBtn.textContent = "Save";
-		actions.appendChild(saveBtn);
+		buttonGroup.appendChild(saveBtn);
 
+		actions.appendChild(buttonGroup);
 		form.appendChild(actions);
 		descEl.after(form);
+		autoSize();
 		textarea.focus({ preventScroll: true });
+		textarea.setSelectionRange(textarea.value.length, textarea.value.length);
 
 		let busy = false;
 		const close = () => {

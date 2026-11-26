@@ -546,9 +546,13 @@ const STYLES = {
       "input": "w-80 max-w-full -mb-px border-b border-dashed border-base-medium bg-transparent p-0 font-bold text-base-dark focus:border-page-default focus:outline-none"
     },
     "description": {
-      "editor": "mt-4 flex w-full flex-col gap-2 rounded-md border border-kind-default bg-white p-3 shadow-xs",
-      "actions": "flex flex-row items-center justify-end gap-2",
-      "save": "inline-flex cursor-pointer items-center justify-center rounded-md bg-kind-default px-3 py-1.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
+      "editor": "mt-4 flex w-full flex-col rounded-lg border border-kind-default bg-kind-bg px-3.5 py-2.5 shadow-xs transition-shadow focus-within:ring-2 focus-within:ring-kind-default/20",
+      "input": "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-relaxed text-base-dark placeholder:text-base-medium focus:outline-none disabled:opacity-60",
+      "actions": "mt-2 flex flex-row items-center justify-between gap-2 border-t border-kind-light/70 pt-2",
+      "buttons": "ml-auto flex flex-row items-center gap-1.5",
+      "remove": "cursor-pointer text-xs font-medium text-base-medium transition-colors hover:text-delete-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default disabled:pointer-events-none disabled:opacity-50",
+      "cancel": "cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-base-dark transition-colors hover:bg-kind-light/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50",
+      "save": "inline-flex cursor-pointer items-center justify-center rounded bg-kind-default px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
     },
     "photo": {
       "chip": "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/70 bg-white px-2.5 py-1.5 text-sm font-semibold text-base-dark shadow-xs transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
