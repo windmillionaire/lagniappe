@@ -114,10 +114,10 @@
             lp-show="info:UserSettings"
             data-kind="user"
             data-visible="false"
-            aria-label="User info and settings"
-            title="User info and settings"
+            aria-label="{{ 'Settings' if is_own_page else 'User info and settings' }}"
+            title="{{ 'Settings' if is_own_page else 'User info and settings' }}"
             class="{{ styles.toggle.tabAction }}">
-      {{ render_icon("user") }}<span class="hidden sm:inline">User settings</span>
+      {{ render_icon("settings.page" if is_own_page else "user") }}<span class="hidden sm:inline">{{ "Settings" if is_own_page else "User settings" }}</span>
     </button>
   {% elif view_permissions %}
     <button type="button"

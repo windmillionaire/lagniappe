@@ -58,8 +58,8 @@ def _is_public_users_own_page(page):
 
 def _load_page_settings_relations(page, *, restrictions=False):
     """Attach the group relations rendered by Page settings at the route boundary."""
-    entities = [page.form] if restrictions and page.form else []
     is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
+    entities = [page.form] if restrictions and not is_own_page and page.form else []
     if page.user and current_user.is_admin and not is_own_page:
         entities.append(page.user)
     if entities:

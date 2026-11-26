@@ -67,7 +67,7 @@
         data-visible="false"
         data-controls="true"
         class="{{ styles.form.default }} mt-4 sm:mt-0">
-    {% if view_permissions %}
+    {% if view_permissions and not is_own_page %}
       {{ restrictions.visible_to(page) }}
       {{ restrictions.restrict_access(page) }}
     {% endif %}
@@ -308,6 +308,7 @@
         data-widget="PageInfo"
         data-title="Info"
         data-help="page_info"
+        data-visible="false"
         data-name="{{ page.name }}"
         data-route="{{ url_for('pages.update', key=page.urlsafe_key) }}"
         data-deferred-route="{{ url_for('pages.info', key=page.urlsafe_key) }}"
