@@ -158,6 +158,18 @@
 	grid-area: 1 / 1;
 }
 
+/* @style form.header.controls */
+.header-controls:not(.task-control-group) > .action-icon-button {
+	block-size: 1.75rem;
+	inline-size: 1.75rem;
+}
+
+/* @style builder.header.side */
+.builder-column-header .action-icon-button {
+	block-size: 1.75rem;
+	inline-size: 1.75rem;
+}
+
 /* @style builder.header.controls */
 .builder-header-controls {
 	& > [data-role="draft-history"][data-visible="true"] + .builder-preview-label,

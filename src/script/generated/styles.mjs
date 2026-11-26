@@ -13,12 +13,13 @@ const STYLES = {
     "icon": "icon-base text-kind-default"
   },
   "builder": {
-    "view": "group/builder mx-auto hidden max-w-7xl flex-row justify-center gap-8 px-4 pt-4 sm:px-0 sm:pt-6 lg:flex lg:pt-8",
+    "view": "group/builder mx-auto hidden max-w-7xl flex-col gap-6 px-4 sm:px-0 lg:flex",
+    "workspace": "flex flex-row justify-center gap-8",
     "component": "text-md flex cursor-move flex-row items-center gap-3 rounded-md bg-form-bg px-3 py-1.5 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark",
     "header": {
-      "model": "h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold",
+      "model": "flex flex-row items-center justify-between gap-4 pb-4 border-b border-base-light/50 text-base-dark",
       "controls": "builder-header-controls flex shrink-0 flex-row items-center gap-2.5",
-      "side": "h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold"
+      "side": "builder-column-header h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-4 text-base font-bold"
     },
     "save": "builder-save-button inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md text-sm font-semibold transition-colors duration-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2",
     "panels": {
@@ -26,7 +27,7 @@ const STYLES = {
       "default": "mb-4 flex flex-col gap-4 rounded-lg p-4 outline-2 outline-form-default",
       "preview": "outline-2 p-6 rounded-lg flex flex-col gap-6 w-full outline-form-default bg-form-bg"
     },
-    "name": "border-b border-dashed focus:outline-none ml-2 w-auto max-w-xs bg-transparent border-base-medium focus:border-form-default",
+    "name": "border-b border-dashed focus:outline-none w-80 max-w-full bg-transparent border-base-medium focus:border-form-default",
     "switch": {
       "label": "builder-preview-label inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm font-semibold text-base-default select-none",
       "container": "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default",
@@ -144,7 +145,7 @@ const STYLES = {
     "header": {
       "container": "flex flex-row items-center justify-between gap-6",
       "title": "text-lg font-semibold text-kind-default flex flex-row items-center gap-2",
-      "controls": "flex flex-row items-center gap-1"
+      "controls": "header-controls flex flex-row items-center gap-1"
     },
     "icon": "form-field-action inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-kind-default transition-colors hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white/80 focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
     "linkLabel": "form-link-label",

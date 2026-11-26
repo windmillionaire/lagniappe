@@ -4,7 +4,7 @@
   <link rel="modulepreload"
         href="/chunks/builder-controls.js?v={{ CONFIG.BUILD_ID }}">
 {% endblock extras %}
-{% from 'common.html' import desktop %}
+{% from 'common.html' import desktop, name_separator %}
 {% import 'controls.html' as controls %}
 {% import 'menus.html' as menus %}
 {% from 'forms/restrictions.html' import restrict_access %}
@@ -63,13 +63,22 @@
 {% endmacro %}
 
 {% macro header() %}
-  <div class="{{ styles.builder.header.model }}">
-    <h2 class="flex flex-row items-center gap-2">
-      {{ render_icon((form.form_type), "icon-xl text-kind-default", form.form_type) }}
-      <div data-menu-anchor class="{{ styles.entity.name.anchor }}">
+  <div class="{{ styles.builder.header.model }}" data-kind="form">
+    <h1 class="flex min-w-0 flex-1 flex-row items-center gap-2 text-xl font-semibold">
+      {%- if Resource.FORMS.allowed(Action.VIEW) -%}
+        <span class="{{ styles.entity.name.parent }} shrink-0">
+          <a href="{{ url_for('forms.form_index') }}"
+             data-kind="form"
+             class="{{ styles.link.default }}">Forms</a>
+          {{- name_separator() -}}
+        </span>
+      {%- endif -%}
+      {{ render_icon((form.form_type), "icon-lg text-kind-default shrink-0", form.form_type) }}
+      <span data-menu-anchor class="{{ styles.entity.name.anchor }} inline-flex min-w-0 items-center">
         <span id="form-name-display"
               data-role="title"
-              class="truncate">{{ form.name }}</span>
+              {% if can_edit_form %}title="Click to rename form"{% endif %}
+              class="truncate {{ 'cursor-text rounded px-1 -mx-1 hover:bg-base-bg' if can_edit_form }}">{{ form.name }}</span>
         <input id="form-name-input"
                type="text"
                value="{{ form.name }}"
@@ -93,8 +102,8 @@
             {% endif %}
           {% endcall %}
         {% endif %}
-      </div>
-    </h2>
+      </span>
+    </h1>
     <div class="{{ styles.builder.header.controls }}">
       <div data-role="draft-history"
            data-visible="true"
@@ -129,13 +138,13 @@
     </div>
   </div>
   {% if not can_edit_form %}
-    <p data-role="readonly-notice" class="{{ styles.message }} mb-3">
+    <p data-role="readonly-notice" class="{{ styles.message }} mt-3">
       <strong>Read-only mode.</strong> You can explore the builder and preview changes, but your changes won't be saved.
     </p>
   {% endif %}
   <p id="notification"
      data-visible="false"
-     class="sm:text-sm ml-2 italic pb-3 text-delete-default"></p>
+     class="sm:text-sm pt-2 italic text-delete-default"></p>
   <form id="schema-form"
         data-visible="false"
         lp-update
@@ -177,55 +186,63 @@
        data-description="{{ form.description }}"
        data-expanded="false"
        class="{{ styles.builder.view }}">
-    <section class="{{ styles.builder.sections.side }}" id="components-column">
-      <div class="{{ styles.builder.header.side }}">
-        <h2>Components</h2>
-        {{ help('form_components') }}
-      </div>
-      <div class="flex flex-col gap-3" id="components-panel"></div>
-    </section>
-    <section class="{{ styles.builder.sections.main }}"
-             id="main-column"
-             data-kind="form">
+    <div class="{{ styles.layout.view.header }}">
       {{ header() }}
-      <div id="preview-panel"
-           data-visible="false"
-           class="{{ styles.builder.panels.preview }}"></div>
-      <div id="default-panel"
-           class="{{ styles.builder.panels.default }} group/default"
-           data-visible="false"></div>
-      <div id="model-panel"
-           class="{{ styles.builder.panels.model }}"
-           data-visible="true"></div>
-      <div id="condition-panel"
-           class="{{ styles.builder.panels.default }} group/condition"
-           data-visible="false"></div>
-    </section>
-    <section class="{{ styles.builder.sections.side }}"
-             id="settings-column"
-             data-kind="form">
-      <div class="{{ styles.builder.header.side }}">
-        <h2>Settings</h2>
-        <div class="{{ styles.home.card.actions }}">
-          {{ help('form_settings') }}
-          {% if can_generate_form or can_restrict_form %}
-            <button type="button"
-                    class="{{ styles.toggle.container }}"
-                    data-role="form-settings"
-                    data-kind="{{ form.form_type }}"
-                    aria-label="Form settings"
-                    title="Form settings">
-              {{ render_icon("settings.page") }}
-            </button>
-          {% endif %}
+    </div>
+    <div class="{{ styles.builder.workspace }}">
+      <section class="{{ styles.builder.sections.side }}" id="components-column">
+        <div class="{{ styles.builder.header.side }}">
+          <h2>Components</h2>
+          {{ help('form_components') }}
         </div>
-      </div>
-      <div id="form-settings-panel" data-visible="true" class="flex flex-col">
-        {% if can_generate_form %}{{ generate() }}{% endif %}
-        {% if can_restrict_form %}{{ restrict_access(form) }}{% endif %}
-      </div>
-      <div id="settings-panel" class="flex flex-col gap-3" data-visible="false"></div>
-    </section>
+        <div class="flex flex-col gap-3" id="components-panel"></div>
+      </section>
+      <section class="{{ styles.builder.sections.main }}"
+               id="main-column"
+               data-kind="form">
+        <div class="{{ styles.builder.header.side }}">
+          <h2 class="group-data-[expanded=true]/builder:hidden">Fields</h2>
+          <h2 class="hidden group-data-[expanded=true]/builder:block">Preview</h2>
+        </div>
+        <div id="preview-panel"
+             data-visible="false"
+             class="{{ styles.builder.panels.preview }}"></div>
+        <div id="default-panel"
+             class="{{ styles.builder.panels.default }} group/default"
+             data-visible="false"></div>
+        <div id="model-panel"
+             class="{{ styles.builder.panels.model }}"
+             data-visible="true"></div>
+        <div id="condition-panel"
+             data-visible="false"
+             class="{{ styles.builder.panels.default }} group/condition"></div>
+      </section>
+      <section class="{{ styles.builder.sections.side }}"
+               id="settings-column"
+               data-kind="form">
+        <div class="{{ styles.builder.header.side }}">
+          <h2>Settings</h2>
+          <div class="{{ styles.home.card.actions }}">
+            {{ help('form_settings') }}
+            {% if can_generate_form or can_restrict_form %}
+              <button type="button"
+                      class="{{ styles.toggle.container }}"
+                      data-role="form-settings"
+                      data-kind="{{ form.form_type }}"
+                      aria-label="Form settings"
+                      title="Form settings">
+                {{ render_icon("settings.page") }}
+              </button>
+            {% endif %}
+          </div>
+        </div>
+        <div id="form-settings-panel" data-visible="true" class="flex flex-col">
+          {% if can_generate_form %}{{ generate() }}{% endif %}
+          {% if can_restrict_form %}{{ restrict_access(form) }}{% endif %}
+        </div>
+        <div id="settings-panel" class="flex flex-col gap-3" data-visible="false"></div>
+      </section>
+    </div>
   </div>
 {% endmacro %}
 

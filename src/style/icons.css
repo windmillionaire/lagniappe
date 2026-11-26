@@ -271,6 +271,21 @@ button.tab-icon .icon {
 	--icon-offset-y: 0;
 }
 
+/* @style form.header.controls */
+.layout-nav-title .header-controls .icon,
+.header-controls:not(.task-control-group) .icon {
+	--icon-box-size: var(--icon-sm-box-size);
+	--icon-size: var(--icon-sm-glyph-size);
+	--icon-offset-y: 0;
+}
+
+/* @style builder.header.side */
+.builder-column-header .icon {
+	--icon-box-size: var(--icon-sm-box-size);
+	--icon-size: var(--icon-sm-glyph-size);
+	--icon-offset-y: 0;
+}
+
 /* @style builder.save */
 .builder-save-button .icon {
 	--icon-box-size: var(--icon-sm-box-size);

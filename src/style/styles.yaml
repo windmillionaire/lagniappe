@@ -47,8 +47,12 @@ badge:
 
 builder:
   view:
-    classes: group/builder mx-auto hidden max-w-7xl flex-row justify-center gap-8 px-4 pt-4 sm:px-0 sm:pt-6 lg:flex lg:pt-8
+    classes: group/builder mx-auto hidden max-w-7xl flex-col gap-6 px-4 sm:px-0 lg:flex
     intent: desktop builder layout hidden below the desktop-only notice breakpoint
+    surfaces: [server]
+  workspace:
+    classes: flex flex-row justify-center gap-8
+    intent: three-column workspace row beneath the full-width form builder header
     surfaces: [server]
   component:
     classes: text-md flex cursor-move flex-row items-center gap-3 rounded-md bg-form-bg px-3 py-1.5 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark
@@ -56,8 +60,8 @@ builder:
     surfaces: [frontend]
   header:
     model:
-      classes: h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold
-      intent: model presentation within builder header
+      classes: flex flex-row items-center justify-between gap-4 pb-4 border-b border-base-light/50 text-base-dark
+      intent: full-width top bar pairing the form title and menu with undo, preview, and save controls
       surfaces: [server]
     controls:
       classes: builder-header-controls flex shrink-0 flex-row items-center gap-2.5
@@ -66,13 +70,11 @@ builder:
       hooks: [builder-header-controls]
       css: [src/style/buttons.css]
     side:
-      classes: h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold
-      intent: side presentation within builder header
+      classes: builder-column-header h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-4 text-base font-bold
+      intent: aligned column heading for the form builder Components, Fields, and Settings columns
       surfaces: [server]
-      exceptions:
-        - diagnostic: duplicate-style-value
-          target: builder.header.model
-          reason: side and model headings are distinct layout roles that may diverge
+      hooks: [builder-column-header]
+      css: [src/style/buttons.css, src/style/icons.css]
   save:
     classes: builder-save-button inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md text-sm font-semibold transition-colors duration-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2
     intent: labeled Saved, Save, and Saving form builder persistence control sized to fit inside the header row
@@ -93,7 +95,7 @@ builder:
       intent: preview presentation within builder panels
       surfaces: [server]
   name:
-    classes: border-b border-dashed focus:outline-none ml-2 w-auto max-w-xs bg-transparent border-base-medium focus:border-form-default
+    classes: border-b border-dashed focus:outline-none w-80 max-w-full bg-transparent border-base-medium focus:border-form-default
     intent: name presentation within builder
     surfaces: [server]
   switch:
@@ -500,9 +502,11 @@ form:
       intent: title presentation within form header
       surfaces: [server, frontend]
     controls:
-      classes: flex flex-row items-center gap-1
+      classes: header-controls flex flex-row items-center gap-1
       intent: controls presentation within form header
       surfaces: [server, frontend]
+      hooks: [header-controls]
+      css: [src/style/buttons.css, src/style/icons.css]
   icon:
     classes: form-field-action inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-kind-default transition-colors hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white/80 focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50 cursor-pointer
     intent: borderless label-adjacent field action separated by a vertical divider (Edit, Use last, Clear, Add row, Done)
@@ -560,10 +564,6 @@ form:
         classes: flex flex-row items-center gap-1
         intent: title presentation within form table cell
         surfaces: [frontend]
-        exceptions:
-          - diagnostic: duplicate-style-value
-            target: form.header.controls
-            reason: table cell titles and form header controls are separate semantic roles
     rowActions:
       classes: "table-row-actions absolute top-0 right-0 z-20 m-0 flex h-8 w-max flex-row items-center rounded-bl-md border-b border-l border-kind-bg bg-base-bg px-1"
       intent: action controls visually docked to the top-right edge of an editable table row
@@ -670,8 +670,8 @@ home:
       surfaces: [server]
       exceptions:
         - diagnostic: duplicate-style-value
-          target: form.header.controls
-          reason: home card actions and form header controls are separate semantic roles
+          target: form.table.cell.title
+          reason: home card actions and table cell titles are separate semantic roles
   column:
     classes: flex flex-col gap-4 sm:gap-6 lg:gap-8
     intent: column presentation within home
