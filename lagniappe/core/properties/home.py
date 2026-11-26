@@ -132,12 +132,13 @@ class TaskList(HomeProperty):
             return self._list
 
         hashes = self._user.properties.restrictions.task
+        viewer_page = self._user.page
         tasks = database_get.due_tasks(
             hashes=hashes,
-            assigned_to=self._user.page,
+            assigned_to=viewer_page,
         )
         task_pages = [
-            page_key
+            viewer_page if viewer_page and page_key == viewer_page.key else page_key
             for task in tasks
             if (page_key := getattr(task, "db", task).get("page"))
         ]

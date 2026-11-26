@@ -41,6 +41,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.measurements import timed
+from lagniappe.core.tools.polling.projections import channel_paths, channel_revisions
 
 LOGIN_USER_KEY = CONFIG.LOGIN_USER_KEY
 LOGIN_USER_PAGE_KEY = CONFIG.LOGIN_USER_PAGE_KEY
@@ -404,8 +405,12 @@ def permission[T](
 
     return decorator
 
-def home_permission(*, anonymous_endpoint: str | None = None) -> _PermissionDecorator:
-    """Permission for home page sections. No entity-level check, just authentication + ETag."""
+def home_permission(
+    *,
+    anonymous_endpoint: str | None = None,
+    poll_channels: Callable[[str | None], tuple[str, ...]] | None = None,
+) -> _PermissionDecorator:
+    """Authenticate Home reads and share their revision keys with the session lookup."""
 
     def decorator(f):
         @wraps(f)
@@ -421,17 +426,33 @@ def home_permission(*, anonymous_endpoint: str | None = None) -> _PermissionDeco
             ):
                 return redirect(url_for(anonymous_endpoint))
 
-            user, _entity = _load_request_context()
+            kind = kwargs.get("kind")
+            channels = poll_channels(kind) if poll_channels else ()
+            paths = tuple(path for channel in channels for path in channel_paths(channel))
+            if channels and request.method == "GET" and kind != "starred":
+                paths = (request.path, *paths)
+            keys = (
+                database_utility.site_fingerprint_keys(paths)
+                if paths and session.get(LOGIN_USER_KEY) else {}
+            )
+            user, _entity = _load_request_context(context_keys=tuple(set(keys.values())))
             if not user.is_authenticated:
                 if anonymous_endpoint:
                     return redirect(url_for(anonymous_endpoint))
                 abort(401)
 
+            # Both the ETag and polling revisions describe the same pre-render snapshot.
+            fingerprints = database_utility.site_fingerprints(
+                paths, records=g.get("request_context_records"),
+            ) if paths else {}
             if request.method == "GET":
-                if kwargs.get("kind") == "starred":
+                if kind == "starred":
                     base_fingerprint = user.modified.timestamp()
                 else:
-                    site_fingerprint = database_utility.site_fingerprint(request.path)
+                    site_fingerprint = (
+                        fingerprints.get(request.path) if channels
+                        else database_utility.site_fingerprint(request.path)
+                    )
                     user_fingerprint = user.modified.timestamp()
                     base_fingerprint = f"{site_fingerprint}:{user_fingerprint}"
 
@@ -439,6 +460,11 @@ def home_permission(*, anonymous_endpoint: str | None = None) -> _PermissionDeco
 
                 if _fingerprint_matches_etag():
                     return "", 304
+
+            if channels:
+                kwargs["poll_revisions"] = channel_revisions(
+                    channels, authenticated_user(), fingerprint_loader=lambda _: fingerprints,
+                )
 
             return f(*args, **kwargs)
 

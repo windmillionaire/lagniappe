@@ -250,8 +250,9 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
             self.allowed_actions.append((action, user))
             return self.visible
 
+    viewer_page = SimpleNamespace(key="page-1")
     user = SimpleNamespace(
-        page="user-page",
+        page=viewer_page,
         properties=SimpleNamespace(
             restrictions=SimpleNamespace(task=("task-a", "task-b"))
         ),
@@ -295,14 +296,14 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     assert due_requests == [
         {
             "hashes": ("task-a", "task-b"),
-            "assigned_to": "user-page",
+            "assigned_to": viewer_page,
         }
     ]
     assert load_requests == [
         (
             (
                 *stored_tasks,
-                "page-1",
+                viewer_page,
                 "page-2",
                 "page-3",
             ),
@@ -317,7 +318,7 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     ]
     assert section.list is visible_tasks
     assert section.count == 7
-    assert count_requests == ["user-page"]
+    assert count_requests == [viewer_page]
 
 
 @pytest.mark.unit

@@ -695,8 +695,7 @@ def tool_report(report: models.AIReport) -> tuple[str, int]:
 # @template home/categories.html::category
 # @template home/directory.html::list
 # @template home/home.html::create
-def home_page(home: models.Home) -> tuple[str, int]:
-    poll_revisions = channel_revisions(("home-notes", "tasks"), auth.authenticated_user())
+def home_page(home: models.Home, poll_revisions: dict[str, str]) -> tuple[str, int]:
     return (
         render_template(
             "home/home.html",
