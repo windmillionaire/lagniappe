@@ -484,7 +484,7 @@ const STYLES = {
     },
     "chip": {
       "editable": "lp-badge task-chip-editable ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-white py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
-      "form": "lp-badge task-chip-form ring-form-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-form-bg/70 py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-form-default ring ring-inset transition-colors hover:bg-form-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-form-default",
+      "form": "lp-badge task-chip-form ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-kind-bg/70 py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
       "add": "task-chip-add inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-kind-light bg-base-bg/60 py-[3px] pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default opacity-75 transition-all hover:border-solid hover:bg-kind-bg hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
       "drawer": "mx-4 mb-4 pt-3.5 border-t border-base-light/50 flex flex-col gap-3 sm:mx-6"
     },
@@ -514,7 +514,6 @@ const STYLES = {
     "plain": "group/toggle action-icon-button transition-colors duration-100 hover:bg-white",
     "icon": {
       "documentSettings": "page-document-settings-icon",
-      "taskHistory": "task-history-icon",
       "active": "invisible group-data-[active=false]/toggle:group-hover/toggle:visible group-data-[active=true]/toggle:group-[:not(:hover)]/toggle:visible",
       "inactive": "invisible group-data-[active=true]/toggle:group-hover/toggle:visible group-data-[active=false]/toggle:group-[:not(:hover)]/toggle:visible",
       "enabled": "text-kind-default invisible group-data-[active=true]/toggle:visible",

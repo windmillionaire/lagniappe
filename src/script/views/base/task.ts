@@ -32,6 +32,23 @@ export class Task extends ViewComponent {
 		return activated;
 	}
 
+	enable() {
+		super.enable();
+		const saveToggle = this.elt.querySelector<HTMLElement>(
+			"[data-role='save-toggle']",
+		);
+		if (saveToggle?.getAttribute("aria-busy") === "true") {
+			saveToggle.removeAttribute("aria-busy");
+			const isSaved = saveToggle.dataset.saved === "true";
+			saveToggle.setAttribute("aria-disabled", String(isSaved));
+			saveToggle.setAttribute(
+				"aria-label",
+				isSaved ? "Saved" : "Save task form",
+			);
+			saveToggle.title = isSaved ? "Saved" : "Save task form";
+		}
+	}
+
 	closeOpenWidget() {
 		if (!this.open || this.open === "false") return false;
 

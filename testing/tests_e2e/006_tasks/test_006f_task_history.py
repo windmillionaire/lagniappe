@@ -63,7 +63,7 @@ def _complete_then_uncomplete(task, *, reload=True):
     task.uncomplete()
     assert not task.completed
     history_toggles = task.element.locator("button[lp-control='history']")
-    expect(history_toggles).to_have_count(2)
+    expect(history_toggles).to_have_count(1)
     expect(
         task.element.locator("button[lp-control='history']:visible")
     ).to_have_count(1)

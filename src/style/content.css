@@ -253,9 +253,10 @@ li[data-open="false"]
 }
 
 /* @style task.chip.form */
-li[data-open="TaskForm"] .task-chip-form {
+li[data-open="TaskForm"] .task-chip-form[data-role="form-chip"],
+li[data-open="TaskHistory"] .task-chip-form[data-role="history-chip"] {
 	background-color: white;
-	box-shadow: 0 0 0 2px var(--color-form-default);
+	box-shadow: 0 0 0 2px var(--kind-default);
 }
 
 /* @style task.description */

@@ -141,6 +141,10 @@ export async function applyTaskChipUpdate(
 		if (saveToggle) {
 			saveToggle.dataset.saved = "false";
 			saveToggle.dataset.visible = "true";
+			saveToggle.removeAttribute("aria-busy");
+			saveToggle.setAttribute("aria-disabled", "false");
+			saveToggle.setAttribute("aria-label", "Save task form");
+			saveToggle.title = "Save task form";
 		}
 	}
 

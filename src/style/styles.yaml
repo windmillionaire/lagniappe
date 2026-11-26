@@ -1584,8 +1584,8 @@ task:
       hooks: [task-chip-editable]
       css: [src/style/content.css]
     form:
-      classes: lp-badge task-chip-form ring-form-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-form-bg/70 py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-form-default ring ring-inset transition-colors hover:bg-form-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-form-default
-      intent: attached task form chip that toggles TaskForm open or closed on click
+      classes: lp-badge task-chip-form ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-kind-bg/70 py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
+      intent: tinted panel-toggle chip for attached task form and task history
       surfaces: [server]
       hooks: [task-chip-form]
       css: [src/style/content.css]
@@ -1688,12 +1688,6 @@ toggle:
       intent: optically centers the Document Settings public glyph in the page action row
       surfaces: [server]
       hooks: [page-document-settings-icon]
-      css: [src/style/icons.css]
-    taskHistory:
-      classes: task-history-icon
-      intent: optically centers the Task History glyph beside task controls
-      surfaces: [server]
-      hooks: [task-history-icon]
       css: [src/style/icons.css]
     active:
       classes: invisible group-data-[active=false]/toggle:group-hover/toggle:visible group-data-[active=true]/toggle:group-[:not(:hover)]/toggle:visible

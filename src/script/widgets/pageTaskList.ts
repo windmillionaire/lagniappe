@@ -78,7 +78,9 @@ export class PageTaskList extends BaseList {
 	}
 
 	init() {
+		this.target.addEventListener("input", this._change);
 		this.target.addEventListener("change", this._change);
+		this.target.addEventListener("updated", this._change);
 		this.target.addEventListener("click", this._click);
 		this.target.addEventListener("dblclick", this._dblclick);
 		this.target.addEventListener("keydown", this._keydown);
@@ -184,6 +186,13 @@ export class PageTaskList extends BaseList {
 	_change(e: Event) {
 		const target = e.target as Element | null;
 		if (!target?.closest) return;
+		if (
+			e.type === "input" &&
+			target instanceof HTMLInputElement &&
+			target.getAttribute("role") === "combobox"
+		) {
+			return;
+		}
 		const widget = target.closest<HTMLElement>("[data-widget]")?.dataset.widget;
 		if (widget !== "TaskForm") {
 			return;
@@ -193,6 +202,10 @@ export class PageTaskList extends BaseList {
 		if (saved) {
 			saved.dataset.saved = "false";
 			saved.dataset.visible = "true";
+			saved.removeAttribute("aria-busy");
+			saved.setAttribute("aria-disabled", "false");
+			saved.setAttribute("aria-label", "Save task form");
+			saved.title = "Save task form";
 		}
 	}
 
@@ -238,8 +251,22 @@ export class PageTaskList extends BaseList {
 			(role === "save-toggle" || role === "complete-toggle") &&
 			this.target.contains(submitter)
 		) {
+			if (
+				role === "save-toggle" &&
+				(submitter.dataset.saved === "true" ||
+					submitter.getAttribute("aria-busy") === "true")
+			) {
+				e.stopPropagation();
+				e.preventDefault();
+				return;
+			}
 			const task = this.view.getComponent(submitter);
 			if (!task) return;
+			if (role === "save-toggle") {
+				submitter.setAttribute("aria-busy", "true");
+				submitter.setAttribute("aria-label", "Saving task form");
+				submitter.title = "Saving task form";
+			}
 			if (role === "complete-toggle") {
 				this.chips?.closeChip(task.elt as HTMLLIElement);
 			}
@@ -982,7 +1009,9 @@ export class PageTaskList extends BaseList {
 
 	destroy() {
 		this.chips?.closeAll();
+		this.target.removeEventListener("input", this._change);
 		this.target.removeEventListener("change", this._change);
+		this.target.removeEventListener("updated", this._change);
 		this.target.removeEventListener("click", this._click);
 		this.target.removeEventListener("dblclick", this._dblclick);
 		this.target.removeEventListener("keydown", this._keydown);

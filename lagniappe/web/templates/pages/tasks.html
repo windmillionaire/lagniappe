@@ -166,12 +166,11 @@
         {% endif %}
       </div>
     </div>
-    <div class="flex shrink-0 flex-row items-start gap-1 ml-auto">
+    <div class="flex shrink-0 flex-row items-center gap-1.5 ml-auto">
       {% if show_form and can_edit_chips %}{{ controls.task_save(t.updated) }}{% endif %}
       <nav class="{{ styles.task.controlGroup }} flex shrink-0 flex-row items-start gap-1"
            data-role="nav-toggles"
            data-nav="{{ t.hash }}">
-        {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
         {% if can_edit_chips %}
           <button type="button"
                   class="{{ styles.toggle.container }}"
@@ -198,7 +197,6 @@
       <div class="{{ styles.form.header.controls }} {{ styles.task.controlGroup }}"
            data-role="controls"
            data-visible="false">
-        {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
         {{ controls.close() }}
       </div>
     </div>
@@ -505,6 +503,20 @@
               class="{{ styles.task.chip.form }}">
         {{ render_icon("form", (styles.badge.icon)) }}
         <span>{{ t.form.name }}</span>
+      </button>
+    {%- endif -%}
+    {%- if t.has_history -%}
+      <button type="button"
+              lp-control="history"
+              lp-show="{{ t.hash }}:TaskHistory"
+              data-toggle="true"
+              data-kind="task"
+              data-role="history-chip"
+              aria-label="Task history"
+              title="Task history"
+              class="{{ styles.task.chip.form }}">
+        {{ render_icon("history", (styles.badge.icon)) }}
+        <span>History</span>
       </button>
     {%- endif -%}
     {%- if t.project -%}

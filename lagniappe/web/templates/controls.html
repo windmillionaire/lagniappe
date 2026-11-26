@@ -24,29 +24,24 @@
   </button>
 {% endmacro %}
 
-{% macro task_history(task) %}
-  <button class="{{ styles.toggle.container }}"
-          lp-control="history"
-          data-controls="show"
-          type="button"
-          lp-show="{{ task.hash }}:TaskHistory"
-          data-kind="task"
-          aria-label="Task history"
-          title="Task history">
-    {{ render_icon("history", styles.toggle.icon.taskHistory) }}
-  </button>
-{% endmacro %}
-
 {% macro task_save(updated) %}
-  <button class="{{ styles.toggle.container }} -translate-x-1"
+  <button class="{{ styles.builder.save }}"
           data-saved="{{ updated|yesno }}"
           data-visible="{{ updated|yesno }}"
           data-role="save-toggle"
+          data-kind="form"
           type="button"
-          aria-label="{{ 'Saved' if updated else 'Unsaved changes' }}"
-          title="{{ 'Saved' if updated else 'Unsaved changes' }}">
-    {{ render_icon("builder.saved", "icon-lg text-kind-default invisible group-data-[saved=true]/toggle:visible", "saved") }}
-    {{ render_icon("builder.unsaved", "icon-lg text-kind-default invisible group-data-[saved=false]/toggle:visible", "unsaved") }}
+          aria-disabled="{{ updated|yesno }}"
+          aria-label="{{ 'Saved' if updated else 'Save task form' }}"
+          title="{{ 'Saved' if updated else 'Save task form' }}">
+    <span class="builder-save-icon" aria-hidden="true">
+      {{ render_icon("builder.saved", "", "saved") }}
+      {{ render_icon("builder.unsaved", "", "unsaved") }}
+      {{ render_icon("spinner", "") }}
+    </span>
+    <span class="builder-save-label" data-state="saved">Saved</span>
+    <span class="builder-save-label" data-state="unsaved">Save</span>
+    <span class="builder-save-label" data-state="saving">Saving…</span>
   </button>
 {% endmacro %}
 

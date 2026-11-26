@@ -246,11 +246,6 @@ button.tab-icon .icon {
 	--icon-offset-y: 0;
 }
 
-/* @style toggle.icon.taskHistory */
-.task-history-icon {
-	--icon-offset-y: 1px;
-}
-
 /* @style task.controlGroup */
 .task-control-group .icon {
 	--icon-box-size: var(--icon-base-box-size);
