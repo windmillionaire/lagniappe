@@ -458,8 +458,8 @@ entity:
       intent: shrinkable wrapper that insulates entity-name spacing from surrounding flex gaps
       surfaces: [server, frontend]
     parent:
-      classes: whitespace-nowrap
-      intent: keeps an entity parent and its breadcrumb separator together
+      classes: inline-block max-w-full overflow-hidden text-ellipsis align-bottom whitespace-nowrap
+      intent: keeps an entity parent and its breadcrumb separator together without overflowing narrow mobile cards
       surfaces: [server, frontend]
     separator:
       classes: mx-1 text-base-medium

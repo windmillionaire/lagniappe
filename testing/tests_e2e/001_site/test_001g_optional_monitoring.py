@@ -79,6 +79,9 @@ def test_optional_monitoring_does_not_gate_controls(
                 wait_until="domcontentloaded",
             )
             if layout == "page":
+                expect(user.page.locator("[lp-view]")).to_have_attribute(
+                    "initialized", ""
+                )
                 user.page.get_by_role("button", name="Page actions", exact=True).click()
                 user.page.locator("[data-page-action='rename']:visible").click()
                 name = user.page.locator("[data-role='rename-form'] input[name='name']")

@@ -132,7 +132,7 @@ const STYLES = {
     "tabIcon": "relative inline-grid place-items-center text-kind-default hover:text-kind-dark tab-icon outline-none",
     "name": {
       "wrapper": "min-w-0",
-      "parent": "whitespace-nowrap",
+      "parent": "inline-block max-w-full overflow-hidden text-ellipsis align-bottom whitespace-nowrap",
       "separator": "mx-1 text-base-medium",
       "anchor": "min-w-0"
     }
