@@ -18,15 +18,34 @@
   </form>
 {% endmacro %}
 
+{% macro empty_import_list_item() %}
+  <li class="{{ styles.files.empty.container }}" data-role="empty">
+    <p class="{{ styles.files.empty.title }}">No spreadsheets imported yet</p>
+    <p class="{{ styles.files.empty.body }}">
+      Upload a CSV file to turn spreadsheet rows into structured pages or tasks.
+    </p>
+    <button type="button"
+            lp-show="ingress:IngressFileUpload"
+            data-kind="file"
+            class="{{ styles.files.empty.action }}">
+      {{ render_icon("add") }}
+      <span>Import CSV</span>
+    </button>
+  </li>
+{% endmacro %}
+
 {% macro import_list(files) %}
   <ul data-widget="IngressList"
       data-persistent="true"
       data-visible="true"
-      data-if-empty="IngressFileUpload"
       class="{{ styles.list.container }} mt-0 sm:mt-4">
-    {%- for file in files.list -%}
-      {{ imported_file(file) }}
-    {%- endfor -%}
+    {%- if files.list -%}
+      {%- for file in files.list -%}
+        {{ imported_file(file) }}
+      {%- endfor -%}
+    {%- else -%}
+      {{ empty_import_list_item() }}
+    {%- endif -%}
   </ul>
 {% endmacro %}
 

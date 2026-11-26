@@ -298,7 +298,7 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 		remove(type, callback, options);
 	});
 	let resolveLoad;
-	const { Modal, OfflineModal } = await esmock.strict(
+	const { DeleteModal, Modal, OfflineModal } = await esmock.strict(
 		"../../src/script/shared/modal.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
@@ -370,6 +370,32 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 	assert.equal(await loading, null);
 	assert.equal(late.isConnected, false);
 	assert.equal(pending.modal, null);
+
+	// DeleteModal focuses the safe Cancel button instead of the destructive Delete button.
+	const host = document.createElement("div");
+	host.setAttribute("lp-entity", "");
+	host.dataset.key = "task-1";
+	const deleteTrigger = document.createElement("button");
+	host.append(deleteTrigger);
+	document.body.append(host);
+	const deleteDialog = document.createElement("div");
+	deleteDialog.id = "modal";
+	deleteDialog.innerHTML =
+		'<div id="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
+		'<h2 id="modal-title">Delete Task</h2>' +
+		'<button type="button" lp-control="close">Cancel</button>' +
+		'<button type="button" data-role="delete" data-route="/delete">Delete</button>' +
+		"</div>";
+	const deleteModal = new DeleteModal({}, deleteTrigger);
+	const deleteInit = deleteModal.init();
+	resolveLoad({ html: deleteDialog });
+	await deleteInit;
+	assert.equal(
+		document.activeElement,
+		deleteDialog.querySelector("[lp-control='close']"),
+	);
+	deleteModal.destroy();
+	host.remove();
 });
 
 test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async (t) => {

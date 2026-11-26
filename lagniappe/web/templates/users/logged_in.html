@@ -29,6 +29,9 @@
     <main class="px-4 sm:px-6 lg:px-8">
       <div class="{{ styles.form.login }}">
         <h1 class="{{ styles.login.heading }}">You are logged in</h1>
+        {% if current_user.is_authenticated and current_user.name %}
+          <p class="mt-2 text-center text-sm text-base-medium">Signed in as {{ current_user.name }}</p>
+        {% endif %}
         <div class="space-y-4 mt-6">
           <a href="{{ url_for('home.home_page') }}"
              data-kind="user"
@@ -37,7 +40,7 @@
                   data-action="logout"
                   data-route="{{ url_for('users.logout') }}"
                   data-kind="user"
-                  class="{{ styles.button.submit }} w-full">Logout</button>
+                  class="{{ styles.button.secondary }} w-full">Sign out</button>
         </div>
       </div>
     </main>

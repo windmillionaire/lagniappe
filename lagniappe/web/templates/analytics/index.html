@@ -16,8 +16,10 @@
     {% for value, label in periods.items() %}
       <a href="{{ url_for('analytics.index', period=value) }}"
          class="{{ styles.attributes.button }}"
+         data-role="attribute"
          data-kind="{{ 'success' if value == period else 'page' }}"
-         data-selected="{{ (value == period)|yesno }}">{{ label }}</a>
+         data-selected="{{ (value == period)|yesno }}"
+         {% if value == period %}aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
   </nav>
 {% endmacro %}

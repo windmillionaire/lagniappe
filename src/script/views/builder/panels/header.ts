@@ -27,8 +27,13 @@ export class Header {
 	declare notification: HTMLElement;
 	declare previewToggle: HTMLElement;
 	declare previewPanel: HTMLElement;
+	declare mobilePreviewPanel: HTMLElement | null;
 	declare draftControls: HTMLElement | null;
 	declare renderer: FormRenderer | null;
+	declare mobileRenderer: FormRenderer | null;
+	declare _mobileMedia: MediaQueryList | null;
+	declare _mobilePreviewGeneration: number;
+	declare _onMobileMedia: (() => void) | null;
 
 	constructor(builder: FormBuilder) {
 		this._destroyed = false;
@@ -50,6 +55,7 @@ export class Header {
 		this.notification = builderControl("notification");
 		this.previewToggle = builderControl("preview-toggle");
 		this.previewPanel = builderControl("preview-panel");
+		this.mobilePreviewPanel = document.getElementById("mobile-preview-panel");
 		this.draftControls = document.querySelector<HTMLElement>(
 			"[data-role='draft-history']",
 		);
@@ -66,6 +72,10 @@ export class Header {
 		this._nameInput = this._nameInput.bind(this);
 
 		this.renderer = null;
+		this.mobileRenderer = null;
+		this._mobileMedia = null;
+		this._mobilePreviewGeneration = 0;
+		this._onMobileMedia = null;
 
 		this.init();
 	}
@@ -168,6 +178,40 @@ export class Header {
 		this.previewToggle.setAttribute("aria-checked", "false");
 		this.previewPanel.dataset.visible = "false";
 		if (this.draftControls) this.draftControls.dataset.visible = "true";
+	}
+
+	async syncMobilePreview() {
+		if (this._destroyed || !this.mobilePreviewPanel) return;
+		if (!this._mobileMedia && typeof window.matchMedia === "function") {
+			this._mobileMedia = window.matchMedia("(max-width: 1023.98px)");
+			this._onMobileMedia = () => {
+				void this.syncMobilePreview();
+			};
+			this._mobileMedia.addEventListener?.("change", this._onMobileMedia);
+		}
+		const isMobile = this._mobileMedia ? this._mobileMedia.matches : false;
+		if (!isMobile || this.mobileRenderer || !this.builder.schema.length) return;
+
+		const generation = ++this._mobilePreviewGeneration;
+		const renderer = new FormRenderer({
+			target: this.mobilePreviewPanel,
+			schema: this.builder.schema,
+			kind: "form",
+			key: this.builder.key,
+			submission: {},
+			htmlFields: Object.fromEntries(
+				Object.entries(this.builder.htmlFields).map(([id, html]) => [
+					id,
+					this.builder.previewHtml(html),
+				]),
+			),
+		});
+		await renderer.render();
+		if (this._destroyed || generation !== this._mobilePreviewGeneration) {
+			renderer.destroy();
+			return;
+		}
+		this.mobileRenderer = renderer;
 	}
 
 	async togglePreviewPanel() {
@@ -372,12 +416,20 @@ export class Header {
 		if (this._destroyed) return;
 		this._destroyed = true;
 		this._previewGeneration += 1;
+		this._mobilePreviewGeneration += 1;
 		clearTimeout(this._messageTimer ?? undefined);
 		this._messageTimer = null;
 		this.nameInput.removeEventListener("blur", this._nameBlur);
 		this.nameInput.removeEventListener("keydown", this._nameKeyDown);
 		this.nameInput.removeEventListener("input", this._nameInput);
+		if (this._mobileMedia && this._onMobileMedia) {
+			this._mobileMedia.removeEventListener?.("change", this._onMobileMedia);
+		}
+		this._mobileMedia = null;
+		this._onMobileMedia = null;
 		this.renderer?.destroy();
 		this.renderer = null;
+		this.mobileRenderer?.destroy();
+		this.mobileRenderer = null;
 	}
 }

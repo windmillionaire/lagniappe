@@ -182,6 +182,7 @@ class FormBuilder {
 		document.addEventListener("keydown", this.keydown);
 		window.addEventListener("beforeunload", this.beforeUnload);
 		this.refreshDraftControls();
+		void this.header.syncMobilePreview?.();
 		this.elt._lp_view = this;
 
 		this._searchPromise = this._initSearch().catch((error) => {

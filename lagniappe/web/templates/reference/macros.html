@@ -2,9 +2,12 @@
   <div id="modal"
        class="{{ styles.modal.wrapper }}">
     <div class="{{ styles.modal.content }}"
-         id="modal-content">
+         id="modal-content"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="modal-title">
       <div class="{{ styles.modal.header }}">
-        <h2 class="text-xl font-bold text-base-dark">{{ title }}</h2>
+        <h2 id="modal-title" class="text-xl font-bold text-base-dark">{{ title }}</h2>
         <button type="button"
                 lp-control="close"
                 class="{{ styles.button.close }}">

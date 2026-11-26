@@ -391,7 +391,10 @@ export class ToolReportList extends BaseList {
 				void this._deleteExecuted(keys, route, modal);
 			});
 			await modal.attach(element);
-			confirm.focus();
+			(
+				modal.modal?.querySelector<HTMLElement>("[lp-control='close']") ??
+				confirm
+			).focus();
 		} finally {
 			this._openingDelete = false;
 		}

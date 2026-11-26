@@ -4,7 +4,7 @@
   <link rel="modulepreload"
         href="/chunks/builder-controls.js?v={{ CONFIG.BUILD_ID }}">
 {% endblock extras %}
-{% from 'common.html' import desktop, name_separator %}
+{% from 'common.html' import name_separator %}
 {% import 'controls.html' as controls %}
 {% import 'menus.html' as menus %}
 {% from 'forms/restrictions.html' import restrict_access %}
@@ -170,10 +170,71 @@
   </button>
 {% endmacro %}
 
+{% macro mobile_preview() %}
+  <div id="mobile-builder-preview"
+       data-role="mobile-preview"
+       data-kind="form"
+       class="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-4 pb-8 lg:hidden">
+    <div class="flex flex-col gap-2 border-b border-base-light/50 pb-3">
+      <h1 class="flex min-w-0 flex-wrap items-center gap-1.5 text-xl font-semibold text-base-dark">
+        {%- if Resource.FORMS.allowed(Action.VIEW) -%}
+          <span class="{{ styles.entity.name.parent }} shrink-0">
+            <a href="{{ url_for('forms.form_index') }}"
+               data-kind="form"
+               class="{{ styles.link.default }}">Forms</a>
+            {{- name_separator() -}}
+          </span>
+        {%- endif -%}
+        {{ render_icon((form.form_type), "icon-lg text-kind-default shrink-0", form.form_type) }}
+        <span class="min-w-0 break-words">{{ form.name }}</span>
+      </h1>
+      <div class="flex flex-wrap items-center gap-2 pt-1">
+        {% if Resource.FORMS.allowed(Action.VIEW) %}
+          <a href="{{ url_for('forms.form_index') }}"
+             data-kind="form"
+             class="inline-flex items-center gap-1.5 rounded-md border border-base-light bg-white px-3 py-1.5 text-sm font-semibold text-base-dark shadow-xs hover:bg-base-bg">
+            {{ render_icon("form", "icon-sm text-kind-default", "form") }}
+            <span>Back to Forms</span>
+          </a>
+        {% endif %}
+        <a href="{{ url_for('home.home_page') }}"
+           data-kind="page"
+           class="inline-flex items-center gap-1.5 rounded-md border border-base-light bg-white px-3 py-1.5 text-sm font-semibold text-base-dark shadow-xs hover:bg-base-bg">
+          {{ render_icon("home", "icon-sm text-kind-default", "page") }}
+          <span>Go to Home</span>
+        </a>
+      </div>
+    </div>
+    <div data-role="desktop-only-notice"
+         class="flex items-start gap-3 rounded-md border border-form-light/70 bg-form-bg/60 p-3.5 text-sm text-base-dark">
+      {{ render_icon("info", "icon-lg shrink-0 text-form-default mt-0.5") }}
+      <div class="min-w-0">
+        <p class="font-semibold text-base-dark">Editing is desktop-only</p>
+        <p class="mt-0.5 text-base-medium">
+          Showing a read-only preview of this form. Open this page on a larger screen to edit fields, settings, or conditions.
+        </p>
+      </div>
+    </div>
+    <section aria-label="Form preview"
+             class="rounded-md border border-base-light/60 bg-white p-4 shadow-xs">
+      {% if form.schema %}
+        <div id="mobile-preview-panel"
+             class="flex flex-col gap-5"
+             inert
+             aria-label="Read-only form preview"></div>
+      {% else %}
+        <p class="py-6 text-center text-sm italic text-base-medium">
+          This form does not have any fields yet.
+        </p>
+      {% endif %}
+    </section>
+  </div>
+{% endmacro %}
+
 {% macro main() %}
   {% if builder_draft is defined %}<script id="builder-draft" type="application/json">{{ builder_draft|tojson }}</script>{% endif %}
   {% if conversion_catalog is defined %}<script id="builder-conversions" type="application/json">{{ conversion_catalog|tojson }}</script>{% endif %}
-  {{ desktop('The form builder') }}
+  {{ mobile_preview() }}
   <div lp-view
        lp-entity
        data-kind="builder"

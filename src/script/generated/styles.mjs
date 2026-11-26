@@ -53,7 +53,7 @@ const STYLES = {
   "button": {
     "submit": "grid w-full grow place-items-center rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm action-button",
     "secondary": "grid w-full grow place-items-center rounded-md bg-white px-3 py-1.5 text-base font-semibold text-kind-default shadow-xs action-button-secondary",
-    "close": "ml-2 text-center text-base rounded-md px-2.5 py-1 font-semibold shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 hover:outline-2 hover:outline-offset-2 text-white bg-delete-default hover:bg-delete-dark outline-delete-default hover:outline-delete-dark",
+    "close": "ml-2 shrink-0 text-center text-sm sm:text-base rounded-md px-3 py-1 font-semibold border border-base-light bg-white text-base-dark shadow-xs transition-colors hover:bg-base-bg hover:border-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-medium",
     "group": "flex flex-col sm:flex-row gap-3",
     "cancel": "ml-auto grid size-6 translate-x-1 place-items-center rounded-md text-delete-default hover:outline-2 hover:outline-delete-default focus-visible:outline-2 focus-visible:outline-delete-default hover:bg-delete-bg focus-visible:bg-delete-bg transition-colors duration-100"
   },

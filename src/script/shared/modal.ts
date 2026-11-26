@@ -245,7 +245,10 @@ export class DeleteModal extends Modal {
 			return;
 		}
 		this.deleteButton.addEventListener("click", this.delete.bind(this));
-		this.deleteButton.focus();
+		(
+			modal.querySelector<HTMLElement>("[lp-control='close']") ??
+			this.deleteButton
+		).focus();
 	}
 
 	removeEntity(key: string) {

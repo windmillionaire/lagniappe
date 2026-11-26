@@ -134,7 +134,10 @@ class DocumentHistoryButton {
 			await modal.remove();
 			await this.refresh();
 		});
-		deleteButton.focus();
+		(
+			modal.modal?.querySelector<HTMLElement>("[lp-control='close']") ??
+			deleteButton
+		).focus();
 	}
 
 	async _showBackups(
