@@ -224,6 +224,11 @@ button[lp-select]:disabled {
 	}
 }
 
+/* @style select.heading */
+.select-heading > :not(.form-field-action) + .form-field-action {
+	margin-left: 0.75rem;
+}
+
 /* @style form.submission.default form.submission.grows */
 .submission-outline {
 	outline-style: solid;

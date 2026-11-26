@@ -351,10 +351,6 @@ export class UserSettings extends FormWidget {
 		return field;
 	}
 
-	get userActionsElement() {
-		return this.target.querySelector("[data-role='user-actions']");
-	}
-
 	get userGroupsElement() {
 		return this.target.querySelector("[data-role='user-groups']");
 	}

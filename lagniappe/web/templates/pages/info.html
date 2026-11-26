@@ -24,20 +24,6 @@
   </form>
 {% endmacro %}
 
-{% macro sign_out_button() %}
-  <div data-role="user-actions" class="ml-auto flex shrink-0">
-    <button type="button"
-            data-action="logout"
-            data-route="{{ url_for('users.logout') }}"
-            data-role="sign-out"
-            data-kind="user"
-            class="action-button flex w-fit grow-0 flex-row items-center justify-center gap-1 rounded-md bg-kind-default px-2 py-1 text-sm font-semibold text-white shadow-sm">
-      {{ render_icon("logout") }}
-      <span>Sign out</span>
-    </button>
-  </div>
-{% endmacro %}
-
 {% macro user_settings(page, is_own_page, is_admin_viewer, is_owner_viewer, is_owner_page, view_permissions, close_target='PageInfo') %}
   {% set can_manage_user = is_admin_viewer and (is_owner_viewer or not page.user.is_admin) %}
   {% set can_edit_name = (is_own_page or can_manage_user) and (is_owner_viewer or not page.user.is_admin) %}
@@ -78,7 +64,6 @@
           {{ render_icon("user", (styles.iconLabel.icon)) }}
           <span>Settings</span>
         </div>
-        {% if is_own_page %}{{ sign_out_button() }}{% endif %}
       </header>
       <div class="flex flex-col gap-4 p-3">
         <div data-role="user-fields" class="flex flex-col gap-4">

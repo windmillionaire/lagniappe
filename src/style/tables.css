@@ -334,6 +334,17 @@ tbody[aria-busy="true"] > tr[lp-entity] {
 	table#table:not([data-embedded]) {
 		margin-inline: -0.75rem;
 		width: calc(100% + 1.5rem);
+
+		& > tbody > tr > td[data-column="name"] {
+			max-width: 22rem;
+			white-space: normal;
+
+			& > div,
+			& span {
+				white-space: normal;
+				overflow-wrap: anywhere;
+			}
+		}
 	}
 
 	table[data-card-table="true"] {

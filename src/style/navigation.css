@@ -95,6 +95,11 @@ nav[data-role="page-header"] [data-role="title"] {
 	transform: translateY(0.125rem);
 }
 
+/* @style layout.nav.title */
+[lp-nav][data-nav="mobile"] > [data-role="header"] {
+	min-height: 3.5rem;
+}
+
 /* @style layout.nav.header */
 [lp-nav] > [data-role="header"] {
 	justify-content: flex-start;

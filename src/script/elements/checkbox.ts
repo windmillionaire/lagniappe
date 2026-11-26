@@ -20,6 +20,13 @@ export class CheckboxElement extends BaseElement {
 		return true;
 	}
 
+	override get mode() {
+		if (this.renderer.mode) {
+			return this.renderer.mode;
+		}
+		return this.readonly ? "read" : "edit";
+	}
+
 	get cell() {
 		if (this.cellEditing) return this.cellEdit;
 		if (!this.submission) return null;

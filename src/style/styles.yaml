@@ -1424,11 +1424,11 @@ select:
     hooks: [select-button, form-input]
     css: [src/style/forms.css, src/style/icons.css]
   heading:
-    classes: select-heading flex min-h-6 items-center gap-1 sm:text-sm font-semibold leading-none text-base-dark mb-1
+    classes: select-heading flex min-h-6 items-center gap-1.5 sm:text-sm font-semibold leading-none text-base-dark mb-1
     intent: section heading with leading semantic icon and optional label-row actions above a select control
     surfaces: [server, frontend]
     hooks: [select-heading]
-    css: [src/style/icons.css]
+    css: [src/style/forms.css, src/style/icons.css]
   label:
     classes: min-w-0 flex-1 truncate text-left
     intent: truncated value or placeholder text inside a section toggle button
@@ -1598,7 +1598,7 @@ task:
     css: [src/style/content.css]
   quickAdd:
     form:
-      classes: mx-4 mb-2 flex flex-row items-center gap-2 rounded-md bg-task-bg p-3 sm:mx-2
+      classes: mx-4 mt-4 mb-2 flex flex-row items-center gap-2 rounded-md bg-task-bg p-3 sm:mx-2 sm:mt-0
       intent: inline quick-add bar at the top of the page tasks tab matching standard tab form margins
       surfaces: [server]
     input:

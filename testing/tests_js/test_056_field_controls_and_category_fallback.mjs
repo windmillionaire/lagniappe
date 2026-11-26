@@ -105,6 +105,9 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 		html: `<form data-widget="TestForm" data-kind="page"></form>`,
 	});
 
+	const { CheckboxElement } = await import(
+		"../../src/script/elements/checkbox.ts"
+	);
 	const { InputElement } = await import("../../src/script/elements/input.ts");
 	const { RadioElement } = await import("../../src/script/elements/radio.ts");
 	const { TableElement } = await import("../../src/script/elements/table.ts");
@@ -157,6 +160,17 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 		{ items: [{ text: "Check brood", checked: false }] },
 	);
 
+	const checkboxField = new CheckboxElement(
+		{ kind: "page", readonly: false },
+		{ id: "verified", type: "checkbox", title: "Verified" },
+		true,
+	);
+	const readonlyCheckboxField = new CheckboxElement(
+		{ kind: "page", readonly: true },
+		{ id: "verified-ro", type: "checkbox", title: "Verified (RO)" },
+		true,
+	);
+
 	class TestFormWidget extends FormWidget {
 		get html() {
 			return [
@@ -166,6 +180,8 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 				historyField.elt,
 				tableField.elt,
 				todoField.elt,
+				checkboxField.elt,
+				readonlyCheckboxField.elt,
 			];
 		}
 	}
@@ -251,6 +267,17 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 		nameClear.click();
 		assert.equal(nameInput.value, "");
 		assert.equal(nameClear.hidden, true);
+
+		// Editable checked checkbox stays directly interactive in edit mode and toggles on the first click.
+		const checkboxElt = form.querySelector("#verified");
+		assert.equal(checkboxElt.dataset.mode, "edit");
+		const checkboxInput = checkboxElt.querySelector("input[type='checkbox']");
+		assert.equal(checkboxInput.checked, true);
+		const checkboxText = checkboxElt.querySelector("span:last-of-type");
+		checkboxText.click();
+		await flush();
+		assert.equal(checkboxInput.checked, false);
+		assert.equal(form.querySelector("#verified-ro")?.dataset.mode, "read");
 
 		// Initially-empty radio gets a hidden Clear action that appears once an option is chosen and hides again on Clear.
 		const radioElt = form.querySelector("#queen");

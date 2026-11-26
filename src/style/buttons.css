@@ -216,11 +216,11 @@
 
 /* @style builder.save */
 .builder-save-button {
-	display: inline-grid;
-	grid-template-columns: auto auto;
 	padding-inline: 0.625rem;
+	&[data-visible="false"] {
+		display: none;
+	}
 	& > .builder-save-icon {
-		grid-area: 1 / 1;
 		display: inline-grid;
 		place-items: center;
 		& > .icon {
@@ -229,8 +229,7 @@
 		}
 	}
 	& > .builder-save-label {
-		grid-area: 1 / 2;
-		visibility: hidden;
+		display: none;
 		line-height: 1;
 		transform: translateY(1px);
 	}
@@ -241,7 +240,7 @@
 			visibility: visible;
 		}
 		& > .builder-save-label[data-state="saved"] {
-			visibility: visible;
+			display: inline;
 		}
 	}
 	&[data-saved="false"]:not([aria-busy="true"]) {
@@ -262,7 +261,7 @@
 			visibility: visible;
 		}
 		& > .builder-save-label[data-state="unsaved"] {
-			visibility: visible;
+			display: inline;
 		}
 	}
 	&[aria-busy="true"] {
@@ -273,7 +272,7 @@
 			visibility: visible;
 		}
 		& > .builder-save-label[data-state="saving"] {
-			visibility: visible;
+			display: inline;
 		}
 	}
 }
