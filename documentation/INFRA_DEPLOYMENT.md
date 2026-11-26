@@ -15,8 +15,14 @@ use one reviewed source/build generation.
    missing, incomplete, corrupt, non-production, or stale;
 3. source and artifact manifest validation for one complete production build;
 4. PWA manifest update;
-5. Datastore index deployment when requested; and
+5. Datastore index deployment and readiness checks when requested; and
 6. `gcloud app deploy` with the generated descriptor.
+
+Managed installs, updates, and upgrades submit `index.yaml` and wait for Google
+to report every declared index as `READY` before deploying the app. The installer
+shows the ready count while it waits. A failed index or a six-hour timeout stops
+deployment. Inspect the target project's Datastore Indexes page, then rerun
+`./setup.sh update` once the issue is resolved. Existing ready indexes are reused.
 
 When `SENTRY_AUTH_TOKEN` is set, production source maps are generated, uploaded,
 and removed from static output. Without it, no source maps or upload plugins are

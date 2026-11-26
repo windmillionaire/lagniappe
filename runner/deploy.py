@@ -19,6 +19,7 @@ from config import (
     _atomic_write_text,
     verify_generation_manifest,
 )
+from runner.datastore_indexes import wait_for_indexes
 from runner.frontend_bundle import sync as install_frontend_bundle
 from runner.frontend_build import (
     FilesystemFrontendBuildReader,
@@ -340,17 +341,20 @@ def update_manifest(
             icon["src"] = f"{base_src}?v={image_version}"
 
 
-def _deploy_app_yaml(file_ref, quiet=False, *, capture_output=False):
-    command = [GCLOUD_CLI or "gcloud", "app", "deploy", str(file_ref.value)]
-    if quiet:
-        command.append("--quiet")
+def _deploy_project_args() -> list[str]:
     project = str(
         SETTINGS.APP.get("GOOGLE_CLOUD_PROJECT")
         or (getattr(SETTINGS, "GCLOUD_CONFIG", {}) or {}).get("PROJECT")
         or ""
     ).strip()
-    if project:
-        command.extend(["--project", project])
+    return ["--project", project] if project else []
+
+
+def _deploy_app_yaml(file_ref, quiet=False, *, capture_output=False):
+    command = [GCLOUD_CLI or "gcloud", "app", "deploy", str(file_ref.value)]
+    if quiet:
+        command.append("--quiet")
+    command.extend(_deploy_project_args())
     result = run_command(
         command,
         check=False,
@@ -443,6 +447,7 @@ def deploy(
             quiet=quiet,
             capture_output=capture_output,
         )
+        wait_for_indexes(File.INDEX_YAML.load(), _deploy_project_args())
 
     if announce_progress:
         print("Deploying app...")

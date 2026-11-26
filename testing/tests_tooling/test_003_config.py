@@ -1784,7 +1784,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
     (app_dir / "main.py").write_text("")
     (app_dir / "requirements.txt").write_text("flask==3.1.3\n")
     (app_dir / "package.json").write_text(json.dumps({"version": "1.23"}))
-    (app_dir / "index.yaml").write_text("indexes: []\n")
+    (app_dir / "index.yaml").write_text("indexes: [{kind: tasks, properties: [{name: due}]}]\n")
     (app_dir / "lagniappe.yaml").write_text("runtime: python314\n")
     (config_source_dir / "constants.py").write_text(
         'BUILD_ID = "b1111111"\nINDEX_YAML = {"indexes": []}\n',
@@ -1875,8 +1875,18 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
             ),
         )
 
+        from runner import datastore_indexes
+
+        list_indexes = ["gcloud", "datastore", "indexes", "list", "--project", "demo-project", "--format=json"]
+
         def fake_run_command(command, **kwargs):
             commands.append((command, kwargs))
+            if command == list_indexes:
+                rows = [{
+                    "kind": "tasks", "ancestor": "NONE", "state": "READY",
+                    "properties": [{"name": "due", "direction": "ASCENDING"}],
+                }]
+                return subprocess.CompletedProcess(command, 0, stdout=json.dumps(rows))
             if command == ["npm", "run", "build"]:
                 package_json = json.loads(
                     (app_dir / "package.json").read_text(encoding="utf-8")
@@ -1885,6 +1895,8 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
                 frontend_build_id["value"] = "b7654321"
             return subprocess.CompletedProcess(command, 0)
 
+        monkeypatch.setattr(datastore_indexes, "GCLOUD_CLI", None)
+        monkeypatch.setattr(datastore_indexes, "run_command", fake_run_command)
         monkeypatch.setattr(deploy_module, "run_command", fake_run_command)
 
         assert deploy_app(
@@ -1920,6 +1932,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
                 ],
                 {"check": False, "capture_output": True},
             ),
+            (list_indexes, {}),
             (
                 [
                     "gcloud",

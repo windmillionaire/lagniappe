@@ -4064,7 +4064,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     deploy.deploy_to_app_engine()
 
     assert capsys.readouterr().out == (
-        "Deploying App Engine indexes and the application may take up to 10 minutes.\n"
+        "The application will deploy once all required Datastore indexes are ready.\n"
         "✓ Deployment complete\n"
     )
     assert deployment_progress == ["Deploying application"]
@@ -4092,7 +4092,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     # An upgrade started on an older checkout still calls the reloaded utils.
     utils.deploy_to_app_engine(print_final_summary=False, first_install=True)
     assert capsys.readouterr().out == (
-        "Deploying App Engine indexes and the application may take up to 10 minutes.\n"
+        "The application will deploy once all required Datastore indexes are ready.\n"
         "MCP server is ready\n"
     )
     assert deploy_commands[-1] == ("certificate", "app.example.com", {"announce_ready": True})

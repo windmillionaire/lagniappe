@@ -45,7 +45,7 @@ def deploy_to_app_engine(
 
     print(
         wrap_text(
-            "Deploying App Engine indexes and the application may take up to 10 minutes."
+            "The application will deploy once all required Datastore indexes are ready."
         )
     )
     with f.progress(
