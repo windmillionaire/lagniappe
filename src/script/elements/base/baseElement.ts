@@ -267,32 +267,6 @@ export class BaseElement {
 			: this.submission;
 	}
 
-	_ensureEditButton(label: Element) {
-		if (label.querySelector("[data-role='edit']")) return;
-		const button = document.createElement("button");
-		button.type = "button";
-		button.dataset.role = "edit";
-		button.ariaLabel = `Edit ${this.label}`;
-		button.title = `Edit ${this.label}`;
-		button.className = `group-data-[mode=edit]/element:hidden ${STYLES.form.icon}`;
-		setIcon(
-			button.appendChild(document.createElement("span")),
-			"edit",
-			"icon-xs",
-		);
-		const editText = button.appendChild(document.createElement("span"));
-		editText.textContent = "Edit";
-
-		const firstAction = label.querySelector(
-			"[data-role='history-fill'], [data-role='clear'], [data-role='close']",
-		);
-		if (firstAction) {
-			label.insertBefore(button, firstAction);
-		} else {
-			label.appendChild(button);
-		}
-	}
-
 	refreshRead(): HTMLElement | null {
 		if (this.readonly || this.schema.type === "table") return null;
 		const elt = this._elt;
@@ -319,14 +293,6 @@ export class BaseElement {
 			existingRead.replaceWith(nextRead);
 		} else {
 			elt.appendChild(nextRead);
-		}
-
-		const label =
-			elt.dataset?.role === "label"
-				? elt
-				: elt.querySelector("[data-role='label']");
-		if (label) {
-			this._ensureEditButton(label);
 		}
 
 		return nextRead;
@@ -367,9 +333,6 @@ export class BaseElement {
 			read.dataset.role = "read";
 			if (!this.readonly && this.hasSubmission) {
 				read.classList.add("cursor-pointer", "transition-colors");
-				if (label) {
-					this._ensureEditButton(label);
-				}
 			} else if (this.readonly) {
 				elt.classList.add("flex", "flex-col", "gap-1");
 			}
@@ -392,22 +355,6 @@ export class BaseElement {
 			);
 			const clearText = clearButton.appendChild(document.createElement("span"));
 			clearText.textContent = "Clear";
-
-			const closeButton = label.appendChild(document.createElement("button"));
-			closeButton.type = "button";
-			closeButton.dataset.role = "close";
-			closeButton.dataset.kind = "default";
-			closeButton.ariaLabel = `Close ${this.label}`;
-			closeButton.title = `Close ${this.label}`;
-			closeButton.hidden = !this.hasSubmission;
-			closeButton.className = `group-data-[mode=read]/element:hidden ${STYLES.form.icon}`;
-			setIcon(
-				closeButton.appendChild(document.createElement("span")),
-				"x",
-				"icon-xs text-delete-default",
-			);
-			const closeText = closeButton.appendChild(document.createElement("span"));
-			closeText.textContent = "Close";
 		}
 
 		elt._lp_element = this;

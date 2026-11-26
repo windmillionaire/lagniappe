@@ -51,12 +51,7 @@ export class PagePhoto extends BaseUpload {
 		this.inputName = "page-photo";
 		this.uploadType = "image";
 		this.aiCreate = this.target.dataset.aiCreate === "true";
-		this.menuOptions = [
-			"remove",
-			"replace",
-			...(this.aiCreate ? ["generate" as const] : []),
-			"paste",
-		];
+		this.menuOptions = this.dropzone.containsImage ? [] : ["paste"];
 		this.uploadMenu = new UploadMenu(this);
 		this.generateForm = this.aiCreate ? sections.generateImageForm() : null;
 		this.submitGroup = this.generateForm?.submitGroup;
@@ -147,6 +142,7 @@ export class PagePhoto extends BaseUpload {
 		this.dropzone = uploadElement.dropzone({
 			element: newDropzone,
 		});
+		this.menuOptions = this.dropzone.containsImage ? [] : ["paste"];
 		this.uploadMenu.destroy();
 		this.uploadMenu = new UploadMenu(this);
 

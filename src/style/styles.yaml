@@ -1303,12 +1303,35 @@ nav:
       surfaces: [server]
       hooks: [nav-search-input]
       css: [src/style/navigation.css]
-    clear:
+    clearButton:
       classes: nav-search-clear absolute right-1 z-10 inline-grid size-6 cursor-pointer place-items-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-page-default
       intent: inline clear button inside the navbar search input
       surfaces: [server]
       hooks: [nav-search-clear]
       css: [src/style/navigation.css]
+  menu:
+    trigger:
+      classes: group/navmenu inline-flex h-10 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-white transition-colors hover:bg-white/15 aria-expanded:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+      intent: top-left navbar menu trigger pairing site logo and chevron to open the workspace directory
+      surfaces: [server]
+    chevron:
+      classes: icon-sm text-white/90 transition-transform duration-150 group-aria-expanded/navmenu:rotate-180
+      intent: rotating chevron indicator next to the site logo in the navbar menu trigger
+      surfaces: [server]
+      hooks: [icon-sm]
+      css: [src/style/icons.css]
+    panel:
+      classes: absolute left-0 top-full z-50 mt-2 w-60 rounded-lg border border-base-light bg-white p-1.5 shadow-lg
+      intent: dropdown panel for the global workspace navigation menu
+      surfaces: [server]
+    item:
+      classes: flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-semibold text-base-dark transition-colors hover:bg-kind-bg hover:text-kind-dark focus-visible:bg-kind-bg focus-visible:text-kind-dark focus-visible:outline-none
+      intent: link or action item inside the global workspace navigation menu
+      surfaces: [server]
+    divider:
+      classes: my-1.5 border-t border-base-light/60
+      intent: horizontal separator grouping sections inside the global navigation menu
+      surfaces: [server]
 
 radio:
   default:
@@ -1726,7 +1749,7 @@ upload:
     intent: header presentation within upload
     surfaces: [frontend]
   dropzone:
-    classes: relative flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic
+    classes: relative flex min-h-24 w-full cursor-pointer select-none flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic transition-colors hover:border-kind-default/70 hover:bg-kind-bg/30
     intent: dropzone presentation within upload
     surfaces: [frontend]
   chip:
@@ -1735,7 +1758,7 @@ upload:
     surfaces: [frontend]
   image:
     container:
-      classes: relative aspect-square rounded-lg p-4 outline-2 outline-base-light outline-dashed
+      classes: relative aspect-square cursor-pointer select-none rounded-lg p-4 outline-2 outline-base-light outline-dashed transition-colors hover:outline-kind-default hover:bg-kind-bg/30
       intent: container presentation within upload image
       surfaces: [server]
     text:
@@ -1746,3 +1769,32 @@ upload:
       classes: text-4xl mb-4 text-kind-default text-center
       intent: icon presentation within upload image
       surfaces: [server]
+
+page:
+  rename:
+    form:
+      classes: inline-flex min-w-0 max-w-full flex-row items-center align-baseline
+      intent: inline rename form replacing the page title span
+      surfaces: [frontend]
+    input:
+      classes: w-80 max-w-full -mb-px border-b border-dashed border-base-medium bg-transparent p-0 font-bold text-base-dark focus:border-page-default focus:outline-none
+      intent: inline dashed-underline text input for renaming a page matching builder and task rename
+      surfaces: [frontend]
+  description:
+    editor:
+      classes: mt-4 flex w-full flex-col gap-2 rounded-md border border-kind-default bg-white p-3 shadow-xs
+      intent: inline header editor for adding or editing a page description
+      surfaces: [frontend]
+    actions:
+      classes: flex flex-row items-center justify-end gap-2
+      intent: action button row inside the inline page description editor
+      surfaces: [frontend]
+    save:
+      classes: inline-flex cursor-pointer items-center justify-center rounded-md bg-kind-default px-3 py-1.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50
+      intent: compact primary save button inside the inline page description editor
+      surfaces: [frontend]
+  photo:
+    chip:
+      classes: inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/70 bg-white px-2.5 py-1.5 text-sm font-semibold text-base-dark shadow-xs transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50
+      intent: labeled image action chip inside the page info header bar
+      surfaces: [server, frontend]

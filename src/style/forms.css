@@ -177,12 +177,10 @@ input[role="combobox"] {
 
 	&
 		label:has(
-			:is(
-					[data-role="edit"],
-					[data-role="history-fill"],
-					[data-role="clear"],
-					[data-role="close"]
-				):is(:hover, :focus-visible)
+			:is([data-role="history-fill"], [data-role="clear"]):is(
+					:hover,
+					:focus-visible
+				)
 		) {
 		& :where(.form-input:not(:disabled)) {
 			outline: 0.5px solid var(--color-base-light);
@@ -234,9 +232,8 @@ button[lp-select]:disabled {
 }
 
 /* @style form.submission.default form.submission.grows */
-.form-element[data-mode="read"]:has([data-role="edit"]) {
-	& > .submission-outline:hover,
-	&:has([data-role="edit"]:is(:hover, :focus-visible)) > .submission-outline {
+.form-element[data-mode="read"] {
+	& > .submission-outline.cursor-pointer:hover {
 		background-color: white;
 		outline-color: var(--kind-default);
 		outline-width: 2px;

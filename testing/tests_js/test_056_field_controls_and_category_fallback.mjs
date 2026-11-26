@@ -180,25 +180,27 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 		assert.equal(form.querySelector("[data-role='edit-all']"), null);
 		assert.equal(form.querySelector("[data-role='edit-all-bar']"), null);
 
-		// Edit action lives in the label row with the existing 'edit' icon, divider hook, and full-width read box.
+		// No redundant per-field Edit or Close actions; read-mode value box spans full width and opens on click.
 		const nameElt = form.querySelector("#name");
-		const editBtn = nameElt.querySelector(
-			"[data-role='label'] [data-role='edit']",
-		);
-		assert.ok(editBtn, "Edit button should live inside the label row");
-		assert.equal(editBtn.getAttribute("aria-label"), "Edit Name");
-		assert.ok(editBtn.textContent.includes("Edit"));
-		assert.ok(editBtn.classList.contains("form-field-action"));
 		assert.equal(
-			editBtn.querySelector("[data-icon]")?.dataset.icon,
-			"edit",
-			"Edit button must keep the existing edit icon",
+			nameElt.querySelector("[data-role='label'] [data-role='edit']"),
+			null,
+			"Edit button should be omitted in favor of direct click-to-edit",
+		);
+		assert.equal(
+			nameElt.querySelector("[data-role='label'] [data-role='close']"),
+			null,
+			"Close button should be omitted from form field labels",
 		);
 		const nameRead = nameElt.querySelector("[data-role='read']");
 		assert.equal(nameElt.querySelector("[data-role='read-row']"), null);
 		assert.ok(
 			nameRead.classList.contains("w-full"),
 			"Read-mode value box should span full width",
+		);
+		assert.ok(
+			nameRead.classList.contains("cursor-pointer"),
+			"Read-mode value box should advertise click-to-edit",
 		);
 
 		// Table and Todo header actions also live inside [data-role='label'] with divider hook.
@@ -222,7 +224,7 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 		await flush();
 		assert.equal(emailElt.dataset.mode, "read");
 
-		// Clicking the read value box switches into edit mode and exposes Clear (clear icon) and Close (x icon).
+		// Clicking the read value box switches into edit mode and exposes Clear (clear icon) without Close.
 		nameRead.dispatchEvent(
 			new MouseEvent("click", { bubbles: true, cancelable: true }),
 		);
@@ -231,91 +233,43 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 		const nameClear = nameElt.querySelector(
 			"[data-role='label'] [data-role='clear']",
 		);
-		const nameClose = nameElt.querySelector(
-			"[data-role='label'] [data-role='close']",
-		);
 		assert.ok(nameClear);
-		assert.ok(nameClose);
 		assert.ok(nameClear.classList.contains("form-field-action"));
-		assert.ok(nameClose.classList.contains("form-field-action"));
 		assert.equal(nameClear.dataset.kind, "default");
-		assert.equal(nameClose.dataset.kind, "default");
 		assert.equal(
 			nameClear.querySelector("[data-icon]")?.dataset.icon,
 			"clear",
 			"Form element Clear should use the same clear icon as select clear",
 		);
-		assert.equal(
-			nameClose.querySelector("[data-icon]")?.dataset.icon,
-			"x",
-			"Form element Close should use the x icon",
-		);
 		assert.equal(nameClear.hidden, false);
-		assert.equal(nameClose.hidden, false);
 
-		// Editing and clicking Close returns to the updated read view.
+		// Clearing empties the input and hides Clear.
 		const nameInput = nameElt.querySelector("input");
 		nameInput.value = "Hive 2";
 		nameInput.dispatchEvent(new Event("input", { bubbles: true }));
-		nameClose.click();
-		await flush();
-		assert.equal(nameElt.dataset.mode, "read");
-		assert.equal(
-			nameElt.querySelector("[data-role='read']")?.textContent,
-			"Hive 2",
-		);
-
-		// Re-opening edit mode and clearing empties the input and hides both Clear and Close.
-		nameElt
-			.querySelector("[data-role='read']")
-			.dispatchEvent(
-				new MouseEvent("click", { bubbles: true, cancelable: true }),
-			);
-		await flush();
-		assert.equal(nameElt.dataset.mode, "edit");
 		assert.equal(nameClear.hidden, false);
-		assert.equal(nameClose.hidden, false);
 		nameClear.click();
 		assert.equal(nameInput.value, "");
 		assert.equal(nameClear.hidden, true);
-		assert.equal(nameClose.hidden, true);
 
-		// Initially-empty radio gets hidden Clear and Close actions that appear once an option is chosen;
-		// Close returns a read view with an Edit action, and Clear hides both.
+		// Initially-empty radio gets a hidden Clear action that appears once an option is chosen and hides again on Clear.
 		const radioElt = form.querySelector("#queen");
 		const radioClear = radioElt.querySelector(
 			"[data-role='label'] [data-role='clear']",
 		);
-		const radioClose = radioElt.querySelector(
-			"[data-role='label'] [data-role='close']",
-		);
 		assert.ok(radioClear);
-		assert.ok(radioClose);
+		assert.equal(
+			radioElt.querySelector("[data-role='label'] [data-role='close']"),
+			null,
+		);
 		assert.equal(radioClear.hidden, true);
-		assert.equal(radioClose.hidden, true);
 		const yesRadio = radioElt.querySelector("input[type='radio'][value='yes']");
 		yesRadio.checked = true;
 		yesRadio.dispatchEvent(new Event("change", { bubbles: true }));
 		assert.equal(radioClear.hidden, false);
-		assert.equal(radioClose.hidden, false);
-		radioClose.click();
-		await flush();
-		assert.equal(radioElt.dataset.mode, "read");
-		assert.equal(
-			radioElt.querySelector("[data-role='read']")?.textContent,
-			"Yes",
-		);
-		assert.ok(
-			radioElt.querySelector("[data-role='label'] [data-role='edit']"),
-			"Closing an initially-empty field with a value should expose Edit",
-		);
-		radioElt.querySelector("[data-role='label'] [data-role='edit']").click();
-		await flush();
-		assert.equal(radioElt.dataset.mode, "edit");
 		radioClear.click();
 		assert.equal(yesRadio.checked, false);
 		assert.equal(radioClear.hidden, true);
-		assert.equal(radioClose.hidden, true);
 
 		// History fill stays lazy, sits before Clear in the label row, and restores value.
 		let resolveHistory;
@@ -352,9 +306,10 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 			form.querySelector("#varroa [data-role='read']")?.textContent,
 			"1.2",
 		);
-		assert.ok(
+		assert.equal(
 			form.querySelector("#varroa [data-role='label'] [data-role='edit']"),
-			"Restored field should expose Edit in its label row",
+			null,
+			"Restored field should rely on click-to-edit without an Edit button",
 		);
 	} finally {
 		widget.destroy();

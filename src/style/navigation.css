@@ -186,9 +186,21 @@ nav:has(> [data-role="actions"]) > [data-role="actions"] {
 	appearance: none;
 }
 
-/* @style nav.search.clear */
+/* @style nav.search.clearButton */
 .nav-search-clear[data-visible="false"] {
 	display: none;
+}
+
+/* @style entity.description */
+[data-role="description"][data-editable="true"] {
+	cursor: pointer;
+	transition:
+		outline-color 120ms ease,
+		background-color 120ms ease;
+	&:hover,
+	&:focus-visible {
+		outline: 1px solid var(--kind-default);
+	}
 }
 
 /* @style task.buttons */

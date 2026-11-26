@@ -163,7 +163,7 @@ export class PageForm extends FormWidget {
 		} else if (imageControls) {
 			this.view?._syncPhotoControls?.(undefined, imageControls);
 		}
-		return [imageControls, this.nameElement, this.descriptionElement];
+		return [imageControls];
 	}
 
 	get append() {

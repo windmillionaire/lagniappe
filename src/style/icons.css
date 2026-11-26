@@ -313,6 +313,7 @@ button.tab-icon .icon {
 	--icon-size: var(--icon-xs-glyph-size);
 }
 
+/* @style nav.menu.chevron */
 .icon.icon-sm {
 	--icon-box-size: var(--icon-sm-box-size);
 	--icon-size: var(--icon-sm-glyph-size);

@@ -2,28 +2,98 @@
   <div data-role="photo-prompt"
        data-visible="true"
        class="flex flex-col gap-2">
-    <div class="inline-flex min-h-10 w-fit overflow-hidden rounded-md border border-base-light/50 bg-white text-base-dark shadow-sm">
-      <span class="grid w-9 place-items-center border-r border-base-light/50 bg-base-bg text-kind-default"
-            aria-hidden="true">{{ render_icon("image") }}</span>
-      <button type="button"
-              data-role="photo-upload"
-              title="{{ 'Hide page image' if has_image else 'Upload page image' }}"
-              aria-label="{{ 'Hide page image' if has_image else 'Upload page image' }}"
-              aria-controls="photo"
-              aria-expanded="{{ has_image|yesno }}"
-              class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
-        {{ render_icon("visibility.visible" if has_image else "upload") }}
-      </button>
-      {% if editable and current_user.access(AI.CREATE) %}
+    <div class="flex flex-wrap items-center gap-2">
+      <div data-role="photo-empty-actions"
+           data-visible="{{ (not has_image)|yesno }}"
+           class="flex flex-wrap items-center gap-2">
         <button type="button"
-                data-role="photo-generate"
-                title="Generate page image"
-                aria-label="Generate page image"
+                data-role="photo-upload"
+                title="Upload image"
+                aria-label="Upload image"
                 aria-controls="photo"
-                class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
-          {{ render_icon("generate") }}
+                aria-expanded="false"
+                class="{{ styles.page.photo.chip }}">
+          {{ render_icon("upload", "icon-xs text-kind-default") }}
+          <span data-role="photo-upload-label">Upload<span class="hidden sm:inline"> image</span></span>
         </button>
-      {% endif %}
+        {% if editable and current_user.access(AI.CREATE) %}
+          <button type="button"
+                  data-role="photo-generate"
+                  title="Generate image"
+                  aria-label="Generate image"
+                  aria-controls="photo"
+                  class="{{ styles.page.photo.chip }}">
+            {{ render_icon("generate", "icon-xs text-kind-default") }}
+            <span>Generate<span class="hidden sm:inline"> image</span></span>
+          </button>
+        {% endif %}
+      </div>
+      <div data-role="photo-existing-actions"
+           data-visible="{{ has_image|yesno }}"
+           class="flex flex-wrap items-center gap-2">
+        <button type="button"
+                data-role="photo-toggle"
+                title="Hide image"
+                aria-label="Hide image"
+                aria-controls="photo"
+                aria-expanded="{{ has_image|yesno }}"
+                class="{{ styles.page.photo.chip }} hidden sm:inline-flex">
+          {{ render_icon("visibility.visible", "icon-xs text-kind-default") }}
+          <span data-role="photo-toggle-label">Hide image</span>
+        </button>
+        {% if editable %}
+          <span lp-menu="photo" class="inline-flex shrink-0 items-center">
+            <button type="button"
+                    data-role="menu-trigger"
+                    data-photo-menu="true"
+                    aria-label="Image actions"
+                    title="Image actions"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    class="{{ styles.page.photo.chip }}">
+              {{ render_icon("image", "icon-xs text-kind-default") }}
+              <span>Image</span>
+              {{ render_icon("menu", "icon-xs text-base-medium") }}
+            </button>
+            <span data-role="menu-items" hidden>
+              <button type="button"
+                      data-menu-item
+                      data-kind="default"
+                      data-photo-action="replace"
+                      class="{{ styles.dropdown.option.action }}">
+                {{ render_icon("replace", (styles.dropdown.icon ~ " text-kind-default")) }}
+                <span>Replace</span>
+              </button>
+              <button type="button"
+                      data-menu-item
+                      data-kind="default"
+                      data-photo-action="paste"
+                      class="{{ styles.dropdown.option.action }}">
+                {{ render_icon("paste", (styles.dropdown.icon ~ " text-kind-default")) }}
+                <span>Paste</span>
+              </button>
+              {% if current_user.access(AI.CREATE) %}
+                <button type="button"
+                        data-menu-item
+                        data-kind="page"
+                        data-photo-action="generate"
+                        class="{{ styles.dropdown.option.action }}">
+                  {{ render_icon("generate", (styles.dropdown.icon ~ " text-kind-default")) }}
+                  <span>Generate</span>
+                </button>
+              {% endif %}
+              <button type="button"
+                      data-menu-item
+                      data-kind="delete"
+                      data-photo-action="remove"
+                      class="{{ styles.dropdown.option.action }}">
+                {{ render_icon("delete", (styles.dropdown.icon ~ " text-kind-default")) }}
+                <span>Remove</span>
+              </button>
+            </span>
+          </span>
+        {% endif %}
+      </div>
     </div>
     <p data-role="photo-prompt-error"
        data-visible="false"

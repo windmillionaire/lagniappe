@@ -212,8 +212,12 @@ def _page_data(
 
     model = loaded.get(category.urlsafe_key) if category else None
     page_data: PageData = {
-        "name": form.get("name"),
-        "description": form.get("description"),
+        "name": form.get("name") if "name" in form else (page.name if page else None),
+        "description": (
+            form.get("description")
+            if "description" in form
+            else (page.description if page else None)
+        ),
         "email": form.get("email"),
         "categories": categories,
         "form": selected_form,
@@ -456,6 +460,16 @@ def patch(
         field = page.properties[schema_id]
         if not isinstance(field, Property) or not field.editable:
             return responses.error("Field cannot be edited")
+        if schema_id == "name":
+            cleaned_name = str(value or "").strip()
+            if not cleaned_name:
+                return responses.error("Page name cannot be empty.")
+            value = cleaned_name
+        if schema_id == "name" and page.user:
+            try:
+                page.update_user({"name": value}, user=current_user)
+            except PermissionError:
+                abort(403)
         field.value = value
     else:
         field = page.properties.submission.fields.get(schema_id)

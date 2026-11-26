@@ -11,7 +11,6 @@
 {% import 'home/tasks.html' as tasks %}
 {% import 'home/starred.html' as starred %}
 {% import 'home/notes.html' as notes %}
-{% import 'home/directory.html' as directory %}
 
 {% macro links() %}
   <div class="{{ styles.home.section }}">
@@ -56,26 +55,6 @@
           data-visible="false"
           data-route='{{ url_for("internal.get", kind="starred") }}'>
       </ul>
-    </div>
-    <div id="directory"
-         loaded
-         lp-component
-         data-open="false"
-         data-kind="page"
-         data-persistent="true"
-         class="{{ styles.home.component }}">
-      <button type="button"
-              lp-show="directory:DirectoryList"
-              data-toggle="true"
-              aria-expanded="false"
-              class="{{ styles.home.toggle }}">
-        <span class="{{ styles.home.toggleLabel }}">
-          {{ render_icon("directory", styles.icon.default) }}
-          <span>Directory</span>
-        </span>
-        {{ render_icon("down", styles.home.expandIndicator) }}
-      </button>
-      {{ directory.list() }}
     </div>
     <a href='{{ url_for("manual.index") }}'
        data-kind="page"

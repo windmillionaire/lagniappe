@@ -120,7 +120,7 @@ def _select_page_option(select, page):
 def _clear_signature(form, field_id=SIGNATURE_FIELD_ID):
     field = _signature_field(form, field_id)
     if field.get_attribute("data-mode") == "read":
-        field.locator("[data-role='edit']").click()
+        field.locator("[data-role='read']").click()
         expect(field).to_have_attribute("data-mode", "edit")
 
     field.locator("[data-role='clear']").click()

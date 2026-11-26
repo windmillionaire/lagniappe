@@ -296,6 +296,7 @@ export class UserSettings extends FormWidget {
 			name,
 		).elt;
 		if (!field) return null;
+		field.querySelector("[data-role='label'] [data-role='clear']")?.remove();
 		const input =
 			field instanceof HTMLInputElement ? field : field.querySelector("input");
 		if (input) input.value = name;

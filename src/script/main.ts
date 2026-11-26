@@ -393,11 +393,90 @@ async function startAuthenticatedLifecycle() {
 	updateUserData();
 }
 
+function installNavMenu() {
+	const setOpen = (menu: HTMLElement, open: boolean) => {
+		const trigger = menu.querySelector<HTMLButtonElement>(
+			"[data-role='nav-menu-trigger']",
+		);
+		const panel = menu.querySelector<HTMLElement>(
+			"[data-role='nav-menu-panel']",
+		);
+		if (!trigger || !panel) return;
+		panel.hidden = !open;
+		trigger.setAttribute("aria-expanded", String(open));
+	};
+
+	const closeOpenMenus = () => {
+		document
+			.querySelectorAll<HTMLElement>("[data-role='nav-menu']")
+			.forEach((menu) => {
+				setOpen(menu, false);
+			});
+	};
+
+	document.addEventListener("click", (event) => {
+		const target = event.target instanceof Element ? event.target : null;
+		const trigger = target?.closest<HTMLButtonElement>(
+			"[data-role='nav-menu-trigger']",
+		);
+		if (trigger) {
+			const menu = trigger.closest<HTMLElement>("[data-role='nav-menu']");
+			const panel = menu?.querySelector<HTMLElement>(
+				"[data-role='nav-menu-panel']",
+			);
+			if (!menu || !panel) return;
+			event.preventDefault();
+			event.stopPropagation();
+			const opening = Boolean(panel.hidden);
+			closeOpenMenus();
+			setOpen(menu, opening);
+			return;
+		}
+		if (!target?.closest("[data-role='nav-menu']")) {
+			closeOpenMenus();
+		}
+	});
+
+	document.addEventListener("keydown", (event) => {
+		const openPanel = document.querySelector<HTMLElement>(
+			"[data-role='nav-menu-panel']:not([hidden])",
+		);
+		if (!openPanel) return;
+		const menu = openPanel.closest<HTMLElement>("[data-role='nav-menu']");
+		const trigger = menu?.querySelector<HTMLButtonElement>(
+			"[data-role='nav-menu-trigger']",
+		);
+		if (event.key === "Escape") {
+			event.preventDefault();
+			if (menu) setOpen(menu, false);
+			trigger?.focus();
+			return;
+		}
+		if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+		const items = Array.from(
+			openPanel.querySelectorAll<HTMLElement>("[role='menuitem']"),
+		);
+		if (!items.length) return;
+		event.preventDefault();
+		const current = items.indexOf(document.activeElement as HTMLElement);
+		let next = 0;
+		if (event.key === "ArrowDown") {
+			next = current < 0 ? 0 : (current + 1) % items.length;
+		} else if (event.key === "ArrowUp") {
+			next = current <= 0 ? items.length - 1 : current - 1;
+		} else if (event.key === "End") {
+			next = items.length - 1;
+		}
+		items[next]?.focus();
+	});
+}
+
 export function initialize() {
 	if (window.__INITIALIZED__) return;
 	window.__INITIALIZED__ = true;
 	setTestMode();
 	installUpstreamUnavailableBanner();
+	installNavMenu();
 	const mode = pageMode();
 	// Registration is fire-and-forget, but the controller/cache boundary is
 	// foundational infrastructure. Establish it before view startup instead of

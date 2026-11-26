@@ -18,6 +18,7 @@
 {% set view_permissions = Resource.USER.allowed(Action.PERMISSIONS) %}
 {% set can_view_user_settings = page.user and (is_own_page or view_permissions) %}
 {% set can_edit_page = page.allowed(Action.EDIT) %}
+{% set can_rename_page = can_edit_page and (not page.user or is_owner_viewer or not page.user.is_admin) %}
 {% set has_document = page.get_asset('document') %}
 {% set render_document = has_document or can_edit_page %}
 {% set has_image = page.image and not is_public_own_page %}
@@ -48,6 +49,10 @@
         {#- Prevent indentation from becoming leading inline title space. -#}
         <span data-role="title">{{- page.name -}}</span>
         {% call menus.title("Page actions") %}
+          {% if can_rename_page %}{{ menus.page_action("Rename", "edit", "rename", "page") }}{% endif %}
+          {% if can_edit_page %}
+            {{ menus.page_action("Edit description" if page.description else "Add description", "textarea", "description", "page", "description-action-label") }}
+          {% endif %}
           {{ menus.star(is_starred(page)) }}
           {% if can_edit_page %}{{ menus.show("Add note", "notes", "page-notes:CreateNote", "note") }}{% endif %}
           {% if page.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
@@ -186,16 +191,16 @@
        data-focus-task="{{ focus_task.urlsafe_key if focus_task else '' }}"
        data-secondary="{{ has_image|yesno }}"
        data-has-image="{{ has_image|yesno }}"
+       data-can-rename="{{ can_rename_page|yesno }}"
+       data-can-edit="{{ can_edit_page|yesno }}"
        class="group/view {{ 'max-w-5xl mx-auto' if not has_image else 'max-w-7xl mx-auto' }}"
        data-readonly="{{ page.readonly|yesno }}">
     <div class="{{ styles.layout.view.header }}">
       {{ view_header(page) }}
       <div data-role="description"
-           class="{{ styles.entity.description }} hidden sm:flex">
-        {%- if page.description -%}
-          <span>{{- page.description -}}</span>
-        {%- endif -%}
-      </div>
+           data-editable="{{ can_edit_page|yesno }}"
+           {% if can_edit_page %}title="Click to edit description"{% endif %}
+           class="{{ styles.entity.description }}">{%- if page.description -%}<span>{{- page.description -}}</span>{%- endif -%}</div>
       {{ notes_section(page) }}
     </div>
     {{ mobile_nav(page, has_image) }}

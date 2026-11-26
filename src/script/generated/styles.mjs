@@ -396,7 +396,14 @@ const STYLES = {
     "search": {
       "icon": "nav-search-icon pointer-events-none text-slate-400 absolute left-1.5 mr-1 z-10",
       "input": "nav-search-input sm:text-sm rounded-md pl-8 pr-7 h-8 w-48 sm:w-64 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
-      "clear": "nav-search-clear absolute right-1 z-10 inline-grid size-6 cursor-pointer place-items-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-page-default"
+      "clearButton": "nav-search-clear absolute right-1 z-10 inline-grid size-6 cursor-pointer place-items-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-page-default"
+    },
+    "menu": {
+      "trigger": "group/navmenu inline-flex h-10 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-white transition-colors hover:bg-white/15 aria-expanded:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+      "chevron": "icon-sm text-white/90 transition-transform duration-150 group-aria-expanded/navmenu:rotate-180",
+      "panel": "absolute left-0 top-full z-50 mt-2 w-60 rounded-lg border border-base-light bg-white p-1.5 shadow-lg",
+      "item": "flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-semibold text-base-dark transition-colors hover:bg-kind-bg hover:text-kind-dark focus-visible:bg-kind-bg focus-visible:text-kind-dark focus-visible:outline-none",
+      "divider": "my-1.5 border-t border-base-light/60"
     }
   },
   "radio": {
@@ -525,12 +532,26 @@ const STYLES = {
     "context": "pt-4 border-t flex flex-col gap-2 outline-base-light bg-white",
     "contextRow": "flex flex-col sm:flex-row gap-3",
     "header": "text-lg font-bold pt-2 pb-1 text-kind-default",
-    "dropzone": "relative flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic",
+    "dropzone": "relative flex min-h-24 w-full cursor-pointer select-none flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic transition-colors hover:border-kind-default/70 hover:bg-kind-bg/30",
     "chip": "not-italic inline-flex cursor-pointer items-center gap-1 rounded-md border border-base-light/60 bg-white/90 px-2.5 py-1 text-xs font-semibold text-base-default shadow-xs backdrop-blur-xs transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
     "image": {
-      "container": "relative aspect-square rounded-lg p-4 outline-2 outline-base-light outline-dashed",
+      "container": "relative aspect-square cursor-pointer select-none rounded-lg p-4 outline-2 outline-base-light outline-dashed transition-colors hover:outline-kind-default hover:bg-kind-bg/30",
       "text": "absolute top-0 right-0 w-full h-full flex flex-col items-center justify-center",
       "icon": "text-4xl mb-4 text-kind-default text-center"
+    }
+  },
+  "page": {
+    "rename": {
+      "form": "inline-flex min-w-0 max-w-full flex-row items-center align-baseline",
+      "input": "w-80 max-w-full -mb-px border-b border-dashed border-base-medium bg-transparent p-0 font-bold text-base-dark focus:border-page-default focus:outline-none"
+    },
+    "description": {
+      "editor": "mt-4 flex w-full flex-col gap-2 rounded-md border border-kind-default bg-white p-3 shadow-xs",
+      "actions": "flex flex-row items-center justify-end gap-2",
+      "save": "inline-flex cursor-pointer items-center justify-center rounded-md bg-kind-default px-3 py-1.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
+    },
+    "photo": {
+      "chip": "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/70 bg-white px-2.5 py-1.5 text-sm font-semibold text-base-dark shadow-xs transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
     }
   }
 };

@@ -108,16 +108,141 @@
   {%- endif -%}
 {% endmacro %}
 
+{% macro nav_menu() %}
+  <div data-role="nav-menu" class="relative inline-flex items-center">
+    <button type="button"
+            data-role="nav-menu-trigger"
+            class="{{ styles.nav.menu.trigger }}"
+            aria-label="Navigation menu"
+            title="Navigation menu"
+            aria-haspopup="menu"
+            aria-expanded="false">
+      <img class="h-8 w-8 rounded-sm"
+           src="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}"
+           alt=""
+           width="32"
+           height="32">
+      {{ render_icon("menu", styles.nav.menu.chevron) }}
+    </button>
+    <div data-role="nav-menu-panel"
+         role="menu"
+         aria-label="Workspace directory"
+         hidden
+         class="{{ styles.nav.menu.panel }}">
+      <a href="{{ url_for('home.home_page') }}"
+         role="menuitem"
+         data-kind="page"
+         class="{{ styles.nav.menu.item }}">
+        {{ render_icon("home", styles.icon.default) }}
+        <span>Home</span>
+      </a>
+      {% if current_user.page %}
+        <a href="{{ url_for('pages.view', key=current_user.page.urlsafe_key) }}"
+           role="menuitem"
+           data-kind="user"
+           class="{{ styles.nav.menu.item }}">
+          {{ render_icon("user", styles.icon.default) }}
+          <span>My Page</span>
+        </a>
+      {% endif %}
+      <div role="separator" class="{{ styles.nav.menu.divider }}"></div>
+      {% if not current_user.is_public %}
+        <a href="{{ url_for('messages.index') }}"
+           role="menuitem"
+           data-kind="user"
+           class="{{ styles.nav.menu.item }}">
+          {{ render_icon("email", styles.icon.default) }}
+          <span>Messages</span>
+        </a>
+      {% endif %}
+      <a href="{{ url_for('tasks.task_index') }}"
+         role="menuitem"
+         data-kind="task"
+         class="{{ styles.nav.menu.item }}">
+        {{ render_icon("tasks", styles.icon.default) }}
+        <span>Active Tasks</span>
+      </a>
+      {% if Resource.FORMS.allowed(Action.VIEW) %}
+        <a href="{{ url_for('forms.form_index') }}"
+           role="menuitem"
+           data-kind="form"
+           class="{{ styles.nav.menu.item }}">
+          {{ render_icon("form", styles.icon.default) }}
+          <span>Forms</span>
+        </a>
+      {% endif %}
+      {% if Resource.USERS.allowed(Action.RESTRICTED) %}
+        <a href="{{ url_for('users.user_index') }}"
+           role="menuitem"
+           data-kind="user"
+           class="{{ styles.nav.menu.item }}">
+          {{ render_icon("group", styles.icon.default) }}
+          <span>Users</span>
+        </a>
+      {% endif %}
+      {% if (CONFIG.ANALYTICS or CONFIG.AI_OBSERVABILITY) and Resource.SITE.allowed(Action.EDIT) %}
+        <a href="{{ url_for('analytics.index') }}"
+           role="menuitem"
+           data-kind="page"
+           class="{{ styles.nav.menu.item }}">
+          {{ render_icon("analytics", styles.icon.default) }}
+          <span>Analytics</span>
+        </a>
+      {% endif %}
+      {% if Resource.SITE.allowed(Action.EDIT) %}
+        <a href="{{ url_for('home.admin') }}"
+           role="menuitem"
+           data-kind="default"
+           class="{{ styles.nav.menu.item }}">
+          {{ render_icon("siteSettings", styles.icon.default) }}
+          <span>Admin</span>
+        </a>
+      {% endif %}
+      <a href="{{ url_for('manual.index') }}"
+         role="menuitem"
+         data-kind="page"
+         class="{{ styles.nav.menu.item }}">
+        {{ render_icon("manual", styles.icon.default) }}
+        <span>Manual</span>
+      </a>
+      <div role="separator" class="{{ styles.nav.menu.divider }}"></div>
+      {% if current_user.page %}
+        <a href="{{ url_for('pages.view', key=current_user.page.urlsafe_key, tab='user-settings') }}"
+           role="menuitem"
+           data-kind="user"
+           class="{{ styles.nav.menu.item }}">
+          {{ render_icon("settings.page", styles.icon.default) }}
+          <span>Account Settings</span>
+        </a>
+      {% endif %}
+      <button type="button"
+              role="menuitem"
+              data-action="logout"
+              data-route="{{ url_for('users.logout') }}"
+              data-role="sign-out"
+              data-kind="user"
+              class="{{ styles.nav.menu.item }}">
+        {{ render_icon("logout", styles.icon.default) }}
+        <span>Sign out</span>
+      </button>
+    </div>
+  </div>
+{% endmacro %}
+
 {% macro navbar(public=False) %}
   <nav class="main-nav {{ styles.nav.bar.wrapper }}">
     <div class="{{ styles.nav.bar.contents }} {{ 'max-w-7xl' if not public else 'max-w-5xl' }}">
-      <a class="{{ styles.nav.link }}" href="{{ url_for('home.home_page') }}">
-        <img class="h-8 w-8"
-             src="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}"
-             alt="logo"
-             width="32"
-             height="32">
-      </a>
+      {%- if not public and current_user.is_authenticated -%}
+        {{ nav_menu() }}
+      {%- else -%}
+        <a class="{{ styles.nav.link }}" href="{{ url_for('home.home_page') }}">
+          <img class="h-8 w-8"
+               src="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}"
+               alt="logo"
+               width="32"
+               height="32">
+        </a>
+      {%- endif -%}
       {%- if not public -%}
         <div class="flex items-center justify-end gap-4">
           {% set active_search_query = query if query is defined and query else '' %}
@@ -143,7 +268,7 @@
                       data-visible="{{ 'true' if active_search_query else 'false' }}"
                       aria-label="Clear search"
                       title="Clear search"
-                      class="{{ styles.nav.search.clear }}">
+                      class="{{ styles.nav.search.clearButton }}">
                 {{ render_icon("close", "icon-xs") }}
               </button>
             </div>
