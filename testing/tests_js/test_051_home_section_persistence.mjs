@@ -58,6 +58,7 @@ async function createHomeHarness(
 		starredCount = 0,
 		widgetLoaders = {},
 		beforeRenderCommit = null,
+		withTransition = async (callback) => callback(),
 	} = {},
 ) {
 	const dom = createBrowser(t);
@@ -222,7 +223,7 @@ async function createHomeHarness(
 				},
 			},
 			"../../src/script/shared/transitions.ts": {
-				withTransition: async (callback) => callback(),
+				withTransition,
 			},
 			"../../src/script/views/base/core.ts": { default: FakeCore },
 		},
@@ -397,6 +398,36 @@ test("test_home_persists_user_toggles_including_empty_selection_and_restores_sav
 		"false",
 	);
 	assert.equal(third.root.querySelector("#tasks").dataset.open, "false");
+});
+
+test("remembered panels become visible inside transition updates as their loads finish", async (t) => {
+	const projects = deferred();
+	const directoryOpened = deferred();
+	const opened = (root) =>
+		Array.from(
+			root.querySelectorAll("[lp-show][aria-expanded='true']"),
+			(button) => button.closest("[lp-component]").id,
+		);
+	const reveals = [];
+	const { home, root } = await createHomeHarness(t, {
+		initialStorage: {
+			"home-open-sections:user-hash-1": ["directory", "projects"],
+		},
+		widgetLoaders: { HomeProjectList: () => projects.promise },
+		withTransition: async (commit) => {
+			const before = opened(root);
+			commit();
+			const added = opened(root).filter((section) => !before.includes(section));
+			reveals.push(...added);
+			if (added.includes("directory")) directoryOpened.resolve();
+		},
+	});
+	const restoring = home.prefetch();
+	await directoryOpened.promise;
+	assert.deepEqual(opened(root), ["directory"]);
+	projects.resolve({ itemCount: 1 });
+	await restoring;
+	assert.deepEqual(reveals, ["directory", "projects"]);
 });
 
 test("test_home_restore_preserves_inflight_sections_and_yields_to_user_click", async (t) => {
