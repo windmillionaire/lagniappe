@@ -167,7 +167,9 @@ def test_task_index_title_link_opens_backing_page_task(get_admin, get_user):
 
     task_on_page = user.locate(f"li[data-key='{task.key}']")
     expect(task_on_page).to_be_visible()
-    expect(task_on_page.locator("[data-widget='TaskSettings']")).to_be_visible()
+    expect(task_on_page.locator("[data-role='task-chips']")).to_have_attribute(
+        "data-tray-open", "true"
+    )
 
 
 def test_task_route_rewrites_to_page_url_after_focus(get_admin, get_user):
@@ -180,7 +182,9 @@ def test_task_route_rewrites_to_page_url_after_focus(get_admin, get_user):
 
     task_on_page = user.locate(f"li[data-key='{task.key}']")
     expect(task_on_page).to_be_visible()
-    expect(task_on_page.locator("[data-widget='TaskSettings']")).to_be_visible()
+    expect(task_on_page.locator("[data-role='task-chips']")).to_have_attribute(
+        "data-tray-open", "true"
+    )
     expect(user.page).to_have_url(canonical)
 
     user.page.reload(wait_until="load")

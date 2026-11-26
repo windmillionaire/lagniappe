@@ -218,7 +218,8 @@ def test_assigned_user_can_work_their_assigned_task(get_admin, get_user):
     task_row = assignee.locate(f"[data-key='{task.key}']")
     expect(task_row).to_be_visible()
     expect(task_row.locator(Task.COMPLETE_TASK_CHECKBOX)).to_be_visible()
-    expect(task_row.locator(Task.SETTINGS_FORM)).to_be_visible()
+    expect(task_row.locator(Task.CHIP_TRAY)).to_have_attribute("data-tray-open", "true")
+    expect(task_row.locator(Task.CHIP_TRAY_TOGGLE)).to_be_visible()
 
 
 def test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page(get_admin, get_user):

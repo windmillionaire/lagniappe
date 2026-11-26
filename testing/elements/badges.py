@@ -17,10 +17,11 @@ Related:
 class Badges(Enum):
     """Assertions for entity badges attached to a task row or container."""
 
-    PROJECT = 'div[data-kind="project"]'
-    MODEL_TASK = 'div[data-kind="model"]'
-    USER = 'div[data-kind="user"]'
-    TASK = 'div[data-kind="task"]'
+    PROJECT = '.lp-badge[data-kind="project"]'
+    MODEL_TASK = '.lp-badge[data-kind="model"]'
+    USER = '.lp-badge[data-kind="user"]'
+    TASK = '.lp-badge[data-kind="task"]'
+    FORM = '.lp-badge[data-kind="form"]'
 
     def visible(self, element, resource):
         """

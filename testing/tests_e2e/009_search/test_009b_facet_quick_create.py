@@ -13,10 +13,8 @@ from testing.definitions.user_definitions import UserDefinition
 from testing.elements import (
     FormElements,
     FormSelect,
-    ProjectSelect,
     Select,
     SpinnerButtons,
-    UserSelect,
 )
 from testing.resources import Page
 
@@ -161,7 +159,7 @@ def test_category_search_permission_filter_returns_editable_categories(get_admin
     assert denied.name not in html
 
 
-# @template pages/tasks.html::action_buttons
+# @template pages/tasks.html::task_details
 def test_user_assign_search_permission_filter_returns_assignable_users(get_admin, get_user):
     owner = get_admin()
     assignable = get_user(Users.assignable_user, creator=owner)
@@ -185,13 +183,19 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_admin
         home.user_page_button.click()
 
     user_page = Page(user=assigner, definition=assigner.definition)
-    user_select = UserSelect(user_page.create_task_form)
+    user_page.entity = assigner.entity.page
+    task_elt, _ = user_page.quick_add_task(_unique("assign-filter"))
+    task_elt.locator("[data-chip='assigned_to']").click()
+    drawer = task_elt.locator("[data-role='chip-drawer']")
+    expect(drawer).to_be_visible()
+    combobox = drawer.locator("input[role='combobox']")
     with assigner.page.expect_response(
         lambda response: "/l/search-index/user" in response.url
         and "permission=assign" in response.url
     ):
-        panel = user_select.panel(fill="User")
+        combobox.fill("User")
 
+    panel = assigner.page.locator("[role='listbox'][data-visible='true']")
     expect(panel).to_be_visible()
     expect(
         panel.get_by_role("option", name=assignable.definition.name, exact=True)
@@ -201,7 +205,7 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_admin
     ).not_to_be_attached()
 
 
-# @template pages/tasks.html::action_buttons
+# @template pages/tasks.html::task_details
 # @template pages/info.html::user_settings
 @pytest.mark.e2e_group("owner")
 def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
@@ -223,18 +227,22 @@ def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
         user_page.entity = managed.entity.page
         managed.go(user_page)
         user_page.wait_for_interaction_readiness()
-        create_form = user_page.create_task_form
-        user_select = UserSelect(create_form)
-        expect(user_select.button).to_contain_text("Assign To")
-        expect(user_select.button).to_be_enabled()
-        expect(user_select.button).not_to_have_attribute("data-readonly", "true")
+        task_elt, _ = user_page.quick_add_task(_unique("owner-opt-in"))
+        assignee_chip = task_elt.locator("[data-chip='assigned_to']")
+        expect(assignee_chip).to_be_visible()
+        expect(assignee_chip).to_be_enabled()
+        assignee_chip.click()
+        drawer = task_elt.locator("[data-role='chip-drawer']")
+        expect(drawer).to_be_visible()
+        combobox = drawer.locator("input[role='combobox']")
 
         with managed.page.expect_response(
             lambda response: "/l/search-index/user" in response.url
             and "permission=assign" in response.url
         ):
-            panel = user_select.panel(fill=owner.definition.name)
+            combobox.fill(owner.definition.name)
 
+        panel = managed.page.locator("[role='listbox'][data-visible='true']")
         expect(panel).to_be_visible()
         expect(
             panel.get_by_role("option", name=owner.definition.name, exact=True)
@@ -275,24 +283,32 @@ def test_page_quick_create_uses_visible_uncategorized_pages_category(get_admin, 
     assert second_page.model.key == first_page.model.key
 
 
-# @template pages/tasks.html::action_buttons
+# @template pages/tasks.html::task_details
 def test_project_combobox_quick_create_selects_new_project(get_admin, get_user):
     user = get_admin()
     page = Pages.test_create_page_task.get(user)
     user.go(page)
     project_name = _unique("project-combobox")
 
-    create_form = page.create_task_form
-    project_select = ProjectSelect(create_form)
-    _quick_create_from_select_button(
-        user,
-        project_select,
-        "Project",
-        project_name,
-        "**/l/search-index/project/create",
-    )
+    task_elt, task_key = page.quick_add_task(_unique("project-quick-create"))
+    task_elt.locator("[data-chip='project']").click()
+    drawer = task_elt.locator("[data-role='chip-drawer']")
+    expect(drawer).to_be_visible()
+    combobox = drawer.locator("input[role='combobox']")
+    combobox.fill(project_name)
+    panel = user.page.locator("[role='listbox'][data-visible='true']")
+    expect(panel).to_be_visible()
+    create_option = panel.locator("[role='option'][data-command='create']")
+    expect(create_option).to_contain_text(f"Add New Project: {project_name}")
+    with (
+        user.page.expect_response("**/l/search-index/project/create") as create_resp,
+        user.page.expect_response(f"**/tasks/{task_key}/update") as update_resp,
+    ):
+        create_option.click()
+    assert create_resp.value.ok
+    assert update_resp.value.ok
 
-    expect(project_select.button).to_contain_text(project_name)
+    expect(task_elt.locator("[data-chip='project']")).to_contain_text(project_name)
 
 
 # @template projects/model_tasks.html::create_model_task

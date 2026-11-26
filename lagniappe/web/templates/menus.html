@@ -28,6 +28,17 @@
   </button>
 {% endmacro %}
 
+{% macro action(label, icon, action_name, kind="default") %}
+  <button type="button"
+          data-menu-item
+          data-kind="{{ kind }}"
+          data-task-action="{{ action_name }}"
+          class="{{ styles.dropdown.option.action }}">
+    {{ render_icon((icon), (styles.dropdown.icon ~ " text-kind-default")) }}
+    <span>{{ label }}</span>
+  </button>
+{% endmacro %}
+
 {% macro star(starred) %}
   <button type="button"
           data-menu-item

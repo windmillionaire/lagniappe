@@ -228,6 +228,45 @@
 	overflow-wrap: normal;
 }
 
+/* @style task.chip.add */
+[data-role="task-chips"]:not([data-tray-open="true"]) > .task-chip-add {
+	display: none;
+}
+
+/* @style task.chip.editable task.chip.add */
+.task-chip-editable[data-editing="true"],
+.task-chip-add[data-editing="true"] {
+	background-color: var(--kind-bg);
+	border-style: solid;
+	box-shadow: 0 0 0 2px var(--kind-light);
+	opacity: 1;
+}
+
+/* @style task.chip.form */
+li[data-open="TaskForm"] .task-chip-form {
+	background-color: white;
+	box-shadow: 0 0 0 2px var(--color-form-default);
+}
+
+/* @style task.chip.trayToggle */
+.task-chip-tray-toggle[aria-expanded="true"] {
+	background-color: var(--color-base-bg);
+	border-style: solid;
+	color: var(--color-base-dark);
+}
+
+/* @style task.description */
+.task-description[data-editable="true"] {
+	cursor: text;
+	transition:
+		background-color 120ms ease,
+		box-shadow 120ms ease;
+	&:hover {
+		background-color: white;
+		box-shadow: inset 0 0 0 1px var(--color-task-light);
+	}
+}
+
 /* ==========================================================================
    LIST ITEMS
    ========================================================================== */

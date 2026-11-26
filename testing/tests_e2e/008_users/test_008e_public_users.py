@@ -17,9 +17,7 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities
 from testing.definitions import SitePages, Users
 from testing.elements import (
-    DateSelect,
     Dropdown,
-    FormElements,
     PermissionsForm,
     SpinnerButtons,
     Tabs,
@@ -194,7 +192,7 @@ def test_public_user_edits_document_without_ai_or_image_tools(limited_public_use
     user.page.keyboard.press("Escape")
 
 
-# @template pages/tasks.html::action_buttons
+# @template pages/tasks.html::task_details
 @pytest.mark.e2e_group("owner")
 def test_public_user_creates_task_with_reduced_schedule_options(
     limited_public_user, browser_failures
@@ -202,11 +200,17 @@ def test_public_user_creates_task_with_reduced_schedule_options(
     scenario = limited_public_user
     user = scenario.user
     page = scenario.page
-    create_form = page.create_task_form
-    expect(create_form.locator("button[type='submit']")).to_be_visible()
-    expect(create_form.locator("[data-role='show-autofill']")).to_have_count(0)
-    expect(create_form.locator("[data-role='file-select']")).to_have_count(0)
-    expect(create_form.locator("[data-role='project-select']")).to_have_count(0)
+    quick_add = page.quick_add_form
+    expect(quick_add.locator("input[name='name']")).to_be_visible()
+    expect(page.task_list.locator("[data-role='show-autofill']")).to_have_count(0)
+
+    task_name = f"Public personal task {uuid4().hex}"
+    task_elt, _ = page.quick_add_task(task_name)
+    expect(task_elt.locator("[data-chip='files']")).to_have_count(0)
+    expect(task_elt.locator("[data-chip='project']")).to_have_count(0)
+    expect(task_elt.locator("[data-role='task-chips']")).to_have_attribute(
+        "data-ai-enabled", "false"
+    )
 
     project = Entities.PROJECT.create(
         {
@@ -268,35 +272,28 @@ def test_public_user_creates_task_with_reduced_schedule_options(
     assert saved_task.name == renamed_task
     assert saved_task.project.key == project.key
 
-    schedule_button = create_form.locator("[data-role='date-select']")
-    expect(schedule_button).to_have_attribute("data-ai-enabled", "false")
-    date_form = DateSelect(create_form).form()
-    expect(date_form.locator("input[name='due-date']")).to_be_visible()
-    expect(date_form).to_contain_text("This task repeats when completed")
-    expect(date_form).to_contain_text("This task repeats on a schedule")
-    expect(date_form).not_to_contain_text("This task repeats periodically")
+    task_elt.locator("[data-chip='schedule']").click()
+    drawer = task_elt.locator("[data-role='chip-drawer']")
+    expect(drawer).to_be_visible()
+    expect(drawer.locator("input[name='due-date']")).to_be_visible()
+    expect(drawer).to_contain_text("This task repeats when completed")
+    expect(drawer).to_contain_text("This task repeats on a schedule")
+    expect(drawer).not_to_contain_text("This task repeats periodically")
 
-    date_form.locator("input[name='scheduled']").check()
+    drawer.locator("input[name='scheduled']").check()
     expect(
-        date_form.locator("input[name='schedule-type'][value='daily']")
+        drawer.locator("input[name='schedule-type'][value='daily']")
     ).to_have_count(1)
     expect(
-        date_form.locator("input[name='schedule-type'][value='weekly']")
+        drawer.locator("input[name='schedule-type'][value='weekly']")
     ).to_have_count(1)
     expect(
-        date_form.locator("input[name='schedule-type'][value='monthly']")
+        drawer.locator("input[name='schedule-type'][value='monthly']")
     ).to_have_count(0)
     expect(
-        date_form.locator("input[name='schedule-type'][value='yearly']")
+        drawer.locator("input[name='schedule-type'][value='yearly']")
     ).to_have_count(0)
-    date_form.locator("input[name='scheduled']").uncheck()
-
-    task_name = f"Public personal task {uuid4().hex}"
-    create_form.locator(FormElements.NAME).fill(task_name)
-    with user.page.expect_response("**/tasks/*/create") as task_response:
-        SpinnerButtons.CREATE.click(create_form)
-    assert task_response.value.ok
-    page.active_task_list.new_item(task_name)
+    drawer.locator("input[name='scheduled']").uncheck()
 
 
 @pytest.mark.e2e_group("owner")

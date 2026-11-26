@@ -29,6 +29,7 @@ class Page(SiteResource):
     _sync = True
 
     # Task Tab
+    QUICK_ADD_FORM = "#tasks [data-role='task-quick-add']"
     CREATE_TASK_TOGGLE = "#tabs [lp-show='tasks:CreateTask']"
     CREATE_TASK_FORM = "[data-widget='CreateTask']"
     TASK_LIST = "#tasks [data-widget='PageTaskList']"
@@ -150,15 +151,35 @@ class Page(SiteResource):
         return f"pages/{self.key}"
 
     @property
+    def quick_add_form(self):
+        _ = self.task_list
+        form = self.user.locate(self.QUICK_ADD_FORM)
+        expect(form).to_be_visible()
+        return form
+
+    def quick_add_task(self, name):
+        form = self.quick_add_form
+        name_input = form.locator("input[name='name']")
+        name_input.fill(name)
+        with expect_successful_response(
+            self.user.page,
+            method="POST",
+            path=f"/tasks/{self.key}/create",
+            entity_key=self.key,
+            request_payload_contains=name,
+        ):
+            name_input.press("Enter")
+        expect(name_input).to_have_value("")
+        expect(name_input).to_be_focused()
+        item = self.active_task_list.new_item(name)
+        expect(item.locator("[data-role='task-chips']")).to_have_attribute(
+            "data-tray-open", "true"
+        )
+        return item, item.get_attribute("data-key")
+
+    @property
     def create_task_form(self):
-        tabs = Tabs(self.user)
-        tasks_tab = tabs.tasks
-        expect(tasks_tab).to_be_visible()
-        create_form = tasks_tab.locator(self.CREATE_TASK_FORM)
-        if not create_form.is_visible():
-            self.user.locate(self.CREATE_TASK_TOGGLE).click()
-            expect(create_form).to_be_visible()
-        return create_form
+        return self.quick_add_form
 
     @property
     def info_form(self):

@@ -1,17 +1,19 @@
 """
-Tests for creating page tasks with linked project, model task, assignee, and due date.
+Tests for page tasks quick-add and inline metadata chips.
 
-The create form (``CreateTask`` / ``tasks.html`` action buttons) uses facet search on the
-project combobox: searching by project name loads matching projects and, when the cache
-expands models, all model tasks for that project. Selecting a model task whose definition
-includes a form should auto-fill the form selector (see ``BaseTaskSettings`` in
-``src/script/widgets/taskSettings.ts``). Task rows render ``entity_badge`` chips for
-linked project, model, assignee, due date, etc.; use ``Badges`` helpers to assert visibility.
+The Page Tasks tab renders an inline quick-add bar above ``PageTaskList``
+(``[data-role='task-quick-add']``). Submitting a task name creates the task
+immediately, prepends it with its faded chip tray expanded, and keeps focus in
+the quick-add input. Task rows render active metadata badges (including a
+clickable Form chip that toggles ``TaskForm``) and a compact ``+`` chip tray
+that reveals inline per-chip editors saving immediately via partial task
+updates.
 
 Verified against:
-- lagniappe/web/templates/pages/tasks.html (task tab, action_buttons, task_details)
-- lagniappe/web/routes/tasks/ (create / update)
-- src/script/widgets/taskSettings.ts (CreateTask, entity selects)
+- lagniappe/web/templates/pages/tasks.html (task_tab, task_list, task, task_details)
+- lagniappe/web/routes/tasks/ (create / update partial chip updates)
+- src/script/widgets/taskChips.ts (TaskChipController)
+- src/script/widgets/pageTaskList.ts (PageTaskList quick-add & chip delegation)
 - lagniappe/core/tools/cache/query.py (``kind_search`` project + model expansion)
 
 Definitions:
@@ -39,14 +41,9 @@ from testing.definitions import (
 from testing.definitions.task_definitions import TaskDefinition
 from testing.elements import (
     Badges,
-    FormElements,
-    FormSelect,
     Modal,
     Select,
     SpinnerButtons,
-    ProjectSelect,
-    DateSelect,
-    UserSelect,
 )
 from testing.resources.task import Task
 from testing.utility.network import expect_successful_response
@@ -58,29 +55,11 @@ SIGNATURE_PNG = base64.b64decode(
 )
 
 
-def _submit_create_task_form(user, page, task, create_form):
-    with expect_successful_response(
-        user.page,
-        method="POST",
-        path=f"/tasks/{page.key}/create",
-        entity_key=page.key,
-        request_payload_contains=task.definition.name,
-    ):
-        SpinnerButtons.CREATE.click(create_form)
-
-    expect(create_form).not_to_be_visible()
-    task_list = page.active_task_list
-    expect(task_list.list).to_be_visible()
-    new_task = task_list.new_item(task.definition.name)
-    return new_task.get_attribute("data-key")
-
-
-def _fill_editable_field(form, field_id, selector, value):
-    field = form.locator(f"#{field_id}")
-    control = field.locator(selector)
-    if not control.is_visible():
-        field.locator("[data-role='label']").click()
-    control.fill(value)
+def _quick_add_page_task(page, task):
+    item, key = page.quick_add_task(task.definition.name)
+    task.key = key
+    task.element = item
+    return key
 
 
 def _open_page_task_form(page, task):
@@ -156,37 +135,33 @@ def test_create_basic_page_task(get_admin, get_user):
     page = Pages.test_create_page_task.get(user)
     user.go(page)
 
-    create_form = page.create_task_form
-    create_form.locator(FormElements.NAME).fill(task.definition.name)
-    create_form.locator(FormElements.DESCRIPTION).fill(task.definition.description)
+    _quick_add_page_task(page, task)
+    task.set_description(task.definition.description)
 
-    task.key = _submit_create_task_form(user, page, task, create_form)
     user.reload(page)
     task.wait_for_load()
     expect(task.element).to_contain_text(task.definition.name)
+    expect(task.element.locator("[data-role='task-description']")).to_have_text(
+        task.definition.description
+    )
 
 
+# @template pages/tasks.html::task_tab
 # @template pages/tasks.html::task_list
 # @template pages/tasks.html::task_empty
-def test_empty_page_task_list_shows_marker_only_after_create_closes(get_admin, get_user):
+def test_empty_page_task_list_shows_quick_add_and_empty_marker(get_admin, get_user):
     user = get_admin()
     page = Pages.test_empty_page_task_list.get(user)
     user.go(page)
 
-    create_form = page.create_task_form
+    quick_add = page.quick_add_form
     empty = user.locate(f"{page.TASK_LIST} [data-role='empty']")
-    expect(create_form).to_be_visible()
-    expect(empty).to_be_attached()
-    expect(empty).not_to_be_visible()
-
-    close = user.locate(
-        "#tabs [data-role='controls'] button[lp-close='tasks:PageTaskList']"
-    )
-    expect(close).to_be_visible()
-    close.click()
-
-    expect(create_form).not_to_be_visible()
+    expect(quick_add).to_be_visible()
     expect(empty).to_be_visible()
+
+    item, _ = page.quick_add_task("First quick-added task")
+    expect(item).to_be_visible()
+    expect(empty).not_to_be_visible()
 
 
 def test_create_page_task_with_form(get_admin, get_user):
@@ -197,11 +172,11 @@ def test_create_page_task_with_form(get_admin, get_user):
     form = task.definition.form.get(user)
     user.go(page)
 
-    create_form = page.create_task_form
-    create_form.locator(FormElements.NAME).fill(task.definition.name)
-    FormSelect(create_form).select(form)
+    _quick_add_page_task(page, task)
+    task.select_chip_option("form", form)
 
-    task.key = _submit_create_task_form(user, page, task, create_form)
+    Badges.FORM.visible(task.element, form)
+    expect(task.element.locator(task.TASK_FORM)).to_be_visible()
 
 
 def test_complete_page_task(get_admin, get_user):
@@ -216,8 +191,7 @@ def test_complete_page_task(get_admin, get_user):
     assert not task.completed
 
 
-# @style select.button
-# @template pages/tasks.html::action_buttons
+# @template pages/tasks.html::task_details
 def test_create_page_task_with_project(get_admin, get_user):
     user = get_admin()
 
@@ -226,42 +200,21 @@ def test_create_page_task_with_project(get_admin, get_user):
     page = Pages.test_create_page_task_with_project.get(user)
     user.go(page)
 
-    create_form = page.create_task_form
-    create_form.locator(FormElements.NAME).fill(task.definition.name)
-    ProjectSelect(create_form).select(project)
+    _quick_add_page_task(page, task)
+    task.select_chip_option("project", project)
 
-    task.key = _submit_create_task_form(user, page, task, create_form)
-
-    Badges.PROJECT.visible(task.element, project)
-
-    settings_form = task.settings_form
-    project_button = ProjectSelect(settings_form).button
-    project_row = project_button.locator(
-        "xpath=ancestor::*[@data-role='section-toggle-row'][1]"
+    project_chip = Badges.PROJECT.visible(task.element, project)
+    project_chip.click()
+    drawer = task.element.locator(task.CHIP_DRAWER)
+    expect(drawer).to_be_visible()
+    expect(drawer.locator("a[data-role='open-link']")).to_have_attribute(
+        "href", re.compile(rf"/projects/{re.escape(project.key)}$")
     )
-    clear_icon = project_row.locator(
-        ":scope > [data-role='clear'] > [data-icon]"
-    )
-    expect(project_button).to_be_visible()
-    expect(project_button).to_have_attribute("title", project.definition.name)
-    expect(clear_icon).to_be_visible()
-    expect(project_button.locator("button, a")).to_have_count(0)
-
-    user.mobile = True
-    expect(project_button).to_have_css("height", "40px")
-
-    user.mobile = False
-    expect(project_button).to_have_css("height", "40px")
-    project_button.click()
-    project_input = settings_form.locator(
-        "[data-role='project-select'] + input[role='combobox']"
-    )
-    expect(project_input).to_be_visible()
-    expect(project_input).to_have_css("height", "40px")
+    expect(drawer.locator("button[data-role='clear']")).to_be_visible()
+    expect(drawer.locator("input[role='combobox']")).to_be_visible()
 
 
 # @template pages/tasks.html::task_details
-# @template pages/tasks.html::action_buttons
 def test_create_page_task_with_model_task(get_admin, get_user):
     user = get_admin()
 
@@ -274,41 +227,41 @@ def test_create_page_task_with_model_task(get_admin, get_user):
     form = Forms.test_create_task_form.get(user)
 
     user.go(page)
+    _quick_add_page_task(page, task)
 
-    create_form = page.create_task_form
-    create_form.locator(FormElements.NAME).fill(task.definition.name)
+    drawer = task.open_chip("project")
+    combobox = drawer.locator("input[role='combobox']")
+    combobox.fill(project.definition.name)
+    panel = user.page.locator("[role='listbox'][data-visible='true']")
+    expect(panel).to_be_visible()
+    expect(panel).to_contain_text(project.definition.name)
+    expect(panel).to_contain_text(model_alpha.definition.name)
+    expect(panel).to_contain_text(model_beta.definition.name)
 
-    project_button = ProjectSelect(create_form)
-    project_panel = project_button.panel(fill=project.definition.name)
-    expect(project_panel).to_contain_text(project.definition.name)
-    expect(project_panel).to_contain_text(model_alpha.definition.name)
-    expect(project_panel).to_contain_text(model_beta.definition.name)
-    project_button.select_by_key(model_beta)
-    assert FormSelect(create_form).contains(form)
+    with expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
+    ):
+        panel.locator(f"[role='option'][data-id='{model_beta.key}']").click()
 
-    task.key = _submit_create_task_form(user, page, task, create_form)
+    Badges.PROJECT.visible(task.element, project)
+    Badges.MODEL_TASK.visible(task.element, model_beta)
+    Badges.FORM.visible(task.element, form)
+    expect(task.element.locator(task.TASK_FORM)).to_be_visible()
 
-    project_badge = Badges.PROJECT.visible(task.element, project)
-    model_badge = Badges.MODEL_TASK.visible(task.element, model_beta)
     project_path = f"/projects/{project.key}"
     model_path = f"{project_path}/status/{model_beta.key}?completed=false"
-    expect(project_badge.locator("a")).to_have_attribute("href", project_path)
-    expect(model_badge.locator("a")).to_have_attribute("href", model_path)
 
     page.reload()
-    expect(project_badge.locator("a")).to_have_attribute("href", project_path)
-    expect(model_badge.locator("a")).to_have_attribute("href", model_path)
-    for badge, path in ((project_badge, project_path), (model_badge, model_path)):
-        with user.page.expect_navigation() as navigation:
-            badge.locator("a").click()
-        assert navigation.value.ok
-        expect(user.page).to_have_url(re.compile(re.escape(path) + "$"))
-        user.go(page).wait_for_interaction_readiness()
+    task.wait_for_load()
+    Badges.PROJECT.visible(task.element, project)
+    Badges.MODEL_TASK.visible(task.element, model_beta)
+    Badges.FORM.visible(task.element, form)
 
-    settings = task.settings_form
-    model_link = settings.locator(
-        '[data-role="section-toggle-row"]:has([data-role="project-select"]) a[data-role="open-link"]'
-    )
+    drawer = task.open_chip("project")
+    model_link = drawer.locator("a[data-role='open-link']")
     expect(model_link).to_have_attribute("href", re.compile(re.escape(model_path) + "$"))
     with user.page.expect_navigation() as navigation:
         model_link.click()
@@ -316,8 +269,8 @@ def test_create_page_task_with_model_task(get_admin, get_user):
     expect(user.page).to_have_url(re.compile(re.escape(model_path) + "$"))
 
 
-# @template pages/tasks.html::action_buttons
-def test_model_task_replaces_form_on_reopened_create_draft(get_admin, get_user):
+# @template pages/tasks.html::task_details
+def test_model_task_replaces_form_on_task_chip(get_admin, get_user):
     user = get_admin()
     page = Pages.test_create_page_task.get(user)
     original_form = Forms.test_create_task_form.get(user)
@@ -346,29 +299,27 @@ def test_model_task_replaces_form_on_reopened_create_draft(get_admin, get_user):
     task = Task(
         user=user,
         definition=TaskDefinition(
-            name=f"Retained draft task {token}", origin=Pages.test_create_page_task
+            name=f"Model replacement task {token}", origin=Pages.test_create_page_task
         ),
     )
     user.go(page)
-    create_form = page.create_task_form
-    create_form.locator(FormElements.NAME).fill(task.definition.name)
-    FormSelect(create_form).select(original_form)
-    user.locate(
-        "#tabs [data-role='controls'] button[lp-close='tasks:PageTaskList']"
-    ).click()
-    expect(create_form).not_to_be_visible()
+    _quick_add_page_task(page, task)
+    task.select_chip_option("form", original_form)
+    Badges.FORM.visible(task.element, original_form)
 
-    create_form = page.create_task_form
-    expect(create_form.locator(FormElements.NAME)).to_have_value(task.definition.name)
-    assert FormSelect(create_form).contains(original_form)
-    Select(ProjectSelect(create_form).button).select_by_key(
-        model.urlsafe_key, query=model.name
-    )
-    expect(FormSelect(create_form).button).to_contain_text(form.name)
-    expect(create_form.locator("select[name='form']")).to_have_value(form.urlsafe_key)
-    expect(create_form.locator("select[name='form'] option:checked")).to_have_count(1)
+    drawer = task.open_chip("project")
+    combobox = drawer.locator("input[role='combobox']")
+    combobox.fill(model.name)
+    panel = user.page.locator("[role='listbox'][data-visible='true']")
+    expect(panel).to_be_visible()
+    with expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
+    ):
+        panel.locator(f"[role='option'][data-id='{model.urlsafe_key}']").click()
 
-    task.key = _submit_create_task_form(user, page, task, create_form)
     saved = Entities.fetch_one(task.key, request=Fetch.direct())
     assert saved.properties.form.key == form.key
     assert saved.properties.model.key == model.key
@@ -384,11 +335,8 @@ def test_create_page_task_with_assigned_to(get_admin, get_user):
     page = Pages.test_create_page_task.get(user)
     user.go(page)
 
-    create_form = page.create_task_form
-    create_form.locator(FormElements.NAME).fill(task.definition.name)
-    UserSelect(create_form).select(assignee)
-
-    task.key = _submit_create_task_form(user, page, task, create_form)
+    _quick_add_page_task(page, task)
+    task.select_chip_option("assigned_to", assignee)
 
     assert Badges.USER.visible(task.element, assignee)
 
@@ -415,20 +363,15 @@ def test_create_page_task_with_due_date(get_admin, get_user):
     page = Pages.test_create_page_task.get(user)
     user.go(page)
 
-    create_form = page.create_task_form
-    create_form.locator(FormElements.NAME).fill(task.definition.name)
-
-    due_form = DateSelect(create_form).form()
-    task.definition.due_date.set(due_form)
-
-    task.key = _submit_create_task_form(user, page, task, create_form)
+    _quick_add_page_task(page, task)
+    task.set_due_date(task.definition.due_date)
 
     expect(task.element.locator("[data-role='change-due-date']")).to_be_visible()
 
 
-# @template controls.html::task_save
 # @template pages/tasks.html::task_title
 # @template pages/tasks.html::task_nav
+# @template pages/tasks.html::task_details
 def test_update_page_task_settings_from_row(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_update_page_task_settings.get(user)
@@ -437,26 +380,8 @@ def test_update_page_task_settings_from_row(get_admin, get_user):
     updated_name = "Task Settings After"
     updated_description = "Updated task settings description.\n\n  Keep this line indented."
 
-    settings_form = task.settings_form
-    save_toggle = task.element.locator("[data-role='save-toggle']")
-    expect(
-        task.element.locator("[data-role='save-toggle'] ~ [data-role='controls']")
-    ).to_have_count(1)
-    expect(
-        task.element.locator("[data-role='save-toggle'] ~ [data-role='nav-toggles']")
-    ).to_have_count(1)
-    expect(save_toggle).to_be_hidden()
-    expect(save_toggle).to_have_attribute("data-saved", "false")
-    _fill_editable_field(settings_form, "name", FormElements.NAME, updated_name)
-    _fill_editable_field(
-        settings_form, "description", FormElements.DESCRIPTION, updated_description
-    )
-    expect(save_toggle).to_be_visible()
-    expect(save_toggle).to_have_attribute("data-saved", "false")
-    expect(save_toggle).to_have_attribute("aria-label", "Unsaved changes")
-    task.save()
-    expect(save_toggle).to_have_attribute("data-saved", "true")
-    expect(save_toggle).to_have_attribute("aria-label", "Saved")
+    task.rename(updated_name)
+    task.set_description(updated_description)
 
     expect(task.element.locator("[data-role='title']")).to_contain_text(updated_name)
     description = task.element.locator("[data-role='task-description']")
@@ -473,83 +398,46 @@ def test_update_page_task_settings_from_row(get_admin, get_user):
     assert description.text_content() == updated_description
 
 
+# @template controls.html::task_save
 # @template pages/tasks.html::task
-# @template pages/tasks.html::settings_form
 # @template pages/tasks.html::task_form
-def test_adding_form_from_task_settings_preserves_widget_identity(get_admin, get_user):
+# @template pages/tasks.html::task_details
+def test_adding_form_from_chip_and_editing_chips_preserves_open_task_form(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_update_page_task_settings.get(user)
     form = Forms.test_task_history_form.get(user)
     user.go(task)
 
-    settings_form = task.settings_form
-    FormSelect(settings_form).select(form)
-    task.save()
+    task.select_chip_option("form", form)
 
-    expect(task.element.locator(task.SETTINGS_FORM)).to_have_count(1)
-    expect(task.element.locator(task.TASK_FORM)).to_have_count(1)
-    settings_form = task.element.locator(task.SETTINGS_FORM)
-    expect(settings_form.locator("[name='name']")).to_have_count(1)
-    expect(settings_form.locator("[name='description']")).to_have_count(1)
-    expect(settings_form.locator("[name='input-textab12']")).to_have_count(0)
-    state = task.element.evaluate(
-        """row => {
-            const component = row._lp_component;
-            return {
-                active: component.active?.name,
-                activeTarget: component.active?.target?.dataset.widget,
-                settingsTarget: component.widgets.TaskSettings?.target?.dataset.widget,
-                formTarget: component.widgets.TaskForm?.target?.dataset.widget ?? null,
-                domWidgets: Array.from(row.querySelectorAll(':scope > [data-widget]'))
-                    .map(widget => widget.dataset.widget),
-            };
-        }"""
-    )
-    assert state == {
-        "active": "TaskSettings",
-        "activeTarget": "TaskSettings",
-        "settingsTarget": "TaskSettings",
-        "formTarget": None,
-        "domWidgets": [
-            "TaskSettings",
-            "TaskMove",
-            "TaskCombine",
-            "TaskForm",
-        ],
-    }
+    expect(task.element.locator(task.TASK_FORM)).to_be_visible()
+    Badges.FORM.visible(task.element, form)
 
     task_form = task.task_form
-    task_value = "Saved with a settings update"
+    save_toggle = task.element.locator("[data-role='save-toggle']")
+    expect(save_toggle).to_have_attribute("data-saved", "true")
+
+    task_value = "Saved alongside chip edit"
     task_form.locator("[name='input-textab12']").fill(task_value)
     user.page.keyboard.press("Tab")
+    expect(save_toggle).to_be_visible()
+    expect(save_toggle).to_have_attribute("data-saved", "false")
 
-    settings_toggle = task.element.locator(
-        f"{task.SETTINGS_FORM_TOGGLE}:visible"
-    )
-    expect(settings_toggle).to_be_visible()
-    settings_toggle.click()
-    settings_form = task.element.locator(task.SETTINGS_FORM)
-    expect(settings_form).to_be_visible()
-    expect(task_form).to_be_hidden()
-    updated_name = "Task Settings and Form After"
-    _fill_editable_field(settings_form, "name", FormElements.NAME, updated_name)
+    # Renaming the task while TaskForm is open preserves unsaved form answers.
+    updated_name = "Task Renamed While Form Open"
+    task.rename(updated_name)
+    expect(task_form).to_be_visible()
+    expect(task_form.locator("[name='input-textab12']")).to_have_value(task_value)
+    expect(task.element.locator("[data-role='save-toggle']")).to_be_visible()
+
     with expect_successful_response(
         user.page,
         method="PUT",
         path=f"/tasks/{task.key}/update",
         entity_key=task.key,
     ):
-        SpinnerButtons.UPDATE.click(settings_form)
-    assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_form)
-
-    settings_form = task.element.locator(task.SETTINGS_FORM)
-    task_form = task.element.locator(task.TASK_FORM)
-    expect(settings_form).to_be_visible()
-    expect(task_form).to_have_count(1)
-    for role in ("project-select", "form-select", "file-select"):
-        expect(settings_form.locator(f"[data-role='{role}']")).to_be_visible()
-    expect(settings_form.locator("[name='input-textab12']")).to_have_count(0)
-    expect(task_form.locator("[name='input-textab12']")).to_have_count(1)
+        SpinnerButtons.UPDATE.click(task_form)
+    assert SpinnerButtons.UPDATE_SUCCESS.successful(task_form)
 
     user.reload()
     task.wait_for_load()
@@ -573,7 +461,7 @@ def test_completed_task_can_move_to_another_page(get_admin, get_user):
     task.complete()
     expect(task.element).to_have_attribute("data-completed", "true")
     expect(task.element).to_have_attribute("data-content-readonly", "true")
-    expect(task.element.locator(task.SETTINGS_FORM)).to_have_count(0)
+    expect(task.element.locator(task.CHIP_TRAY_TOGGLE)).to_have_count(0)
 
     task.element.get_by_role("button", name="Task actions").click()
     menu = user.page.get_by_role("menu", name="Task actions")
@@ -663,14 +551,13 @@ def test_submit_attached_task_form(get_admin, get_user):
 
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
-# @template pages/tasks.html::settings_form
 def test_task_update_preserves_open_widget_and_completed_readonly_state(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_task_update_preserves_open_widget.get(user)
     page = Pages.test_create_page_task.get(user)
     user.go(task)
 
-    expect(task.settings_form).to_be_visible()
+    expect(task.element.locator(task.CHIP_TRAY_TOGGLE)).to_be_visible()
     task_form = _open_page_task_form(page, task)
     expect(task_form).to_be_visible()
 
@@ -699,7 +586,7 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_admi
     expect(task.element).to_have_attribute("data-content-readonly", "true")
     expect(task_form).to_have_attribute("data-readonly", "true")
     expect(task_form).to_be_visible()
-    expect(task.element.locator(task.SETTINGS_FORM)).to_have_count(0)
+    expect(task.element.locator(task.CHIP_TRAY_TOGGLE)).to_have_count(0)
     expect(task.element.locator("[data-role='save-toggle']")).to_have_count(0)
     expect(task_form.locator("[data-role='show-autofill']")).to_have_count(0)
     expect(task_form.locator("button[type='submit']")).to_have_count(0)
@@ -714,7 +601,6 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_admi
 
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
-# @template pages/tasks.html::settings_form
 def test_completed_task_with_empty_form_is_readonly(get_admin, get_user, tmp_path):
     user = get_admin()
     task = Tasks.test_completed_task_readonly_form.get(user)
@@ -736,7 +622,7 @@ def test_completed_task_with_empty_form_is_readonly(get_admin, get_user, tmp_pat
     expect(completed_form.get_by_text("Task was completed with an empty submission", exact=True)).to_be_visible()
     expect(completed_form.locator("input:not([type='hidden'])")).to_have_count(0)
     expect(completed_form).not_to_contain_text("Not provided")
-    expect(task.element.locator(task.SETTINGS_FORM)).to_have_count(0)
+    expect(task.element.locator(task.CHIP_TRAY_TOGGLE)).to_have_count(0)
     expect(task.element.locator("[data-role='show-autofill']")).to_have_count(0)
     expect(task.element.locator("[data-widget='TaskMove']")).to_have_count(1)
 
@@ -794,29 +680,15 @@ def test_create_page_task_while_another_task_is_open_keeps_rows_clear(get_admin,
     page = Pages.test_create_page_task.get(user)
     user.go(existing_task)
 
-    expect(existing_task.settings_form).to_be_visible()
-
-    create_form = page.create_task_form
-    expect(existing_task.element).to_have_attribute("data-open", "false")
-    expect(
-        existing_task.element.locator(existing_task.SETTINGS_FORM)
-    ).not_to_be_visible()
-
-    create_form.locator(FormElements.NAME).fill(new_task.definition.name)
-    create_form.locator(FormElements.DESCRIPTION).fill(
-        new_task.definition.description
+    expect(existing_task.element.locator(existing_task.CHIP_TRAY)).to_have_attribute(
+        "data-tray-open", "true"
     )
 
-    new_task.key = _submit_create_task_form(user, page, new_task, create_form)
+    _quick_add_page_task(page, new_task)
 
     expect(page.task_list).to_be_visible()
     expect(page.active_task_list.get_item(existing_task)).to_be_visible()
     expect(page.active_task_list.get_item(new_task)).to_be_visible()
-    expect(user.locate(page.CREATE_TASK_FORM)).not_to_be_visible()
-    expect(existing_task.element).to_have_attribute("data-open", "false")
-    expect(
-        existing_task.element.locator(existing_task.SETTINGS_FORM)
-    ).not_to_be_visible()
 
 
 def test_signature_submission_draw_save_reload_and_clear(get_admin, get_user):
@@ -885,7 +757,7 @@ def test_signature_submission_draw_save_reload_and_clear(get_admin, get_user):
     expect(reset_field.locator("[data-role='read']")).to_have_count(0)
 
 
-# @template pages/tasks.html::action_buttons
+# @template pages/tasks.html::task_details
 def test_create_page_task_with_file(get_admin, get_user):
     user = get_admin()
 
@@ -893,45 +765,33 @@ def test_create_page_task_with_file(get_admin, get_user):
     page = Pages.test_create_page_task.get(user)
     user.go(page)
 
-    create_form = page.create_task_form
-    create_form.locator(FormElements.NAME).fill(task.definition.name)
+    _quick_add_page_task(page, task)
+    drawer = task.open_chip("files")
+    expect(drawer.locator("[data-role='dropzone']")).to_be_visible()
 
-    file_select = create_form.locator("[data-role='file-select']")
-    expect(file_select).to_have_attribute("data-title", "Attach File/Photo")
-    file_select.click()
-    expect(create_form.locator("[data-role='dropzone']")).to_be_visible()
     with user.page.expect_response(
         lambda response: response.request.method == "POST"
-        and f"/tasks/{page.key}/upload-file" in response.url
+        and f"/tasks/{task.key}/upload-file" in response.url
+    ), expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
     ):
-        Uploads.csv_file_input.set(create_form)
+        Uploads.csv_file_input.set(drawer)
 
     filename = Uploads.csv_file_input.definition.filename
-    create_saved_files = create_form.locator("[data-role='saved-files']")
-    expect(create_saved_files).to_be_visible()
-    expect(create_saved_files).to_contain_text(filename)
-    expect(create_saved_files.locator("li").first).to_have_css(
-        "align-items", "center"
-    )
-    expect(create_saved_files.locator("a").first).to_have_attribute(
-        "href", re.compile(r"/files/")
-    )
-
-    task.key = _submit_create_task_form(user, page, task, create_form)
-
-    expect(task.element).to_contain_text(filename)
-
-    page_entity = Entities.fetch_one(page.key, request=Fetch.direct())
-    assert filename not in [file.name for file in page_entity.files]
-
-    settings_form = task.settings_form
-    settings_form.locator("[data-role='file-select']").click()
-    saved_files = settings_form.locator("[data-role='saved-files']")
+    saved_files = drawer.locator("[data-role='saved-files']")
     expect(saved_files).to_be_visible()
     expect(saved_files).to_contain_text(filename)
+    expect(saved_files.locator("li").first).to_have_css("align-items", "center")
     expect(saved_files.locator("a").first).to_have_attribute(
         "href", re.compile(r"/files/")
     )
+    expect(task.element.locator("[data-role='task-chips']")).to_contain_text(filename)
+
+    page_entity = Entities.fetch_one(page.key, request=Fetch.direct())
+    assert filename not in [file.name for file in page_entity.files]
 
     delete_button = saved_files.locator("[data-role='delete-task-file']").first
     with user.page.expect_response(
@@ -940,5 +800,7 @@ def test_create_page_task_with_file(get_admin, get_user):
     ):
         delete_button.click()
 
-    expect(task.element).not_to_contain_text(filename)
+    expect(task.element.locator("[data-role='task-chips']")).not_to_contain_text(
+        filename
+    )
     expect(saved_files).not_to_be_visible()

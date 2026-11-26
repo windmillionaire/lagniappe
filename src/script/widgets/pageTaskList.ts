@@ -1,9 +1,15 @@
 import { BaseList, type ListAttributes } from "../elements/base/baseList.ts";
+import { request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
 import type { RequestResult } from "../types/api";
 import type ViewComponent from "../views/base/component.ts";
 import type Core from "../views/base/core.ts";
 import type { Task } from "../views/base/task.ts";
+import {
+	setTaskTrayOpen,
+	TaskChipController,
+	type TaskChipField,
+} from "./taskChips.ts";
 
 export interface PageTaskDelta {
 	remove?: string[];
@@ -43,11 +49,20 @@ export class PageTaskList extends BaseList {
 	declare _replaceAll?: HTMLElement[] | null;
 	declare _preparedReplacements?: StagedReplacement[];
 	declare _preparedCreated?: StagedCreation[];
+	declare chips: TaskChipController;
+	declare _quickAddForm: HTMLFormElement | null;
+	declare _quickAddInput: HTMLInputElement | null;
+	declare _quickAddSubmit: HTMLButtonElement | null;
+	declare _quickAddError: HTMLElement | null;
 
 	constructor(attributes: TaskListSettings) {
 		super(attributes);
 		this._change = this._change.bind(this);
 		this._click = this._click.bind(this);
+		this._dblclick = this._dblclick.bind(this);
+		this._keydown = this._keydown.bind(this);
+		this._quickAddInputChanged = this._quickAddInputChanged.bind(this);
+		this._quickAddSubmitted = this._quickAddSubmitted.bind(this);
 		this._setActiveTask = this._setActiveTask.bind(this);
 		this._scrollOpenedTask = this._scrollOpenedTask.bind(this);
 
@@ -55,20 +70,122 @@ export class PageTaskList extends BaseList {
 		this._removed = [];
 		this._replaced = [];
 		this._updated = [];
+		this.chips = new TaskChipController(this.view);
+		this._quickAddForm = null;
+		this._quickAddInput = null;
+		this._quickAddSubmit = null;
+		this._quickAddError = null;
 	}
 
 	init() {
 		this.target.addEventListener("change", this._change);
 		this.target.addEventListener("click", this._click);
+		this.target.addEventListener("dblclick", this._dblclick);
+		this.target.addEventListener("keydown", this._keydown);
 		this.target.addEventListener("set-subcomponent", this._setActiveTask);
 		this.target.addEventListener("component-opened", this._scrollOpenedTask);
+		this._initQuickAdd();
+	}
+
+	_initQuickAdd() {
+		const container = this.component?.elt;
+		if (!container) return;
+		const form = container.querySelector<HTMLFormElement>(
+			"[data-role='task-quick-add']",
+		);
+		if (!form) return;
+		this._quickAddForm = form;
+		this._quickAddInput =
+			form.querySelector<HTMLInputElement>("input[name='name']");
+		this._quickAddSubmit = form.querySelector<HTMLButtonElement>(
+			"button[type='submit']",
+		);
+		this._quickAddError = container.querySelector<HTMLElement>(
+			"[data-role='quick-add-error']",
+		);
+		this._quickAddInput?.addEventListener("input", this._quickAddInputChanged);
+		form.addEventListener("submit", this._quickAddSubmitted);
+		this._quickAddInputChanged();
+	}
+
+	_quickAddInputChanged() {
+		if (!this._quickAddInput || !this._quickAddSubmit) return;
+		const hasText = this._quickAddInput.value.trim().length > 0;
+		this._quickAddSubmit.disabled = !hasText;
+		if (this._quickAddError && hasText) {
+			this._quickAddError.dataset.visible = "false";
+			this._quickAddError.textContent = "";
+		}
+	}
+
+	async _quickAddSubmitted(e: Event) {
+		e.preventDefault();
+		e.stopPropagation();
+		const form = this._quickAddForm;
+		const input = this._quickAddInput;
+		const submit = this._quickAddSubmit;
+		if (!form || !input) return;
+
+		const name = input.value.trim();
+		const route = form.dataset.route;
+		if (!name || !route) return;
+
+		if (submit) submit.disabled = true;
+		form.setAttribute("aria-busy", "true");
+		if (this._quickAddError) {
+			this._quickAddError.dataset.visible = "false";
+			this._quickAddError.textContent = "";
+		}
+
+		const data = new FormData();
+		data.append("name", name);
+		const response = await request.post<RequestResult>(route, data);
+
+		form.removeAttribute("aria-busy");
+		if (!response?.ok) {
+			if (this._quickAddError) {
+				this._quickAddError.textContent =
+					response?.error || "Could not create task. Please try again.";
+				this._quickAddError.dataset.visible = "true";
+			}
+			if (submit) submit.disabled = input.value.trim().length === 0;
+			input.focus({ preventScroll: true });
+			return;
+		}
+
+		const html = response.html || null;
+		const newRow = html?.querySelector<HTMLLIElement>(
+			"li[lp-component][data-kind='task']",
+		);
+		input.value = "";
+		if (submit) submit.disabled = true;
+
+		if (newRow && this.activeTasks) {
+			const existing = this._existingTask(newRow);
+			if (existing) {
+				setTaskTrayOpen(existing, true);
+			} else {
+				await withTransition(
+					() => {
+						this.activeTasks?.prepend(newRow);
+						this.view.getComponent(newRow);
+						setTaskTrayOpen(newRow, true);
+						this.view.addFlash(newRow);
+						this._isEmpty = false;
+						this._setListVisibility();
+					},
+					{ label: "page-tasks:quick-add" },
+				);
+			}
+		}
+		input.focus({ preventScroll: true });
 	}
 
 	_change(e: Event) {
 		const target = e.target as Element | null;
 		if (!target?.closest) return;
 		const widget = target.closest<HTMLElement>("[data-widget]")?.dataset.widget;
-		if (widget !== "TaskSettings" && widget !== "TaskForm") {
+		if (widget !== "TaskForm") {
 			return;
 		}
 		const task = target.closest("li");
@@ -79,16 +196,53 @@ export class PageTaskList extends BaseList {
 		}
 	}
 
+	_dblclick(e: MouseEvent) {
+		const target = e.target as Element | null;
+		const title = target?.closest<HTMLElement>("[data-role='title']");
+		if (!title || !this.target.contains(title)) return;
+		const taskRow = title.closest<HTMLLIElement>(
+			"li[lp-component][data-kind='task']",
+		);
+		if (taskRow?.dataset.canEditChips !== "true") return;
+		e.preventDefault();
+		e.stopPropagation();
+		this.chips.startRename(taskRow);
+	}
+
+	_keydown(e: KeyboardEvent) {
+		if (e.key !== "Enter" && e.key !== " ") return;
+		const target = e.target as Element | null;
+		const description = target?.closest<HTMLElement>(
+			"[data-role='task-description'][data-editable='true']",
+		);
+		if (!description || !this.target.contains(description)) return;
+		const taskRow = description.closest<HTMLLIElement>(
+			"li[lp-component][data-kind='task']",
+		);
+		if (!taskRow) return;
+		e.preventDefault();
+		e.stopPropagation();
+		void this.chips.openChip(taskRow, "description");
+	}
+
 	_click(e: MouseEvent) {
 		const target = e.target as Element | null;
 		if (!target?.closest) return;
+
 		const submitter = target.closest<HTMLElement>(
 			"[data-role='save-toggle'], [data-role='complete-toggle']",
 		);
 		const role = submitter?.dataset?.role;
-		if (submitter && this.target.contains(submitter)) {
+		if (
+			submitter &&
+			(role === "save-toggle" || role === "complete-toggle") &&
+			this.target.contains(submitter)
+		) {
 			const task = this.view.getComponent(submitter);
 			if (!task) return;
+			if (role === "complete-toggle") {
+				this.chips?.closeChip(task.elt as HTMLLIElement);
+			}
 			const route = task.elt.dataset.route;
 			task.disable();
 			e.stopPropagation();
@@ -119,6 +273,74 @@ export class PageTaskList extends BaseList {
 			return;
 		}
 
+		const trayToggle = target.closest<HTMLElement>(
+			"[data-role='chip-tray-toggle']",
+		);
+		if (
+			trayToggle?.dataset.role === "chip-tray-toggle" &&
+			this.target.contains(trayToggle)
+		) {
+			const taskRow = trayToggle.closest<HTMLLIElement>(
+				"li[lp-component][data-kind='task']",
+			);
+			if (taskRow) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.chips?.toggleTray(taskRow);
+			}
+			return;
+		}
+
+		const chipButton = target.closest<HTMLElement>("[data-chip]");
+		if (chipButton?.dataset.chip && this.target.contains(chipButton)) {
+			const taskRow = chipButton.closest<HTMLLIElement>(
+				"li[lp-component][data-kind='task']",
+			);
+			const field = chipButton.dataset.chip as TaskChipField;
+			if (taskRow) {
+				e.preventDefault();
+				e.stopPropagation();
+				void this.chips?.openChip(taskRow, field);
+			}
+			return;
+		}
+
+		const taskAction = target.closest<HTMLElement>("[data-task-action]");
+		if (taskAction?.dataset.taskAction && this.target.contains(taskAction)) {
+			const taskRow = taskAction.closest<HTMLLIElement>(
+				"li[lp-component][data-kind='task']",
+			);
+			const action = taskAction.dataset.taskAction;
+			if (taskRow) {
+				e.preventDefault();
+				e.stopPropagation();
+				if (action === "rename") {
+					this.chips?.startRename(taskRow);
+				} else if (action === "change-form") {
+					void this.chips?.openChip(taskRow, "form");
+				}
+			}
+			return;
+		}
+
+		const editableDescription = target.closest<HTMLElement>(
+			"[data-role='task-description'][data-editable='true']",
+		);
+		if (
+			editableDescription?.dataset.role === "task-description" &&
+			this.target.contains(editableDescription)
+		) {
+			const taskRow = editableDescription.closest<HTMLLIElement>(
+				"li[lp-component][data-kind='task']",
+			);
+			if (taskRow) {
+				e.preventDefault();
+				e.stopPropagation();
+				void this.chips?.openChip(taskRow, "description");
+			}
+			return;
+		}
+
 		const completedHeader = this.completedHeader;
 		if (completedHeader?.contains(target)) {
 			const expandToggle = this.expandToggle;
@@ -131,6 +353,22 @@ export class PageTaskList extends BaseList {
 			expandToggle.setAttribute("aria-label", open ? "Collapse" : "Expand");
 			expandToggle.title = open ? "Collapse" : "Expand";
 			completedTasks.dataset.visible = open ? "true" : "false";
+			return;
+		}
+
+		// Clicking a no-form editable task row expands or collapses its faded '+' chip tray.
+		if (
+			!target.closest(
+				"button, a, input, textarea, select, form, [lp-menu], [data-role='chip-drawer']",
+			)
+		) {
+			const nav = target.closest<HTMLElement>("[lp-nav]:not([lp-show])");
+			const taskRow = nav?.closest<HTMLLIElement>(
+				"li[lp-component][data-kind='task'][data-can-edit-chips='true']",
+			);
+			if (taskRow && this.target.contains(taskRow)) {
+				this.chips?.toggleTray(taskRow);
+			}
 		}
 	}
 
@@ -214,19 +452,28 @@ export class PageTaskList extends BaseList {
 	}
 
 	async focusTask(taskId: string) {
-		const taskElt = this.target.querySelector(`[data-key="${taskId}"]`);
+		const taskElt = this.target.querySelector<HTMLLIElement>(
+			`[data-key="${taskId}"]`,
+		);
 		if (!taskElt) return false;
 
 		const task = this.view.getComponent(taskElt);
 		if (!task) return false;
 
 		const revealCompleted = this.completedTasks?.contains(taskElt);
-		await task.activate("default");
-		await task.prepareRender(true);
+		const hasDefaultWidget = Boolean(task.default);
+		if (hasDefaultWidget) {
+			await task.activate("default");
+			await task.prepareRender(true);
+		}
 		await withTransition(
 			() => {
 				if (revealCompleted) this._openCompletedTasks();
-				task.render(true);
+				if (hasDefaultWidget) {
+					task.render(true);
+				} else if (taskElt.dataset.canEditChips === "true") {
+					setTaskTrayOpen(taskElt, true);
+				}
 			},
 			{ label: "page-tasks:focus" },
 		);
@@ -259,7 +506,7 @@ export class PageTaskList extends BaseList {
 			Boolean(empty) &&
 			!hasActive &&
 			!hasCompleted &&
-			Object.is(this.component.active, this);
+			this.component.active?.name !== "CreateTask";
 
 		if (empty) empty.dataset.visible = showEmpty ? "true" : "false";
 		activeTasks.dataset.visible = hasActive || showEmpty ? "true" : "false";
@@ -545,6 +792,13 @@ export class PageTaskList extends BaseList {
 		component: ViewComponent | null,
 		replacement: HTMLLIElement | null = null,
 	) {
+		if (
+			this.chips?.hasOpenEditor(
+				(component?.elt as HTMLLIElement | null) ?? null,
+			)
+		) {
+			return true;
+		}
 		return Object.values(component?.widgets ?? {}).some((widget) => {
 			if (
 				widget.unsavedState === true ||
@@ -642,6 +896,7 @@ export class PageTaskList extends BaseList {
 		}
 
 		for (const elt of this._removed) {
+			this.chips?.closeChip(elt);
 			const component = this.view.getComponent(elt);
 			component?.destroy?.();
 			elt.remove();
@@ -650,6 +905,7 @@ export class PageTaskList extends BaseList {
 
 		for (const { current, from, replacement, to } of this
 			._preparedReplacements || []) {
+			this.chips?.closeChip(from);
 			from.replaceWith(to);
 			current?.destroy?.();
 			if (replacement) {
@@ -685,5 +941,24 @@ export class PageTaskList extends BaseList {
 			const task = this.view.getComponent(elt) as Task | null;
 			task?.closeOpenWidget?.();
 		});
+	}
+
+	destroy() {
+		this.chips?.closeAll();
+		this.target.removeEventListener("change", this._change);
+		this.target.removeEventListener("click", this._click);
+		this.target.removeEventListener("dblclick", this._dblclick);
+		this.target.removeEventListener("keydown", this._keydown);
+		this.target.removeEventListener("set-subcomponent", this._setActiveTask);
+		this.target.removeEventListener("component-opened", this._scrollOpenedTask);
+		this._quickAddInput?.removeEventListener(
+			"input",
+			this._quickAddInputChanged,
+		);
+		this._quickAddForm?.removeEventListener("submit", this._quickAddSubmitted);
+		this._quickAddForm = null;
+		this._quickAddInput = null;
+		this._quickAddSubmit = null;
+		this._quickAddError = null;
 	}
 }

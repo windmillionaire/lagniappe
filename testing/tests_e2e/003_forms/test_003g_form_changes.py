@@ -911,7 +911,7 @@ def test_checkbox_replacement_explains_and_preserves_boolean_choices(get_admin, 
 # @style radio.default
 # @template forms/builder.html::main
 # @template pages/tasks.html::task_form
-# @template pages/tasks.html::settings_form
+# @template pages/tasks.html::task_details
 # @template reference/macros.html::modal
 def test_saved_conversion_runs_after_save_and_preserves_originals(get_admin, get_user, tmp_path):
     user = get_admin()
@@ -1077,13 +1077,8 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_admin, get
     )
     assert saved_notice
 
-    # Updating settings refreshes the loaded form without dismissing its notice.
-    settings_form = task_resource.settings_form
-    description = settings_form.locator("[name='description']")
-    if not description.is_visible():
-        settings_form.locator("#description [data-role='label']").click()
-    description.fill("Settings updated after migration")
-    task_resource.save()
+    # Updating a chip refreshes task metadata without dismissing the open form's notice.
+    task_resource.set_description("Settings updated after migration")
     saved = Entities.fetch_one(tasks[1].key, request=Fetch.root())
     assert saved.description == "Settings updated after migration"
     assert saved.db.get("pre_migration") == saved_notice

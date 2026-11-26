@@ -1,44 +1,51 @@
 from playwright.sync_api import expect
 
 from testing.definitions import SitePages, Tasks, Users
-from testing.elements import DateSelect, UserSelect
+from testing.elements import Badges
 from testing.utility.local_time import (
     local_date_plus_days_iso,
 )
+from testing.utility.network import expect_successful_response
 
 
 DUE_DATE_BADGE = "[data-role='change-due-date']"
 SCHEDULE_BADGE = "[data-role='schedule']"
 
 
-def _open_schedule_form(task):
-    schedule_form = DateSelect(task.settings_form).form()
-    expect(schedule_form.locator("input[name='due-date']")).to_be_visible()
-    return schedule_form
+def _open_schedule_drawer(task):
+    drawer = task.open_chip("schedule")
+    expect(drawer.locator("input[name='due-date']")).to_be_visible()
+    return drawer
 
 
-def _save_settings(task):
-    task.save()
-    expect(task.element.locator(task.SETTINGS_FORM)).to_be_visible()
+def _save_schedule(task, drawer):
+    with expect_successful_response(
+        task.user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
+    ):
+        drawer.locator("[data-role='save-schedule']").click()
+    expect(drawer).not_to_be_visible()
 
 
 def _add_recurring_schedule(task, interval="1", unit="day"):
-    schedule_form = _open_schedule_form(task)
-    schedule_form.locator("input[name='recurring']").check()
-    expect(schedule_form.locator("[data-role='recurring']")).to_be_visible()
-    schedule_form.locator("input[name='interval']").fill(interval)
-    schedule_form.locator(f"input[name='unit'][value='{unit}']").check()
-    _save_settings(task)
+    drawer = _open_schedule_drawer(task)
+    drawer.locator("input[name='recurring']").check()
+    expect(drawer.locator("[data-role='recurring']")).to_be_visible()
+    drawer.locator("input[name='interval']").fill(interval)
+    drawer.locator(f"input[name='unit'][value='{unit}']").check()
+    _save_schedule(task, drawer)
 
 
 def _add_weekly_schedule(task):
-    schedule_form = _open_schedule_form(task)
-    schedule_form.locator("input[name='scheduled']").check()
-    expect(schedule_form.locator("[data-role='scheduled']")).to_be_visible()
-    schedule_form.locator("input[name='schedule-type'][value='weekly']").check()
-    expect(schedule_form.locator("[data-role='weekly']")).to_be_visible()
-    schedule_form.locator("input[name='weekly-day-0']").check()
-    _save_settings(task)
+    drawer = _open_schedule_drawer(task)
+    drawer.locator("input[name='scheduled']").check()
+    expect(drawer.locator("[data-role='scheduled']")).to_be_visible()
+    drawer.locator("input[name='schedule-type'][value='weekly']").check()
+    expect(drawer.locator("[data-role='weekly']")).to_be_visible()
+    drawer.locator("input[name='weekly-day-0']").check()
+    _save_schedule(task, drawer)
 
 
 def test_page_task_add_due_date(get_admin, get_user):
@@ -47,23 +54,16 @@ def test_page_task_add_due_date(get_admin, get_user):
     assignee = Users.create_user.get(user)
     user.go(task)
 
-    UserSelect(task.settings_form).select(assignee)
-    _save_settings(task)
-    settings_form = task.settings_form
-    expect(UserSelect(settings_form).button).to_contain_text(assignee.definition.name)
-    expect(settings_form.locator("select[name='assigned_to']")).to_have_value(
-        assignee.entity.page.urlsafe_key
-    )
+    task.select_chip_option("assigned_to", assignee)
+    Badges.USER.visible(task.element, assignee)
 
     due_date = local_date_plus_days_iso(4)
-    schedule_form = _open_schedule_form(task)
-    schedule_form.locator("input[name='due-date']").fill(due_date)
-    _save_settings(task)
+    drawer = _open_schedule_drawer(task)
+    drawer.locator("input[name='due-date']").fill(due_date)
+    _save_schedule(task, drawer)
 
     expect(task.element.locator(DUE_DATE_BADGE)).to_be_visible()
-    expect(UserSelect(task.settings_form).button).to_contain_text(
-        assignee.definition.name
-    )
+    Badges.USER.visible(task.element, assignee)
 
     assigned_user = get_user(Users.create_user)
     assigned_home = assigned_user.go(SitePages.HOME)
@@ -76,9 +76,9 @@ def test_page_task_remove_due_date(get_admin, get_user):
     task = Tasks.test_page_task_remove_due_date.get(user)
     user.go(task)
 
-    schedule_form = _open_schedule_form(task)
-    schedule_form.get_by_role("button", name="Remove").click()
-    _save_settings(task)
+    drawer = _open_schedule_drawer(task)
+    drawer.get_by_role("button", name="Remove").click()
+    _save_schedule(task, drawer)
 
     expect(task.element.locator(DUE_DATE_BADGE)).not_to_be_attached()
 
@@ -88,9 +88,9 @@ def test_page_task_due_today(get_admin, get_user):
     task = Tasks.test_page_task_due_today.get(user)
     user.go(task)
 
-    schedule_form = _open_schedule_form(task)
-    schedule_form.get_by_role("button", name="Today").click()
-    _save_settings(task)
+    drawer = _open_schedule_drawer(task)
+    drawer.get_by_role("button", name="Today").click()
+    _save_schedule(task, drawer)
 
     expect(task.element.locator(DUE_DATE_BADGE)).to_contain_text("Today")
 
@@ -107,7 +107,6 @@ def test_page_task_repeats_when_completed(get_admin, get_user):
 
     expect(task.element.locator(task.COMPLETE_TASK_CHECKBOX)).not_to_be_checked()
     expect(task.element.locator(DUE_DATE_BADGE)).to_be_visible()
-
 
 
 def test_page_task_add_schedule(get_admin, get_user):
@@ -127,9 +126,9 @@ def test_page_task_remove_schedule(get_admin, get_user):
 
     _add_weekly_schedule(task)
 
-    schedule_form = _open_schedule_form(task)
-    schedule_form.locator("input[name='scheduled']").uncheck()
-    _save_settings(task)
+    drawer = _open_schedule_drawer(task)
+    drawer.locator("input[name='scheduled']").uncheck()
+    _save_schedule(task, drawer)
 
     expect(task.element.locator(SCHEDULE_BADGE)).not_to_be_attached()
 
