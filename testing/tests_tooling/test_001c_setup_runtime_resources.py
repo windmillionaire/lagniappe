@@ -3358,11 +3358,11 @@ def test_setup_package_install_helpers(monkeypatch):
         "-m",
         "pip",
         "install",
-        "PyYAML==6.0.3",
+        "PyYAML==6.0.4",
     ]
-    assert package_install._pinned_requirement("redis") == "redis[hiredis]==8.1.0"
+    assert package_install._pinned_requirement("redis") == "redis[hiredis]==8.2.0"
     assert package_install._pinned_requirement("rich") == "rich==15.0.0"
-    assert package_install._pinned_requirement("certifi") == "certifi==2026.10.23"
+    assert package_install._pinned_requirement("certifi") == "certifi==2026.11.20"
     assert run_calls[1][0] == [sys.executable, "-m", "pip", "check"]
     assert invalidated == [True]
     assert imported == ["yaml"]
@@ -3434,7 +3434,7 @@ def test_setup_dependency_transaction_validates_versions_and_pip_check(monkeypat
     monkeypatch.setattr(
         package_install.metadata,
         "version",
-        lambda _distribution_name: "6.0.3",
+        lambda _distribution_name: "6.0.4",
     )
     monkeypatch.setattr(
         package_install.importlib,
@@ -3445,7 +3445,7 @@ def test_setup_dependency_transaction_validates_versions_and_pip_check(monkeypat
         "yaml",
         "PyYAML",
         check_import=False,
-    ) == ("PyYAML==6.0.3", True, "6.0.3")
+    ) == ("PyYAML==6.0.4", True, "6.0.4")
     assert preflight_imports == []
 
     dependencies = (
@@ -3454,7 +3454,7 @@ def test_setup_dependency_transaction_validates_versions_and_pip_check(monkeypat
     )
     status_calls = {"yaml": 0, "requests": 0}
     requirements = {
-        "yaml": "PyYAML==6.0.3",
+        "yaml": "PyYAML==6.0.4",
         "requests": "requests==2.34.2",
     }
 
@@ -3467,7 +3467,7 @@ def test_setup_dependency_transaction_validates_versions_and_pip_check(monkeypat
         return (
             requirements[import_name],
             ready,
-            "6.0.3" if ready else "version mismatch",
+            "6.0.4" if ready else "version mismatch",
         )
 
     run_calls = []
@@ -3508,7 +3508,7 @@ def test_setup_dependency_transaction_validates_versions_and_pip_check(monkeypat
             "--upgrade",
             "--upgrade-strategy",
             "eager",
-            "PyYAML==6.0.3",
+            "PyYAML==6.0.4",
             "requests==2.34.2",
         ],
         [sys.executable, "-m", "pip", "check"],
