@@ -273,11 +273,7 @@ def _run_node_command(
             )
             break
         except OSError as error:
-            if attempt == 1 and error.errno in {
-                errno.EAGAIN,
-                errno.EINTR,
-                errno.EFAULT,
-            }:
+            if attempt == 1 and error.errno in {errno.EAGAIN, errno.EINTR}:
                 attempt += 1
                 continue
             scope = "file batch" if case_timeout_ms is not None else "isolated case"
