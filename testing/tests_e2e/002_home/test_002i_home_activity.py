@@ -196,6 +196,7 @@ def _warm_offline_create_widgets(home, *, note=True, task=True):
 
 # @template home/notes.html::list
 # @template home/notes.html::empty_note_item
+@pytest.mark.e2e_serial
 def test_home_notes_empty_state_opens_with_hint(get_admin, get_user):
     owner = get_admin()
     suffix = uuid4().hex
@@ -268,12 +269,14 @@ def test_create_note_body_and_photo_from_home(get_admin, get_user):
     photo_note = Entities.fetch_one(
         photo_item.get_attribute("data-key"), request=Fetch.direct()
     )
-
-    assert photo_note.body == photo_body
-    assert photo_note.visibility == "everyone"
-    assert photo_note.scope == "home"
-    assert "photo" in photo_note.assets
-    expect(photo_item).to_contain_text("Everyone")
+    try:
+        assert photo_note.body == photo_body
+        assert photo_note.visibility == "everyone"
+        assert photo_note.scope == "home"
+        assert "photo" in photo_note.assets
+        expect(photo_item).to_contain_text("Everyone")
+    finally:
+        Entities.delete(photo_note)
 
 
 # @template home/home.html::create
@@ -382,22 +385,24 @@ def test_home_note_visibility_across_users(get_user):
     viewer = get_user(Users.create_user_from_index, creator=owner)
     shared_body = _unique("Shared Home note")
     private_body = _unique("Private Home note")
-    _save_note(author, shared_body, visibility="everyone")
-    _save_note(author, private_body, visibility="private")
+    shared_note = _save_note(author, shared_body, visibility="everyone")
+    private_note = _save_note(author, private_body, visibility="private")
+    try:
+        viewer_home = viewer.go(SitePages.HOME)
+        _ = viewer_home.activity_list
+        expect(_activity_item(viewer_home, shared_body)).to_be_visible()
+        expect(_activity_item(viewer_home, private_body)).not_to_be_attached()
 
-    viewer_home = viewer.go(SitePages.HOME)
-    _ = viewer_home.activity_list
-    expect(_activity_item(viewer_home, shared_body)).to_be_visible()
-    expect(_activity_item(viewer_home, private_body)).not_to_be_attached()
+        author_home = author.go(SitePages.HOME)
+        _ = author_home.activity_list
+        expect(_activity_item(author_home, shared_body)).to_be_visible()
+        expect(_activity_item(author_home, private_body)).to_be_visible()
 
-    author_home = author.go(SitePages.HOME)
-    _ = author_home.activity_list
-    expect(_activity_item(author_home, shared_body)).to_be_visible()
-    expect(_activity_item(author_home, private_body)).to_be_visible()
-
-    owner_home = owner.go(SitePages.HOME)
-    _ = owner_home.activity_list
-    expect(_activity_item(owner_home, private_body)).to_be_visible()
+        owner_home = owner.go(SitePages.HOME)
+        _ = owner_home.activity_list
+        expect(_activity_item(owner_home, private_body)).to_be_visible()
+    finally:
+        Entities.delete(shared_note, private_note)
 
 
 # @template notifications.html::item

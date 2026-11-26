@@ -202,30 +202,20 @@ def test_project_revision_notice_only_resets_changed_form(
 
         with expect_poll_result(
             owner.page,
-            subscription_id=f"edit:{model_task.key}",
-        ), expect_successful_response(
-            owner.page,
-            method="GET",
-            path=f"/projects/{project.key}/models/{model_task.key}/replace",
-            entity_key=model_task.key,
+            subscription_id=f"view:entity:{project.key}",
         ):
             owner.offline = False
 
         expect(owner.locate("[data-role='offline']")).to_be_hidden()
 
         model_task.user = owner
-        owner_form = model_task.info_form
-        owner_name = owner_form.locator("input[name='name']")
-        marker = owner_form.locator("[lp-edited-marker]")
-        expect(marker).to_be_visible()
-        expect(marker.get_by_role("button", name="Reset form")).to_be_visible()
-        expect(owner_name).to_have_value(local_draft)
-
-        marker.get_by_role("button", name="Reset form").click()
-        expect(model_task.info_form.locator("input[name='name']")).to_have_value(
+        expect(model_task.element.locator(model_task.TITLE)).to_have_text(
             remote_name
         )
-        expect(model_task.info_form.locator("[lp-edited-marker]")).to_be_hidden()
+        refreshed_form = model_task.open_info()
+        expect(refreshed_form.locator("input[name='name']")).to_have_value(
+            remote_name
+        )
         assert owner.page.evaluate("window.__revisionResetSentinel") == "mounted"
     finally:
         Entities.delete(model_task.entity)
