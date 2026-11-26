@@ -424,12 +424,12 @@ STYLES = {
 		"wrapper": "grid grid-cols-1 h-10",
 		"default": "form-input col-start-1 row-start-1 h-10 w-full appearance-none rounded-md py-1.25 pr-8 pl-3 sm:text-sm placeholder:text-base-medium",
 		"icon": "select-icon pointer-events-none col-start-1 row-start-1 mr-2.5 self-center justify-self-end z-25 text-base-medium",
-		"button": "select-button group/toggle flex h-10 min-w-0 w-full flex-1 flex-row items-center gap-2 rounded-md bg-white px-3 text-left font-semibold focus-visible:outline-kind-default hover:outline-kind-default hover:outline-2 focus-visible:outline-2 disabled:pointer-events-none disabled:hover:outline-0 disabled:focus-visible:outline-0",
+		"button": "select-button form-input group/toggle flex h-10 min-w-0 w-full flex-1 flex-row items-center gap-2 rounded-md px-3 text-left sm:text-sm font-semibold disabled:pointer-events-none",
 		"heading": "select-heading flex items-center gap-1.5 sm:text-sm font-semibold leading-none text-base-dark mb-1.5",
 		"label": "min-w-0 flex-1 truncate text-left",
 		"row": "flex w-full items-center gap-2",
 		"expandIndicator": "ml-auto shrink-0 text-base-medium transition-transform duration-150 group-aria-expanded/toggle:rotate-180",
-		"action": "grid size-10 shrink-0 place-items-center rounded-md bg-white text-kind-default shadow-sm hover:outline-2 hover:outline-kind-default focus-visible:outline-2 focus-visible:outline-kind-default"
+		"action": "form-input grid size-10 shrink-0 place-items-center rounded-md text-kind-default"
 	},
 	"signature": {
 		"pad": "relative rounded-md w-full h-40 bg-white outline-base-light outline",
@@ -478,10 +478,9 @@ STYLES = {
 		"complete": "order-first mt-0.5 grid size-5 shrink-0 place-items-center self-start",
 		"description": "task-description text-sm whitespace-pre-wrap [overflow-wrap:anywhere] italic px-3 py-2 ring ring-inset font-semibold min-w-0 w-fit max-w-full rounded-md text-base-default ring-task-default/20 bg-base-bg",
 		"quickAdd": {
-			"form": "mx-4 mb-3 flex flex-row items-center gap-2 rounded-md border border-task-light/50 bg-task-bg/50 px-3 py-2 sm:mx-6",
-			"icon": "text-task-default inline-flex shrink-0 items-center justify-center",
-			"input": "min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base text-base-dark placeholder:text-base-medium focus:border-task-light focus:bg-white focus:outline-none focus:ring-2 focus:ring-task-default/15",
-			"submit": "shrink-0 rounded-md bg-task-default px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-task-dark disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-task-default"
+			"form": "mx-4 mb-2 flex flex-row items-center gap-2 rounded-md bg-task-bg p-3 sm:mx-2",
+			"input": "form-input h-10 min-w-0 flex-1 rounded-md px-3 py-1.25 text-base sm:text-sm font-normal",
+			"submit": "h-10 shrink-0 rounded-md bg-task-default px-4 text-sm font-semibold text-white transition-colors hover:bg-task-dark disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-task-default"
 		},
 		"chip": {
 			"editable": "lp-badge task-chip-editable ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-white py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",

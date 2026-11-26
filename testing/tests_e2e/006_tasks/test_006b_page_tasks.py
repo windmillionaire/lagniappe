@@ -211,7 +211,7 @@ def test_create_page_task_with_project(get_admin, get_user):
         "href", re.compile(rf"/projects/{re.escape(project.key)}$")
     )
     expect(drawer.locator("button[data-role='clear']")).to_be_visible()
-    expect(drawer.locator("button[lp-select]")).to_be_visible()
+    expect(drawer.locator("input[role='combobox']")).to_be_visible()
     expect(user.page.locator("[role='listbox'][data-visible='true']")).to_have_count(0)
 
 
@@ -231,7 +231,6 @@ def test_create_page_task_with_model_task(get_admin, get_user):
     _quick_add_page_task(page, task)
 
     drawer = task.open_chip("project")
-    drawer.locator("button[lp-select]").click()
     combobox = drawer.locator("input[role='combobox']")
     combobox.fill(project.definition.name)
     panel = user.page.locator("[role='listbox'][data-visible='true']")
@@ -310,7 +309,6 @@ def test_model_task_replaces_form_on_task_chip(get_admin, get_user):
     Badges.FORM.visible(task.element, original_form)
 
     drawer = task.open_chip("project")
-    drawer.locator("button[lp-select]").click()
     combobox = drawer.locator("input[role='combobox']")
     combobox.fill(model.name)
     panel = user.page.locator("[role='listbox'][data-visible='true']")

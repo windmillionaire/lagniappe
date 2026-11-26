@@ -190,12 +190,11 @@ test("test_task_chips_tray_toggle_and_apply_update_preserves_open_form", async (
 		"../../src/script/widgets/taskChips.ts",
 		{
 			"../../src/script/elements/combobox/facets.ts": {
+				FacetsBox: class {},
 				isFacetOption: () => false,
 			},
 			"../../src/script/elements/dueDate.ts": { DueDate: class {} },
-			"../../src/script/elements/sectionToggle.ts": {
-				SectionToggle: { facet: () => ({ init() {}, destroy() {} }) },
-			},
+			"../../src/script/elements/formatting.ts": { formatting: {} },
 			"../../src/script/elements/taskUpload.ts": { TaskUpload: class {} },
 			"../../src/script/shared/index.ts": { request: {} },
 			"../../src/script/shared/transitions.ts": {

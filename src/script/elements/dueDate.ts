@@ -653,11 +653,11 @@ export class DueDate {
 		);
 
 		const everyCol = row.appendChild(
-			primitives.div({ style: "flex flex-col gap-1 w-24" }),
+			primitives.div({ style: "flex flex-col gap-1.5 w-24" }),
 		);
 		everyCol.appendChild(
 			primitives.span({
-				style: "text-xs font-semibold text-base-dark",
+				style: STYLES.label.default,
 				text: "Every",
 			}),
 		);
@@ -670,11 +670,11 @@ export class DueDate {
 		everyCol.appendChild(intervalInput);
 
 		const unitCol = row.appendChild(
-			primitives.div({ style: "flex flex-col gap-1" }),
+			primitives.div({ style: "flex flex-col gap-1.5" }),
 		);
 		unitCol.appendChild(
 			primitives.span({
-				style: "text-xs font-semibold text-base-dark",
+				style: STYLES.label.default,
 				text: "Unit",
 			}),
 		);

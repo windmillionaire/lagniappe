@@ -16,20 +16,17 @@
       <form data-role="task-quick-add"
             data-route="{{ url_for('tasks.create', key=page.urlsafe_key) }}"
             class="{{ styles.task.quickAdd.form }}">
-        <span class="{{ styles.task.quickAdd.icon }}" aria-hidden="true">
-          {{ render_icon("add", styles.icon.default) }}
-        </span>
         <input type="text"
                name="name"
                autocomplete="off"
                aria-label="Add a task"
-               placeholder="Add a task…"
+               placeholder="add a task..."
                class="{{ styles.task.quickAdd.input }}">
         <button type="submit"
                 disabled
                 class="{{ styles.task.quickAdd.submit }}">Add</button>
       </form>
-      <p class="{{ styles.message }} mx-4 sm:mx-6"
+      <p class="{{ styles.message }} mx-4 sm:mx-2"
          data-kind="error"
          data-role="quick-add-error"
          data-visible="false"></p>

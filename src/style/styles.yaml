@@ -1391,10 +1391,10 @@ select:
     hooks: [select-icon]
     css: [src/style/icons.css]
   button:
-    classes: select-button group/toggle flex h-10 min-w-0 w-full flex-1 flex-row items-center gap-2 rounded-md bg-white px-3 text-left font-semibold focus-visible:outline-kind-default hover:outline-kind-default hover:outline-2 focus-visible:outline-2 disabled:pointer-events-none disabled:hover:outline-0 disabled:focus-visible:outline-0
-    intent: single-line select button with truncated label and trailing chevron
-    surfaces: [server, frontend]
-    hooks: [select-button]
+    classes: select-button form-input group/toggle flex h-10 min-w-0 w-full flex-1 flex-row items-center gap-2 rounded-md px-3 text-left sm:text-sm font-semibold disabled:pointer-events-none
+    intent: single-line select button with truncated label, thin flat border, and trailing chevron
+    surfaces: [server]
+    hooks: [select-button, form-input]
     css: [src/style/forms.css, src/style/icons.css]
   heading:
     classes: select-heading flex items-center gap-1.5 sm:text-sm font-semibold leading-none text-base-dark mb-1.5
@@ -1415,9 +1415,11 @@ select:
     intent: trailing chevron indicating expandable section toggle state
     surfaces: [frontend]
   action:
-    classes: grid size-10 shrink-0 place-items-center rounded-md bg-white text-kind-default shadow-sm hover:outline-2 hover:outline-kind-default focus-visible:outline-2 focus-visible:outline-kind-default
-    intent: square companion open-link or clear button beside a section toggle
+    classes: form-input grid size-10 shrink-0 place-items-center rounded-md text-kind-default
+    intent: flat thin-bordered square companion open-link or clear button beside a select control
     surfaces: [frontend]
+    hooks: [form-input]
+    css: [src/style/forms.css]
 
 signature:
   pad:
@@ -1561,19 +1563,17 @@ task:
     css: [src/style/content.css]
   quickAdd:
     form:
-      classes: mx-4 mb-3 flex flex-row items-center gap-2 rounded-md border border-task-light/50 bg-task-bg/50 px-3 py-2 sm:mx-6
-      intent: inline quick-add bar at the top of the page tasks tab
-      surfaces: [server]
-    icon:
-      classes: text-task-default inline-flex shrink-0 items-center justify-center
-      intent: leading add icon inside the task quick-add bar
+      classes: mx-4 mb-2 flex flex-row items-center gap-2 rounded-md bg-task-bg p-3 sm:mx-2
+      intent: inline quick-add bar at the top of the page tasks tab matching standard tab form margins
       surfaces: [server]
     input:
-      classes: min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base text-base-dark placeholder:text-base-medium focus:border-task-light focus:bg-white focus:outline-none focus:ring-2 focus:ring-task-default/15
-      intent: text input inside the inline task quick-add bar
+      classes: form-input h-10 min-w-0 flex-1 rounded-md px-3 py-1.25 text-base sm:text-sm font-normal
+      intent: text input inside the inline task quick-add bar matching standard form inputs
       surfaces: [server]
+      hooks: [form-input]
+      css: [src/style/forms.css]
     submit:
-      classes: shrink-0 rounded-md bg-task-default px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-task-dark disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-task-default
+      classes: h-10 shrink-0 rounded-md bg-task-default px-4 text-sm font-semibold text-white transition-colors hover:bg-task-dark disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-task-default
       intent: submit button for the inline task quick-add bar
       surfaces: [server]
   chip:
