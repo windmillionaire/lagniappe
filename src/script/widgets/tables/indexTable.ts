@@ -35,9 +35,15 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 	declare loading: boolean;
 	declare loaded: boolean;
 	declare _empty: boolean;
-	declare _updated: Iterable<HTMLTableRowElement> & { length: number };
-	declare _created: Iterable<HTMLTableRowElement> & { length: number };
+	declare _updated: HTMLTableRowElement[];
+	declare _created: HTMLTableRowElement[];
 	declare _finishLoading?: boolean;
+	declare _completedSaves: Set<HTMLTableCellElement>;
+	declare _completedTimers: Map<
+		HTMLTableCellElement,
+		ReturnType<typeof setTimeout>
+	>;
+	declare _onDirectCompletedChange: (event: Event) => void;
 
 	constructor(
 		attributes: BaseTableAttributes<IndexTableView, IndexTableComponent>,
@@ -49,19 +55,114 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 		this._empty = false;
 		this._updated = [];
 		this._created = [];
+		this._completedSaves = new Set();
+		this._completedTimers = new Map();
+		this._onDirectCompletedChange = (event) =>
+			void this._handleCompletedToggle(event).catch(captureError);
+		this.target.addEventListener("change", this._onDirectCompletedChange);
+	}
+
+	async _handleCompletedToggle(event: Event) {
+		const input =
+			event.target instanceof HTMLInputElement &&
+			event.target.type === "checkbox"
+				? event.target
+				: null;
+		if (!input) return;
+		const toggle = input.closest("[data-role='task-complete-toggle']");
+		const cell = input.closest<HTMLTableCellElement>(
+			"td[data-column='completed'][data-editable='true']",
+		);
+		const row = cell?.closest<HTMLTableRowElement>("tr[data-key]");
+		if (!toggle || !cell || !row || !this.target.contains(cell)) return;
+		if (this._completedSaves.has(cell)) return;
+
+		const key = row.dataset.key;
+		if (!key) return;
+		const checked = input.checked;
+
+		this._completedSaves.add(cell);
+		const prevTimer = this._completedTimers.get(cell);
+		if (prevTimer !== undefined) {
+			clearTimeout(prevTimer);
+			this._completedTimers.delete(cell);
+		}
+		cell.querySelector("[data-role='quick-edit-error']")?.remove();
+		cell.dataset.editState = "saving";
+		cell.setAttribute("aria-busy", "true");
+		input.disabled = true;
+
+		try {
+			const { request } = await import("../../shared/request.ts");
+			const response = await request.patch(`/tasks/${key}/patch`, {
+				schema_id: "completed",
+				form_generation: cell.dataset.formGeneration || "0",
+				value: checked,
+			});
+			if (!cell.isConnected || !this.target.contains(cell)) return;
+			if (!response?.ok) {
+				input.checked = !checked;
+				cell.dataset.editState = "error";
+				const error = document.createElement("p");
+				error.dataset.role = "quick-edit-error";
+				error.setAttribute("role", "alert");
+				error.textContent =
+					response?.error || "Could not update task completion.";
+				cell.appendChild(error);
+				return;
+			}
+			const serialized = JSON.stringify(checked);
+			cell.dataset.editValue = serialized;
+			cell.dataset.sortValue = serialized;
+			const taskName =
+				row.querySelector("td[data-column='name']")?.textContent?.trim() ||
+				"task";
+			input.setAttribute(
+				"aria-label",
+				`Mark ${taskName} ${checked ? "incomplete" : "complete"}`,
+			);
+			cell.dataset.editState = "saved";
+			const timer = setTimeout(() => {
+				if (this._completedTimers.get(cell) !== timer) return;
+				this._completedTimers.delete(cell);
+				if (cell.isConnected && cell.dataset.editState === "saved") {
+					delete cell.dataset.editState;
+				}
+			}, 1200);
+			this._completedTimers.set(cell, timer);
+			this.sortingWidget?.refreshRows?.();
+		} catch (error) {
+			if (cell.isConnected && this.target.contains(cell)) {
+				input.checked = !checked;
+				cell.dataset.editState = "error";
+				const message = document.createElement("p");
+				message.dataset.role = "quick-edit-error";
+				message.setAttribute("role", "alert");
+				message.textContent = "Could not update task completion.";
+				cell.appendChild(message);
+			}
+			captureError(error);
+		} finally {
+			this._completedSaves.delete(cell);
+			if (cell.isConnected) {
+				cell.removeAttribute("aria-busy");
+				input.disabled = false;
+			}
+		}
 	}
 
 	async updated(response: RequestResult) {
 		const html = response.html || null;
-		this._updated =
-			html?.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]") || [];
+		const rows = html?.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]");
+		if (rows?.length) this._updated.push(...rows);
 		const append = html?.querySelector<HTMLTableRowElement>("tr[lp-load]");
 		this.loaded = !append;
 		return append;
 	}
 
 	async created(response: RequestResult) {
-		this._created = (response.html || null)?.querySelectorAll("tr") || [];
+		const rows = (response.html || null)?.querySelectorAll("tr");
+		if (rows?.length) this._created.push(...rows);
 	}
 
 	get selector() {
@@ -269,26 +370,36 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 			rowsChanged = true;
 		}
 
+		let finishedLoading = false;
 		if (this._finishLoading) {
 			this._finishLoading = false;
+			finishedLoading = true;
 			this.target.setAttribute("loaded", "");
 			this.setEmptyRowVisibility();
 			target.dataset.visible = "true";
 			this.loading = false;
 		}
 
-		if (rowsChanged) {
+		if (rowsChanged || finishedLoading) {
 			this.setEmptyRowVisibility();
-			if (sortingWasInitialized) this.sortingWidget?.refreshRows?.();
-			void this.component?.widgets?.TableEditor?.refreshCheckboxes().catch(
-				captureError,
-			);
+			if (sortingWasInitialized || finishedLoading) {
+				this.sortingWidget?.refreshRows?.();
+			}
+			if (rowsChanged) {
+				void this.component?.widgets?.TableEditor?.refreshCheckboxes().catch(
+					captureError,
+				);
+			}
 		} else if (this.target.hasAttribute("loaded")) {
 			this._clearLoadingState();
 		}
 	}
 
 	destroy() {
+		this.target.removeEventListener("change", this._onDirectCompletedChange);
+		for (const timer of this._completedTimers.values()) clearTimeout(timer);
+		this._completedTimers.clear();
+		this._completedSaves.clear();
 		this._clearLoadingState();
 		super.destroy();
 	}

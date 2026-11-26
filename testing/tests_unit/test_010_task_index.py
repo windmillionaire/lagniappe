@@ -157,8 +157,8 @@ def test_task_index(get_test_entities):
     ]
     assert [c["field"] for c in table.columns] == expected_fields
 
-    # Only name, due_date, modified selected by default
-    assert table.selected == ["name", "due_date", "modified"]
+    # Completed, name, due_date, modified selected by default
+    assert table.selected == ["completed", "name", "due_date", "modified"]
 
     # Verify entity.column() returns correct column_value for each task
     for task in tasks:
@@ -288,7 +288,7 @@ def test_task_index_status_column_derives_messages_from_mixed_forms(get_schema):
     ]
     assert table.fields["status"].label == "Status"
     assert table.fields["status"].selected is False
-    assert table.selected == ["name", "due_date", "modified"]
+    assert table.selected == ["completed", "name", "due_date", "modified"]
 
     assert completed_task.column("status").column_value == ["Completed"]
     assert completed_task.column("status").sort_value is True

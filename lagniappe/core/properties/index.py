@@ -32,7 +32,7 @@ class TaskTable(Columns["Entity | Site"]):
             AssignedTo,
             Modified,
         ]
-        self.default_selected = (Name, DueDate, Modified)
+        self.default_selected = (Completed, Name, DueDate, Modified)
         super().__init__(*args, entity=entity, **kwargs)
 
         for field in self.fields.values():

@@ -753,7 +753,9 @@ export default class Core extends ShellView {
 			target.closest("form") ||
 			target.closest("a") ||
 			target.closest("input") ||
-			target.closest("button")
+			target.closest("label") ||
+			target.closest("button") ||
+			target.closest("td[data-column='completed'][data-editable='true']")
 		) {
 			return;
 		}

@@ -449,18 +449,18 @@ const STYLES = {
     "thead": {
       "default": "sticky top-16 z-40 bg-white",
       "embedded": "bg-white",
-      "th": "group/header max-w-48 gap-2 truncate py-2.5 pr-3 text-left font-medium data-[active=false]:border-b-2",
+      "th": "group/header max-w-48 gap-2 truncate py-2.5 px-3 text-left font-medium data-[active=false]:border-b-2",
       "actionCell": "sticky right-0 z-20 w-px min-w-px max-w-px p-0 align-top overflow-visible",
       "actions": "absolute top-1/2 right-0 z-20 m-0 grid -translate-y-1/2 place-items-center",
       "actionButton": "grid size-7 place-items-center rounded-md bg-white text-kind-default outline-offset-0 transition-colors duration-100 hover:text-kind-dark hover:outline-2 hover:outline-kind-default focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-kind-default",
       "actionIcon": "embedded-table-action-icon"
     },
     "cell": {
-      "default": "max-w-48 py-3.5 pr-3 text-left font-medium",
-      "action": "w-px py-2.5 text-right text-lg font-medium whitespace-nowrap",
+      "default": "max-w-48 py-3.5 px-3 text-left font-medium",
+      "action": "w-px px-3 py-2.5 text-right text-lg font-medium whitespace-nowrap",
       "compact": {
-        "th": "group/header w-28 min-w-24 max-w-32 py-2.5 pr-3 text-left font-medium leading-snug whitespace-normal data-[active=false]:border-b-2",
-        "default": "w-28 min-w-24 max-w-32 py-3.5 pr-3 text-left font-medium whitespace-nowrap"
+        "th": "group/header w-28 min-w-24 max-w-32 py-2.5 px-3 text-left font-medium leading-snug whitespace-normal data-[active=false]:border-b-2",
+        "default": "w-28 min-w-24 max-w-32 py-3.5 px-3 text-left font-medium whitespace-nowrap"
       }
     },
     "filters": {
@@ -546,12 +546,12 @@ const STYLES = {
       "input": "w-80 max-w-full -mb-px border-b border-dashed border-base-medium bg-transparent p-0 font-bold text-base-dark focus:border-page-default focus:outline-none"
     },
     "description": {
-      "editor": "mt-4 flex w-full flex-col rounded-lg border border-kind-default bg-kind-bg px-3.5 py-2.5 shadow-xs transition-shadow focus-within:ring-2 focus-within:ring-kind-default/20",
-      "input": "block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-relaxed text-base-dark placeholder:text-base-medium focus:outline-none disabled:opacity-60",
-      "actions": "mt-2 flex flex-row items-center justify-between gap-2 border-t border-kind-light/70 pt-2",
+      "editor": "mt-4 flex w-full flex-col gap-2",
+      "input": "form-input block w-full resize-none overflow-hidden rounded-md px-3 py-2 text-sm leading-relaxed disabled:opacity-60",
+      "actions": "flex flex-row items-center justify-between gap-2",
       "buttons": "ml-auto flex flex-row items-center gap-1.5",
       "remove": "cursor-pointer text-xs font-medium text-base-medium transition-colors hover:text-delete-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default disabled:pointer-events-none disabled:opacity-50",
-      "cancel": "cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-base-dark transition-colors hover:bg-kind-light/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50",
+      "cancel": "cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-base-dark transition-colors hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50",
       "save": "inline-flex cursor-pointer items-center justify-center rounded bg-kind-default px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
     },
     "photo": {

@@ -113,6 +113,18 @@
        data-kind="{{ field.kind }}"
        href="{{ value.get('url') }}"
        target="_blank">{{ value.get('title') }}</a>
+  {%- elif field.id == 'completed' and field.editable and not parent.table.embedded -%}
+    <label data-role="task-complete-toggle"
+           data-type="checkbox"
+           class="{{ styles.checkbox.container }} cursor-pointer">
+      <input type="checkbox"
+             name="completed"
+             data-kind="task"
+             {% if value %}checked{% endif %}
+             aria-label="Mark {{ entity.name }} {{ 'incomplete' if value else 'complete' }}"
+             class="{{ styles.checkbox.default }}">
+      {{ render_icon("check", styles.checkbox.icon) }}
+    </label>
   {%- elif value is boolean -%}
     {{- boolean_icon(value) -}}
   {%- elif value is number -%}

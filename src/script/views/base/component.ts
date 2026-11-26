@@ -276,13 +276,13 @@ export default class ViewComponent {
 		}
 
 		const append = await widget.updated?.(response);
-		if (append) void this.load(widget, append.dataset.route);
 		if (widget !== this.active) {
 			await widget.prepareReconcile();
 			await withTransition(() => widget.reconcile(), {
 				label: `${this.name}:${widget.name}:load`,
 			});
 		}
+		if (append) void this.load(widget, append.dataset.route);
 	}
 
 	// triggered by a submit event, called by the core class's update() method
@@ -523,6 +523,23 @@ export default class ViewComponent {
 		Object.values(this.widgets).forEach((widget) => {
 			widget.reconcile();
 		});
+
+		if (this.activeWidget?.target) {
+			for (const candidate of this.elt.querySelectorAll<HTMLElement>(
+				"[data-widget]",
+			)) {
+				if (
+					candidate === this.activeWidget.target ||
+					candidate.dataset.persistent === "true" ||
+					candidate.closest("[lp-component]") !== this.elt
+				) {
+					continue;
+				}
+				if (!this.widgets[candidate.dataset.widget ?? ""]) {
+					candidate.dataset.visible = "false";
+				}
+			}
+		}
 
 		if (this.nav) {
 			this.nav.enable(this);

@@ -290,6 +290,10 @@ export class TableEditor {
 		return cell;
 	}
 
+	_isDirectCompletedCell(cell: Cell) {
+		return Boolean(cell.querySelector("[data-role='task-complete-toggle']"));
+	}
+
 	async _prepareCheckboxes() {
 		this._discardPreparedCheckboxes();
 		if (this._destroyed || !this.visible || !this.rows) return null;
@@ -304,7 +308,10 @@ export class TableEditor {
 		this._preparedCheckboxes = batch;
 		const results = await Promise.allSettled(
 			this._editableCells()
-				.filter((cell) => this._isCheckboxCell(cell))
+				.filter(
+					(cell) =>
+						this._isCheckboxCell(cell) && !this._isDirectCompletedCell(cell),
+				)
 				.map((cell) => this._prepareCheckbox(cell, batch)),
 		);
 		const failure = results.find((result) => result.status === "rejected");
@@ -445,6 +452,7 @@ export class TableEditor {
 
 		const cell = this._editableCell(e.target);
 		if (!cell || !this._isCheckboxCell(cell)) return;
+		if (this._isDirectCompletedCell(cell)) return;
 
 		e.stopPropagation();
 		const edit = this.checkboxEdits.get(cell);

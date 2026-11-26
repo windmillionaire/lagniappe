@@ -1477,7 +1477,7 @@ table:
       intent: embedded presentation within table thead
       surfaces: [server]
     th:
-      classes: "group/header max-w-48 gap-2 truncate py-2.5 pr-3 text-left font-medium data-[active=false]:border-b-2"
+      classes: "group/header max-w-48 gap-2 truncate py-2.5 px-3 text-left font-medium data-[active=false]:border-b-2"
       intent: th presentation within table thead
       surfaces: [server]
     actionCell:
@@ -1500,20 +1500,20 @@ table:
       css: [src/style/icons.css]
   cell:
     default:
-      classes: max-w-48 py-3.5 pr-3 text-left font-medium
+      classes: max-w-48 py-3.5 px-3 text-left font-medium
       intent: default presentation within table cell
       surfaces: [server]
     action:
-      classes: w-px py-2.5 text-right text-lg font-medium whitespace-nowrap
+      classes: w-px px-3 py-2.5 text-right text-lg font-medium whitespace-nowrap
       intent: action presentation within table cell
       surfaces: [server]
     compact:
       th:
-        classes: group/header w-28 min-w-24 max-w-32 py-2.5 pr-3 text-left font-medium leading-snug whitespace-normal data-[active=false]:border-b-2
+        classes: group/header w-28 min-w-24 max-w-32 py-2.5 px-3 text-left font-medium leading-snug whitespace-normal data-[active=false]:border-b-2
         intent: th presentation within table cell compact
         surfaces: [server]
       default:
-        classes: w-28 min-w-24 max-w-32 py-3.5 pr-3 text-left font-medium whitespace-nowrap
+        classes: w-28 min-w-24 max-w-32 py-3.5 px-3 text-left font-medium whitespace-nowrap
         intent: default presentation within table cell compact
         surfaces: [server]
   filters:
@@ -1782,16 +1782,18 @@ page:
       surfaces: [frontend]
   description:
     editor:
-      classes: mt-4 flex w-full flex-col rounded-lg border border-kind-default bg-kind-bg px-3.5 py-2.5 shadow-xs transition-shadow focus-within:ring-2 focus-within:ring-kind-default/20
-      intent: single-frame inline header editor for adding or editing a page description
+      classes: mt-4 flex w-full flex-col gap-2
+      intent: borderless inline header editor wrapper for adding or editing a page description
       surfaces: [frontend]
     input:
-      classes: block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-relaxed text-base-dark placeholder:text-base-medium focus:outline-none disabled:opacity-60
-      intent: borderless auto-sizing textarea inside the inline page description editor
+      classes: form-input block w-full resize-none overflow-hidden rounded-md px-3 py-2 text-sm leading-relaxed disabled:opacity-60
+      intent: form-styled auto-sizing textarea inside the inline page description editor
       surfaces: [frontend]
+      hooks: [form-input]
+      css: [src/style/forms.css]
     actions:
-      classes: mt-2 flex flex-row items-center justify-between gap-2 border-t border-kind-light/70 pt-2
-      intent: footer action bar inside the inline page description editor
+      classes: flex flex-row items-center justify-between gap-2
+      intent: clean borderless action row below the inline page description textarea
       surfaces: [frontend]
     buttons:
       classes: ml-auto flex flex-row items-center gap-1.5
@@ -1802,7 +1804,7 @@ page:
       intent: subtle remove link inside the inline page description editor
       surfaces: [frontend]
     cancel:
-      classes: cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-base-dark transition-colors hover:bg-kind-light/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50
+      classes: cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-base-dark transition-colors hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50
       intent: compact cancel button inside the inline page description editor
       surfaces: [frontend]
     save:

@@ -199,7 +199,7 @@ nav:has(> [data-role="actions"]) > [data-role="actions"] {
 		background-color 120ms ease;
 	&:hover,
 	&:focus-visible {
-		outline: 1px solid var(--kind-default);
+		outline: 2px solid var(--kind-default);
 	}
 }
 

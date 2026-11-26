@@ -86,17 +86,27 @@ tbody[data-editing="true"]
 }
 
 /* @style form.table.form */
-tbody[data-editing="true"] td[data-edit-state="saving"] {
+tbody[data-editing="true"] td[data-column="completed"][data-editable="true"] {
+	background-color: transparent;
+	outline: none;
+	cursor: default;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td[data-edit-state="saving"],
+td[data-column="completed"][data-edit-state="saving"] {
 	background-color: var(--color-note-bg);
 }
 
 /* @style form.table.form */
-tbody[data-editing="true"] td[data-edit-state="saved"] {
+tbody[data-editing="true"] td[data-edit-state="saved"],
+td[data-column="completed"][data-edit-state="saved"] {
 	background-color: var(--color-project-bg);
 }
 
 /* @style form.table.form */
-tbody[data-editing="true"] td[data-edit-state="error"] {
+tbody[data-editing="true"] td[data-edit-state="error"],
+td[data-column="completed"][data-edit-state="error"] {
 	background-color: var(--color-delete-bg);
 }
 
@@ -302,6 +312,14 @@ td [data-role="quick-edit-error"] {
 	line-height: 1rem;
 	color: var(--color-delete-default);
 	white-space: normal;
+}
+
+/* @style table.default */
+@media (min-width: 769px) {
+	table[id="table"]:not([data-embedded]) {
+		margin-inline: -0.75rem;
+		width: calc(100% + 1.5rem);
+	}
 }
 
 /* @style table.default table.embedded */

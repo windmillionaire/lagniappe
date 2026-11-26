@@ -359,6 +359,7 @@ def test_filter_table_derives_parent_fields_and_related_forms(get_schema):
     assert category_table.fields["input-numab12"].selected is False
 
     assert project_table.kind == "task"
+    assert project_table.fields["completed"].selected is True
     assert project_table.fields["name"].parent is True
     assert project_table.fields["name"].selected is True
     assert "due_date" in project_table.fields
