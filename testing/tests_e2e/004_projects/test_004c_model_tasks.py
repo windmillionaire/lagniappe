@@ -152,11 +152,16 @@ def _click_status_filter(model_task, label):
         .get_by_role("link", name=label, exact=True)
     )
     expect(status_link).to_be_visible()
-    status_link.click()
+    status_href = status_link.get_attribute("href")
+    with model_task.user.page.expect_response("**/filters/*/test?**"):
+        status_link.click()
 
-    results = model_task.user.locate("#table")
+    results = model_task.user.locate("#project-tasks-table")
     expect(results).to_be_visible()
-    return results
+    expect(model_task.user.locate("#filter-bar [data-role='match-status']")).not_to_have_text(
+        "Filtering…"
+    )
+    return results, status_href
 
 
 # @template tasks/index.html::view
@@ -164,7 +169,21 @@ def test_completed_button(get_admin, get_user, browser_failures):
     user = get_admin()
     model_task, completed_task, in_progress_task = _status_filter_context(user)
 
-    results = _click_status_filter(model_task, "Completed")
+    results, status_href = _click_status_filter(model_task, "Completed")
+
+    chips = user.locate("#filter-bar [data-role='chips']")
+    expect(chips).to_contain_text(model_task.definition.name)
+    expect(results.locator(f"tr[data-key='{completed_task.key}']")).to_be_visible()
+    expect(
+        results.locator(f"tr[data-key='{in_progress_task.key}']")
+    ).not_to_be_visible()
+
+    base_url = model_task.project.url.rsplit("/projects/", 1)[0]
+    user.navigate(f"{base_url}{status_href}")
+    user.page.wait_for_selector("[lp-view][initialized]")
+
+    standalone_results = user.locate("#table")
+    expect(standalone_results).to_be_visible()
 
     root = user.locate("[lp-view]")
     expect(root).to_have_attribute("data-poll-channel", "tasks")
@@ -172,14 +191,16 @@ def test_completed_button(get_admin, get_user, browser_failures):
     expect(root).not_to_have_attribute("data-key", re.compile(r".*"))
     expect(root).not_to_have_attribute("data-index", re.compile(r".*"))
 
-    expect(results.locator("tbody")).to_have_attribute(
+    expect(standalone_results.locator("tbody")).to_have_attribute(
         "data-route",
         re.compile(r"[?&]completed=true(?:&|$)"),
     )
 
-    expect(results.locator(f"tr[data-key='{completed_task.key}']")).to_be_visible()
     expect(
-        results.locator(f"tr[data-key='{in_progress_task.key}']")
+        standalone_results.locator(f"tr[data-key='{completed_task.key}']")
+    ).to_be_visible()
+    expect(
+        standalone_results.locator(f"tr[data-key='{in_progress_task.key}']")
     ).not_to_be_visible()
 
     offline_indicator = user.locate("[data-role='offline']")
@@ -211,9 +232,11 @@ def test_completed_button(get_admin, get_user, browser_failures):
             user.offline = False
 
     expect(offline_indicator).to_be_hidden()
-    expect(results.locator(f"tr[data-key='{completed_task.key}']")).to_be_visible()
     expect(
-        results.locator(f"tr[data-key='{in_progress_task.key}']")
+        standalone_results.locator(f"tr[data-key='{completed_task.key}']")
+    ).to_be_visible()
+    expect(
+        standalone_results.locator(f"tr[data-key='{in_progress_task.key}']")
     ).not_to_be_visible()
 
 
@@ -221,13 +244,10 @@ def test_in_progress_button(get_admin, get_user):
     user = get_admin()
     model_task, completed_task, in_progress_task = _status_filter_context(user)
 
-    results = _click_status_filter(model_task, "In Progress")
+    results, _status_href = _click_status_filter(model_task, "In Progress")
 
-    expect(results.locator("tbody")).to_have_attribute(
-        "data-route",
-        re.compile(r"[?&]completed=false(?:&|$)"),
-    )
-
+    chips = user.locate("#filter-bar [data-role='chips']")
+    expect(chips).to_contain_text(model_task.definition.name)
     expect(results.locator(f"tr[data-key='{in_progress_task.key}']")).to_be_visible()
     expect(
         results.locator(f"tr[data-key='{completed_task.key}']")
@@ -248,7 +268,7 @@ def test_status_filter_loads_task_page_form_permissions(get_admin):
     task.save()
     try:
         user.go(model_task.project)
-        results = _click_status_filter(model_task, "In Progress")
+        results, _status_href = _click_status_filter(model_task, "In Progress")
         row = results.locator(f"tr[data-key='{task.urlsafe_key}']")
         expect(row).to_be_visible()
         expect(row).to_have_attribute("data-fingerprint", re.compile(r".+"))

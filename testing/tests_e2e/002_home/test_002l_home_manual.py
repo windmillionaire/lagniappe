@@ -196,4 +196,4 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
     )
     expect(cloud_console_links).to_have_count(2)
     expect(cloud_console_links.first).to_have_text("Google Cloud console")
-    expect(delegated.locator("summary [data-icon]")).to_have_count(0)
+    expect(delegated.locator("summary [data-icon='down']")).to_have_count(2)

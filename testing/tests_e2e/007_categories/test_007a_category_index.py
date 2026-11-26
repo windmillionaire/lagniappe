@@ -13,6 +13,7 @@ from testing.definitions import Categories, Forms, Pages
 from testing.elements import (
     FormElements,
     FormSelect,
+    Select,
     SpinnerButtons,
     Table,
 )
@@ -30,13 +31,11 @@ def _create_page(user, page, create_form):
     return new_row.get_attribute("data-key")
 
 
-def _fill_editable_field(form, field_id, selector, value):
-    field = form.locator(f"#{field_id}")
-    control = field.locator(selector)
-    if not control.is_visible():
-        field.locator("[data-role='label']").click()
-    expect(control).to_be_visible()
-    control.fill(value)
+def _toggle_quick_edit(category):
+    menu = category.open_actions_menu()
+    edit_toggle = menu.locator("button[lp-show='table:TableEditor']")
+    expect(edit_toggle).to_be_visible()
+    edit_toggle.click()
 
 
 def _open_visibility_panel(user, category):
@@ -312,32 +311,65 @@ def test_update_category_info_from_tools(get_admin, get_user):
     user.go(category)
     expect(user.page.get_by_role("button", name="Category actions")).to_be_visible()
 
-    info_form = category.category_info_form()
-
     updated_name = "Updated Category Info"
-    updated_description = "A category updated through the tools panel."
+    updated_description = "A category updated through the inline header controls."
     try:
-        _fill_editable_field(info_form, "name", FormElements.NAME, updated_name)
-        _fill_editable_field(
-            info_form,
-            "description",
-            FormElements.DESCRIPTION,
-            updated_description,
-        )
-        expect(info_form.locator("[data-icon='builder.unsaved']")).to_be_visible()
-        FormSelect(info_form).select(updated_form)
+        menu = category.open_actions_menu()
+        menu.locator("[data-category-action='rename']").click()
+        rename_input = user.locate("[data-role='rename-form'] input[name='name']")
+        expect(rename_input).to_be_visible()
+        rename_input.fill(updated_name)
         with expect_successful_response(
-            user.page, method="PUT", path=f"/categories/{category.key}/update",
+            user.page,
+            method="PATCH",
+            path=f"/categories/{category.key}/patch",
             entity_key=category.key,
         ):
-            SpinnerButtons.UPDATE.click(info_form)
+            rename_input.press("Enter")
+        expect(user.locate(category.CATEGORY_TITLE)).to_have_text(updated_name)
 
-        expect(user.locate("[data-nav='view'] [data-role='title']")).to_have_text(
-            updated_name
+        menu = category.open_actions_menu()
+        menu.locator("[data-category-action='description']").click()
+        desc_editor = user.locate("[data-role='description-editor']")
+        expect(desc_editor).to_be_visible()
+        desc_editor.locator("textarea[name='description']").fill(updated_description)
+        with expect_successful_response(
+            user.page,
+            method="PATCH",
+            path=f"/categories/{category.key}/patch",
+            entity_key=category.key,
+        ):
+            desc_editor.get_by_role("button", name="Save", exact=True).click()
+        expect(user.locate(category.CATEGORY_DESCRIPTION)).to_have_text(
+            updated_description
         )
-        expect(info_form.locator("#name")).to_contain_text(updated_name)
-        expect(info_form.locator("#description")).to_contain_text(updated_description)
-        FormSelect(info_form).contains(updated_form)
+
+        menu = category.open_actions_menu()
+        menu.locator("[data-category-action='default-form']").click()
+        form_editor = user.locate("[data-role='default-form-editor']")
+        expect(form_editor).to_be_visible()
+        Select(form_editor.locator("[lp-select]")).select_by_name(
+            updated_form.definition.name
+        )
+        with (
+            expect_successful_response(
+                user.page,
+                method="PATCH",
+                path=f"/categories/{category.key}/patch",
+                entity_key=category.key,
+            ),
+            user.page.expect_navigation(),
+        ):
+            form_editor.get_by_role("button", name="Save", exact=True).click()
+        user.page.wait_for_selector("[lp-view][initialized]")
+        expect(user.locate(category.TABLE_BODY)).to_have_attribute("loaded", "")
+
+        expect(user.locate(category.CATEGORY_TITLE)).to_have_text(updated_name)
+        expect(user.locate(category.CATEGORY_DESCRIPTION)).to_have_text(
+            updated_description
+        )
+        create_form = category.new_page_form()
+        FormSelect(create_form).contains(updated_form)
     finally:
         restored = category.refresh_entity(request=Fetch.direct())
         for name, value in original.items():
@@ -393,9 +425,7 @@ def test_category_index_quick_edit_updates_text_cell(get_admin, get_user):
     row = user.locate(f"{category.TABLE} tbody tr[data-key='{page.key}']")
     expect(row).to_be_visible()
 
-    edit_toggle = user.locate("button[lp-show='table:TableEditor']")
-    expect(edit_toggle).to_be_visible()
-    edit_toggle.click()
+    _toggle_quick_edit(category)
 
     body = user.locate(category.TABLE_BODY)
     expect(body).to_have_attribute("data-editing", "true")
@@ -435,9 +465,7 @@ def test_category_index_quick_edit_renders_checkbox_cells(get_admin, get_user):
     cell = row.locator(f"td[data-column='{field}']")
     expect(cell).to_be_visible()
 
-    edit_toggle = user.locate("button[lp-show='table:TableEditor']")
-    expect(edit_toggle).to_be_visible()
-    edit_toggle.click()
+    _toggle_quick_edit(category)
 
     body = user.locate(category.TABLE_BODY)
     expect(body).to_have_attribute("data-editing", "true")
@@ -453,11 +481,11 @@ def test_category_index_quick_edit_renders_checkbox_cells(get_admin, get_user):
         expect(checkbox).not_to_be_checked()
         expect(cell).to_have_attribute("data-edit-value", "false")
 
-        edit_toggle.click()
+        _toggle_quick_edit(category)
         expect(checkbox).not_to_be_attached()
     finally:
         if body.get_attribute("data-editing") != "true":
-            edit_toggle.click()
+            _toggle_quick_edit(category)
         if not checkbox.is_checked():
             with user.page.expect_response("**/pages/*/patch"):
                 checkbox.set_checked(True)

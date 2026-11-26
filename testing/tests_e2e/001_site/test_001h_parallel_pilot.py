@@ -77,15 +77,15 @@ def test_worker_page_and_task(get_user, case, results):
     page = Page(user=user)
     page.entity = entity
     user.go(page)
-    form = page.info_form
-    field = form.locator(Page.INFO_DESCRIPTION)
-    control = field.locator("textarea")
-    if not control.is_visible():
-        field.locator("[data-role='label']").click()
+    user.page.get_by_role("button", name="Page actions", exact=True).click()
+    user.page.locator("[data-page-action='description']:visible").click()
+    editor = user.locate("[data-role='description-editor']")
+    control = editor.locator("textarea[name='description']")
+    expect(control).to_be_visible()
     description = f"Pilot saved by {case}"
     control.fill(description)
-    with expect_successful_response(user.page, method="PUT", path=f"/pages/{page.key}/update"):
-        form.get_by_role("button", name="Update Page", exact=True).click()
+    with expect_successful_response(user.page, method="PATCH", path=f"/pages/{page.key}/patch"):
+        editor.get_by_role("button", name="Save", exact=True).click()
     expect(user.locate(Page.PAGE_DESCRIPTION)).to_have_text(description)
 
     task_name = f"Task for {identity}"

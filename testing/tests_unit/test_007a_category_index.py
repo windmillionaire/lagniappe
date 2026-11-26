@@ -45,7 +45,7 @@ def test_category_index(get_test_entities):
             ("name", "Name", "text", "lexical", True),
             ("form", "Form", "form", "categorical", False),
             ("description", "Description", "textarea", None, False),
-            ("modified", "Modified", "date", "numeric", True),
+            ("modified", "Modified", "date", "date", True),
         ]
         assert table.selected == ["name", "modified"]
         assert table.fields["name"].link is True

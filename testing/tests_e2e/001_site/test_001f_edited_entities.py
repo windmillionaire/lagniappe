@@ -207,7 +207,7 @@ def test_cold_notification_state_seeds_through_one_poll(get_user):
     )
     notifications.click()
     expect(
-        owner.page.locator("[role='listbox'][data-visible='true']").get_by_text(
+        owner.page.locator("[role='dialog'][data-visible='true']").get_by_text(
             body, exact=True
         )
     ).to_be_visible()

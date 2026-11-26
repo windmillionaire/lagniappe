@@ -32,6 +32,7 @@ from contextlib import nullcontext
 from datetime import datetime
 import json
 import re
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 import pytest
@@ -48,10 +49,7 @@ from testing.definitions.model_task_definitions import ModelTaskDefinition
 from testing.definitions.task_definitions import TaskDefinition
 from testing.elements import (
     Badges,
-    Buttons,
-    Dropdown,
     Filters,
-    Modal,
     ProjectFilterConditions,
     Tabs,
 )
@@ -69,10 +67,9 @@ def test_filters_tab_opens(get_admin, get_user):
     user.go(project)
 
     filters = Filters(user, project)
-    expect(filters.save_button).to_be_visible()
-    expect(filters.run_button).to_be_visible()
-    expect(filters.reset_button).to_be_visible()
-    expect(filters.conditions).to_be_visible()
+    expect(filters.add_trigger).to_be_visible()
+    expect(filters.saved_trigger).to_be_visible()
+    expect(filters.results_table).to_be_visible()
 
 
 def test_project_filter_conditions_include_task_fields(get_admin, get_user):
@@ -81,11 +78,11 @@ def test_project_filter_conditions_include_task_fields(get_admin, get_user):
     user.go(project)
 
     filters = Filters(user, project)
-    panel = Dropdown(filters.conditions).open()
+    filters.open_add_popover()
 
-    expect(panel.get_by_role("option", name="Task Name", exact=True)).to_be_visible()
-    expect(panel.get_by_role("option", name="Has Status", exact=True)).to_be_visible()
-    expect(panel.get_by_role("option", name="Completed", exact=True)).to_be_visible()
+    expect(filters.field_option("Task Name")).to_be_visible()
+    expect(filters.field_option("Has Status")).to_be_visible()
+    expect(filters.field_option("Completed")).to_be_visible()
 
 
 def test_filter_preview_rejects_malformed_and_forged_contracts(
@@ -139,7 +136,7 @@ def test_filter_preview_rejects_malformed_and_forged_contracts(
 # --- String conditions (Task Name) ---
 
 
-# @template projects/filters.html::task_filters
+# @template projects/filters.html::project_tasks_tab
 def test_filter_by_task_name(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_filter_by_task_name.get(user)
@@ -157,14 +154,7 @@ def test_filter_by_task_name(get_admin, get_user):
     expect(results).to_be_visible()
     row = results.locator("tr").filter(has_text=task.definition.name)
     expect(row).to_be_visible()
-    table_frame = results.locator("[data-role='results-table']")
-    expect(table_frame).to_have_css("border-top-width", "1px")
-    expect(table_frame).to_have_css("outline-style", "none")
-    expect(table_frame.locator("[data-role='table']")).to_have_css("border-top-width", "0px")
-    form_box = filters.form.bounding_box()
-    table_box = table_frame.bounding_box()
-    assert table_box["x"] == pytest.approx(form_box["x"], abs=1)
-    assert table_box["width"] == pytest.approx(form_box["width"], abs=1)
+    expect(filters.match_status).to_have_text(re.compile(r"^\d+ match(?:es)?$"))
 
 
 def test_filter_by_task_name_exact(get_admin, get_user):
@@ -175,12 +165,15 @@ def test_filter_by_task_name_exact(get_admin, get_user):
     filters = Filters(user, project)
     filters.set_condition(ProjectFilterConditions.NAME)
 
-    badges = filters.name_equals(task.definition.name).add_filter()
+    with expect_successful_response(
+        user.page, method="GET", path=f"/filters/{project.key}/test"
+    ) as response_info:
+        badges = filters.name_equals(task.definition.name).add_filter()
     expect(badges).to_be_visible()
-    definition = json.loads(
-        badges.locator("input[name='definition']").input_value()
+    contract = json.loads(
+        parse_qs(urlsplit(response_info.value.url).query)["contract"][0]
     )
-    assert definition["values"] == [task.definition.name]
+    assert contract["conditions"][0]["values"] == [task.definition.name]
 
     results = filters.run()
     expect(results).to_be_visible()
@@ -251,7 +244,7 @@ def _attached_form_filter_context(user):
 
     filters.set_condition(attached_form)
     expect(filters.badges).to_contain_text(attached_form.definition.name)
-    expect(filters.form_conditions).to_be_visible()
+    expect(filters.add_popover).to_have_attribute("data-visible", "true")
 
     return filters, matching_task, excluded_task
 
@@ -316,22 +309,21 @@ def test_project_filter_results_respect_task_permissions(get_user, mode, permiss
         owner_filters.set_condition(ProjectFilterConditions.NAME)
         owner_filters.name_contains(token).add_filter()
         saved_filter = owner_filters.save_filter()
-        saved_key = saved_filter.get_attribute("data-key")
+        saved_url = saved_filter["url"]
 
     viewer = get_user(Users.general_models_view_only)
     project = viewer.go(project)
     filters = Filters(viewer, project)
     if mode == "preview":
         filters.set_condition(ProjectFilterConditions.NAME)
-        expect(filters.name_contains(token).add_filter()).to_be_visible()
         with expect_successful_response(viewer.page, method="GET", path=f"/filters/{project.key}/test") as response_info:
-            results = filters.run()
+            expect(filters.name_contains(token).add_filter()).to_be_visible()
+        results = filters.run()
         initial_response = response_info.value
     else:
-        saved_row = filters.section.locator(f"{Filters.SAVED_FILTERS} li[data-key='{saved_key}']")
-        with viewer.page.expect_navigation(url=f"**/filters/{saved_key}") as response_info:
-            saved_row.get_by_role("link", name="Run saved filter").click()
-        initial_response = response_info.value
+        base_url = project.url.rsplit("/projects/", 1)[0]
+        initial_response = viewer.navigate(f"{base_url}{saved_url}")
+        viewer.page.wait_for_selector("[lp-view][initialized]")
         results = viewer.locate("[lp-view][data-kind='task'] #table")
 
     etag = initial_response.headers["etag"]
@@ -380,7 +372,9 @@ def test_project_filter_results_respect_task_permissions(get_user, mode, permiss
                 restriction.set_checked(restrict)
                 builder.save_restrictions()
             if mode == "preview":
-                filters.run()
+                filters.reset()
+                filters.set_condition(ProjectFilterConditions.NAME)
+                filters.name_contains(token).add_filter()
         fresh = conditional_get(etag)
         assert fresh["status"] == 200
         assert fresh["etag"] != etag
@@ -402,17 +396,19 @@ def test_unchanged_project_filter_returns_304(get_admin, mode):
     project = user.go(task.project)
     filters = Filters(user, project)
     filters.set_condition(ProjectFilterConditions.NAME)
-    filters.name_contains(task.definition.name).add_filter()
     if mode == "preview":
         with expect_successful_response(user.page, method="GET", path=f"/filters/{project.key}/test") as result:
-            results = filters.run()
+            filters.name_contains(task.definition.name).add_filter()
+        results = filters.run()
+        response = result.value
     else:
+        filters.name_contains(task.definition.name).add_filter()
         saved = filters.save_filter()
-        with user.page.expect_navigation(url=f"**/filters/{saved.get_attribute('data-key')}") as result:
-            saved.get_by_role("link", name="Run saved filter").click()
+        base_url = project.url.rsplit("/projects/", 1)[0]
+        response = user.navigate(f"{base_url}{saved['url']}")
+        user.page.wait_for_selector("[lp-view][initialized]")
         results = user.locate("[lp-view][data-kind='task'] #table")
     expect(results.locator(f"tr[data-key='{task.key}']")).to_be_visible()
-    response = result.value
     assert response.status == 200
     unchanged = requests.get(
         response.url,
@@ -548,8 +544,8 @@ def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_admin, get_
     expect(badges).to_contain_text("Inspection Notes")
 
     saved_filter = filters.save_filter()
-    expect(saved_filter).to_be_visible()
-    saved_filter.locator("a[aria-label='Run saved filter']").click()
+    base_url = task.project.url.rsplit("/projects/", 1)[0]
+    user.navigate(f"{base_url}{saved_filter['url']}")
 
     view = user.locate("[lp-view][data-kind='task']")
     expect(view).to_have_attribute("initialized", "")
@@ -625,11 +621,16 @@ def test_filter_results_expands_table_submission_cell(get_admin, get_user):
     )
     expect(badges).to_contain_text("Inspection Notes")
 
-    results = filters.run()
+    saved_filter = filters.save_filter()
+    base_url = matching_task.project.url.rsplit("/projects/", 1)[0]
+    user.navigate(f"{base_url}{saved_filter['url']}")
+    user.page.wait_for_selector("[lp-view][initialized]")
+
+    results = user.locate("#table")
     expect(results).to_be_visible()
     _expect_only_matching_task(results, matching_task, excluded_task)
 
-    table_container = results.locator("[data-role='table'].table-container")
+    table_container = user.locate("[data-role='table'].table-container")
     expect(table_container).to_be_visible()
     expect(table_container).to_have_css("overflow-x", "auto")
 
@@ -653,9 +654,7 @@ def test_filter_results_expands_table_submission_cell(get_admin, get_user):
         expand.click()
 
     expect(expand).to_have_attribute("data-open", "true")
-    embedded = results.locator(
-        "#embedded-table > tbody > tr[data-embedded='true']"
-    )
+    embedded = results.locator("> tbody > tr[data-embedded='true']")
     expect(embedded).to_be_visible()
     expect(embedded).to_contain_text("Note")
     expect(embedded).to_contain_text("Escalated item")
@@ -676,7 +675,12 @@ def test_filter_by_has_status_renders_status_column(get_admin, get_user):
     badges = filters.boolean("status").add_filter()
     expect(badges).to_contain_text("Has Status")
 
-    results = filters.run()
+    saved_filter = filters.save_filter()
+    base_url = project.url.rsplit("/projects/", 1)[0]
+    user.navigate(f"{base_url}{saved_filter['url']}")
+    user.page.wait_for_selector("[lp-view][initialized]")
+
+    results = user.locate("#table")
     expect(results).to_be_visible()
     _expect_only_matching_task(results, matching_task, excluded_task)
 
@@ -721,54 +725,57 @@ def test_filter_reset(get_admin, get_user):
     filters.set_condition(ProjectFilterConditions.NAME)
     filters.name_contains("Filter").add_filter()
 
-    expect(filters.badges).to_be_visible()
+    expect(filters.badges.locator(".lp-badge")).to_have_count(1)
 
     filters.reset()
 
-    expect(filters.badges).not_to_be_visible()
+    expect(filters.badges.locator(".lp-badge")).to_have_count(0)
+    expect(filters.bar_actions).to_have_attribute("data-visible", "false")
 
 
 def test_filter_save(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_filter_by_task_name.get(user)
     project = user.go(task.project)
+    token = f"Filter {uuid4().hex[:8]}"
 
     filters = Filters(user, project)
     filters.set_condition(ProjectFilterConditions.NAME)
-    filters.name_contains("Filter").add_filter()
+    filters.name_contains(token).add_filter()
 
     saved_filter = filters.save_filter()
-    filter_key = saved_filter.get_attribute("data-key")
-    expect(saved_filter).to_contain_text("Task Name")
-    expect(saved_filter).to_contain_text("Filter")
+    filter_key = saved_filter["key"]
 
     user.reload(project)
     reloaded_filters = Filters(user, project)
-    reloaded_saved = reloaded_filters.section.locator(Filters.SAVED_FILTERS)
-    expect(reloaded_saved).to_be_visible()
-    expect(reloaded_saved.locator(f"li[data-key='{filter_key}']")).to_be_visible()
+    reloaded_saved = reloaded_filters.open_saved_popover(expect_fetch=True)
+    reloaded_row = reloaded_saved.locator("> div").filter(has_text=token)
+    expect(reloaded_row).to_be_visible()
+    expect(reloaded_row).to_contain_text("Task Name")
 
     viewer = get_user(Users.general_models_view_only)
     viewer.go(project)
     viewer_filters = Filters(viewer, project)
-    viewer_saved = viewer_filters.section.locator(Filters.SAVED_FILTERS)
-    viewer_filter = viewer_saved.locator(f"li[data-key='{filter_key}']")
-    expect(viewer_filter).to_be_visible()
-    expect(viewer_filter.locator("[lp-delete]")).to_have_count(0)
+    viewer_saved = viewer_filters.open_saved_popover(expect_fetch=True)
+    viewer_row = viewer_saved.locator("> div").filter(has_text=token)
+    expect(viewer_row).to_be_visible()
+    expect(viewer_row.locator("[data-role='saved-delete']")).to_have_count(0)
 
     user.go(project)
     owner_filters = Filters(user, project)
-    owner_saved = owner_filters.section.locator(Filters.SAVED_FILTERS)
-    owner_filter = owner_saved.locator(f"li[data-key='{filter_key}']")
-    expect(owner_filter).to_be_visible()
-    owner_filter.locator(Buttons.LP_DELETE).click()
-    Modal(user.page).delete()
-    expect(owner_filter).not_to_be_visible()
+    owner_saved = owner_filters.open_saved_popover(expect_fetch=True)
+    owner_row = owner_saved.locator("> div").filter(has_text=token)
+    expect(owner_row).to_be_visible()
+    with expect_successful_response(
+        user.page, method="DELETE", path=f"/filters/{filter_key}/delete"
+    ):
+        owner_row.locator("[data-role='saved-delete']").click()
+    expect(owner_row).to_have_count(0)
 
     user.reload(project)
     reloaded_filters = Filters(user, project)
-    reloaded_saved = reloaded_filters.section.locator(Filters.SAVED_FILTERS)
-    expect(reloaded_saved.locator(f"li[data-key='{filter_key}']")).to_have_count(0)
+    reloaded_saved = reloaded_filters.open_saved_popover(expect_fetch=True)
+    expect(reloaded_saved.locator("> div").filter(has_text=token)).to_have_count(0)
 
 
 def test_filter_multiple_conditions(get_admin, get_user):
@@ -810,10 +817,8 @@ def test_saved_in_progress_filter_removes_completed_task_after_back_navigation(
     filters.boolean("in progress").add_filter()
 
     saved_filter = filters.save_filter()
-    expect(saved_filter).to_be_visible()
-
-    with user.page.expect_navigation():
-        saved_filter.locator("a[href*='/filters/']").click()
+    base_url = project.url.rsplit("/projects/", 1)[0]
+    user.navigate(f"{base_url}{saved_filter['url']}")
     user.page.wait_for_selector("[lp-view][initialized]")
 
     filtered_row = user.locate("#table tbody tr[lp-entity]").filter(
@@ -851,10 +856,10 @@ def test_saved_in_progress_filter_refreshes_after_reconnect(
     filters.set_condition(ProjectFilterConditions.COMPLETED)
     filters.boolean("in progress").add_filter()
     saved_filter = filters.save_filter()
-    filter_key = saved_filter.get_attribute("data-key")
+    filter_key = saved_filter["key"]
 
-    with user.page.expect_navigation():
-        saved_filter.locator("a[href*='/filters/']").click()
+    base_url = project.url.rsplit("/projects/", 1)[0]
+    user.navigate(f"{base_url}{saved_filter['url']}")
     user.page.wait_for_selector("[lp-view][initialized]")
 
     root = user.locate("[lp-view]")

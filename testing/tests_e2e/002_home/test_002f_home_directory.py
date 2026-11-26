@@ -129,7 +129,7 @@ def test_directory_links_present(get_admin):
     for link in ["Active Tasks", "Forms", "Users", "Admin", "Account Settings"]:
         link_element = list_root.locator(f"a:has-text('{link}')")
         expect(link_element).to_be_visible()
-    expect(list_root.get_by_role("button", name="Sign out")).to_be_visible()
+    expect(list_root.get_by_role("menuitem", name="Sign out")).to_be_visible()
     expect(user.locate(home.MANUAL_BUTTON)).to_be_visible()
 
     user.locate(home.DIRECTORY_LIST_TOGGLE).click()
@@ -154,7 +154,7 @@ def test_directory_account_settings_and_sign_out(get_admin, get_user):
     home = user.go(SitePages.HOME)
     directory = home.directory.list
 
-    account_settings = directory.get_by_role("link", name="Account Settings")
+    account_settings = directory.get_by_role("menuitem", name="Account Settings")
     expect(account_settings).to_be_visible()
     with user.page.expect_navigation():
         account_settings.click()
@@ -165,7 +165,7 @@ def test_directory_account_settings_and_sign_out(get_admin, get_user):
     assert "tab=" not in user.page.url
 
     home = user.go(SitePages.HOME)
-    sign_out = home.directory.list.get_by_role("button", name="Sign out")
+    sign_out = home.directory.list.get_by_role("menuitem", name="Sign out")
     expect(sign_out).to_be_visible()
     with user.page.expect_navigation():
         sign_out.click()

@@ -248,10 +248,11 @@ def test_photo_controls_toggle_and_remember_desktop_visibility(get_admin, get_us
     expect(prompt).to_be_visible()
 
     _upload_image_from_prompt(user, page)
-    expect(toggle.locator("[data-icon]")).to_have_attribute("data-icon", "visibility.visible")
-    toggle.click()
+    photo_toggle = prompt.locator("[data-role='photo-toggle']")
+    expect(photo_toggle.locator("[data-icon]")).to_have_attribute("data-icon", "visibility.visible")
+    photo_toggle.click()
     expect(user.locate(page.PHOTO_FORM)).to_be_hidden()
-    expect(toggle.locator("[data-icon]")).to_have_attribute("data-icon", "visibility.hidden")
+    expect(photo_toggle.locator("[data-icon]")).to_have_attribute("data-icon", "visibility.hidden")
     expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-5xl.*"))
 
     for tab in ("document", "files", "tasks"):
@@ -267,7 +268,7 @@ def test_photo_controls_toggle_and_remember_desktop_visibility(get_admin, get_us
         info.get_by_role("button", name="Update Page", exact=True).click()
     user.page.wait_for_function("element => !element.isConnected", arg=original)
     expect(prompt).to_be_visible()
-    expect(toggle.locator("[data-icon]")).to_have_attribute("data-icon", "visibility.hidden")
+    expect(photo_toggle.locator("[data-icon]")).to_have_attribute("data-icon", "visibility.hidden")
     expect(user.locate(page.PHOTO_FORM)).to_be_hidden()
 
     photo_tab = page.mobile_nav.select_section("photo")
@@ -278,9 +279,9 @@ def test_photo_controls_toggle_and_remember_desktop_visibility(get_admin, get_us
     user.mobile = False
     expect(prompt).to_be_visible()
     expect(user.locate(page.PHOTO_FORM)).to_be_hidden()
-    toggle.click()
+    photo_toggle.click()
     expect(user.locate(page.PHOTO_EXISTING_IMAGE)).to_be_visible()
-    expect(user.locate(page.PHOTO_MENU_BUTTON)).to_be_visible()
+    expect(prompt.locator("[data-photo-menu='true']")).to_be_visible()
 
 
 # @template pages/photo.html::image_controls
@@ -292,16 +293,16 @@ def test_readonly_viewer_can_toggle_image_without_editing(get_admin, get_user):
     viewer = get_user(Users.page_acl_one_visible)
     viewer.go(page)
     prompt = _photo_prompt(page)
-    toggle = prompt.locator(page.PHOTO_PROMPT_UPLOAD)
+    toggle = prompt.locator("[data-role='photo-toggle']")
     expect(viewer.locate(page.PHOTO_EXISTING_IMAGE)).to_be_visible()
-    expect(viewer.locate(page.PHOTO_MENU_BUTTON)).not_to_be_attached()
+    expect(prompt.locator("[data-photo-menu='true']")).not_to_be_attached()
     expect(prompt.locator(page.PHOTO_PROMPT_GENERATE)).not_to_be_attached()
     expect(viewer.locate(f"{page.PHOTO_FORM} input[type='file']")).not_to_be_attached()
     toggle.click()
     expect(viewer.locate(page.PHOTO_FORM)).to_be_hidden()
     toggle.click()
     expect(viewer.locate(page.PHOTO_EXISTING_IMAGE)).to_be_visible()
-    expect(viewer.locate(page.PHOTO_MENU_BUTTON)).not_to_be_attached()
+    expect(prompt.locator("[data-photo-menu='true']")).not_to_be_attached()
 
 
 # @template pages/photo.html::image_controls
@@ -348,7 +349,6 @@ def test_cancel_generation_restores_previous_image_visibility(get_admin, get_use
     page.entity.save()
     user.go(page)
     prompt = _photo_prompt(page)
-    toggle = prompt.locator(page.PHOTO_PROMPT_UPLOAD)
     generate = prompt.locator(page.PHOTO_PROMPT_GENERATE)
     generate.click()
     empty_form = _photo_form(user)
@@ -356,16 +356,17 @@ def test_cancel_generation_restores_previous_image_visibility(get_admin, get_use
     expect(empty_form).to_be_hidden()
     expect(prompt).to_be_visible()
     _upload_image_from_prompt(user, page)
+    photo_toggle = prompt.locator("[data-role='photo-toggle']")
     for initially_visible in (True, False):
         if not initially_visible:
-            toggle.click()
+            photo_toggle.click()
             expect(user.locate(page.PHOTO_FORM)).to_be_hidden()
-        generate.click()
+        UploadDropdown.GENERATE.select(_photo_form(user))
         form = _photo_form(user)
         expect(form.locator("[data-role='generate-image']")).to_be_visible()
         description = form.locator("textarea[name='prompt']")
         description.fill("Keep this image description")
-        generate.click()
+        UploadDropdown.GENERATE.select(form)
         expect(description).to_have_value("Keep this image description")
         form.get_by_role("button", name="Cancel", exact=True).click()
         if initially_visible:
@@ -373,7 +374,6 @@ def test_cancel_generation_restores_previous_image_visibility(get_admin, get_use
         else:
             expect(form).to_be_hidden()
         expect(prompt).to_be_visible()
-        expect(generate).to_be_focused()
 
 
 @pytest.mark.parametrize("dirty", [False, True])
@@ -391,14 +391,11 @@ def test_image_changes_preserve_page_info_dom_and_draft(get_admin, get_user, dir
         info = page.info_form
         original = info.element_handle()
         if dirty:
-            for selector, value in (
-                (Page.INFO_NAME, "Unsaved image page name"),
-                (Page.INFO_DESCRIPTION, "Unsaved image page description"),
-                ("[id^='sync-text-renderer-']", "Unsaved custom field"),
-            ):
-                field = info.locator(selector)
-                field.locator("[data-role='label']").click()
-                field.locator("input, textarea").fill(value)
+            field = info.locator("[id^='sync-text-renderer-']")
+            text_input = field.locator("input, textarea")
+            if not text_input.is_visible():
+                field.locator("[data-role='read']").click()
+            text_input.fill("Unsaved custom field")
 
         for action in ("add", "replace", "remove"):
             before = user.locate("[lp-view]").get_attribute("data-fingerprint")
@@ -426,8 +423,6 @@ def test_image_changes_preserve_page_info_dom_and_draft(get_admin, get_user, dir
             assert original.evaluate("element => element.isConnected")
             expect(info.locator("[lp-edited-marker]")).to_be_hidden()
             if dirty:
-                expect(info.locator("input[name='name']")).to_have_value("Unsaved image page name")
-                expect(info.locator("textarea[name='description']")).to_have_value("Unsaved image page description")
                 expect(info.locator("input[name='sync-text']")).to_have_value("Unsaved custom field")
     finally:
         # Browser uploads changed the persisted assets, not this resource's
@@ -463,4 +458,4 @@ def test_failed_image_replacement_preserves_existing_image(get_admin, get_user, 
         image = form.locator("[data-role='existing-image'] img")
         expect(image).to_be_visible()
         expect(image).to_have_attribute("src", original_src)
-        expect(user.locate(page.PHOTO_PROMPT_UPLOAD)).to_be_enabled()
+        expect(user.locate("[data-photo-menu='true']")).to_be_enabled()

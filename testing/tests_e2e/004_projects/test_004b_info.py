@@ -1,10 +1,10 @@
 """
-Tests for project info tab functionality.
+Tests for project header inline editing and project model-task revision handling.
 
-Tests project info editing.
 Verified against:
-- lagniappe/web/templates/projects/info.html
-- src/script/widgets/projectInfo.ts (ProjectInfo)
+- lagniappe/web/templates/projects/project.html
+- lagniappe/web/templates/projects/model_tasks.html
+- src/script/widgets/projectHeader.ts
 - lagniappe/web/routes/projects/main.py
 """
 
@@ -16,9 +16,9 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, SubmissionFields, Users
-from testing.elements import SpinnerButtons
-from testing.resources import Project
-from testing.utility.network import expect_successful_response
+from testing.definitions.model_task_definitions import ModelTaskDefinition
+from testing.resources import ModelTask, Project
+from testing.utility.network import browser_fetch, expect_successful_response
 from testing.utility.polling import expect_poll_result
 
 
@@ -35,7 +35,7 @@ def _wait_for_services_ready(user):
 
 
 # @template projects/project.html::view_header
-# @template projects/info.html::info_tab
+# @template projects/project.html::main
 # @style entity.description
 def test_project_info_form(get_admin, get_user):
     user = get_admin()
@@ -46,37 +46,31 @@ def test_project_info_form(get_admin, get_user):
     new_name = "Apples"
     new_description = "Apples are mad tasty.\n\n  Keep this line indented."
 
-    info_form = project.info_form
-
-    name = SubmissionFields.INPUT.get("name", submission_value=project.definition.name)
-    assert name.verify_submission_value(info_form)
-
-    description = SubmissionFields.TEXTAREA.get(
-        "description", submission_value=project.definition.description
-    )
-    assert description.verify_submission_value(info_form)
-
-    name.value = new_name
-    description.value = new_description
-
+    menu = project.open_actions_menu()
+    menu.locator("[data-project-action='rename']").click()
+    rename_input = user.locate("[data-role='rename-form'] input[name='name']")
+    expect(rename_input).to_be_visible()
+    expect(rename_input).to_have_value(project.definition.name)
+    rename_input.fill(new_name)
     with expect_successful_response(
-        user.page, method="PUT", path=f"/projects/{project.key}/update"
+        user.page, method="PATCH", path=f"/projects/{project.key}/patch"
     ):
-        SpinnerButtons.UPDATE.click(info_form)
-
-    assert SpinnerButtons.UPDATE_SUCCESS.successful(info_form)
-
-    new_info_form = project.info_form
-    new_name_field = SubmissionFields.INPUT.get("name", submission_value=new_name)
-    assert new_name_field.verify_submission_value(new_info_form)
-
-    new_description_field = SubmissionFields.TEXTAREA.get(
-        "description", submission_value=new_description
-    )
-    assert new_description_field.verify_submission_value(new_info_form)
+        rename_input.press("Enter")
 
     title = user.locate(project.PROJECT_TITLE)
     expect(title).to_contain_text(new_name)
+
+    menu = project.open_actions_menu()
+    menu.locator("[data-project-action='description']").click()
+    desc_editor = user.locate("[data-role='description-editor']")
+    expect(desc_editor).to_be_visible()
+    desc_textarea = desc_editor.locator("textarea[name='description']")
+    expect(desc_textarea).to_have_value(project.definition.description)
+    desc_textarea.fill(new_description)
+    with expect_successful_response(
+        user.page, method="PATCH", path=f"/projects/{project.key}/patch"
+    ):
+        desc_editor.get_by_role("button", name="Save", exact=True).click()
 
     description = user.locate(project.PROJECT_DESCRIPTION)
     expect(description).to_contain_text(new_description)
@@ -84,13 +78,14 @@ def test_project_info_form(get_admin, get_user):
     assert description.text_content() == new_description
 
     user.reload()
+    expect(user.locate(project.PROJECT_TITLE)).to_contain_text(new_name)
     description = user.locate(project.PROJECT_DESCRIPTION)
     expect(description).to_contain_text(new_description)
     expect(description).to_have_css("white-space", "pre-wrap")
     assert description.text_content() == new_description
 
 
-# @template projects/info.html::info_form
+# @template projects/project.html::main
 def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision(
     get_admin,
     browser_failures,
@@ -104,11 +99,8 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
         ),
     ).create()
     owner.go(project)
-    info_form = project.info_form
-    expect(info_form.locator("input[name='name']")).to_have_value(
-        project.definition.name
-    )
-    expect(info_form.locator("textarea[name='description']")).to_have_value(
+    expect(owner.locate(project.PROJECT_TITLE)).to_have_text(project.definition.name)
+    expect(owner.locate(project.PROJECT_DESCRIPTION)).to_have_text(
         project.definition.description
     )
     _wait_for_services_ready(owner)
@@ -131,27 +123,21 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
     with expect_poll_result(
         owner.page,
         subscription_id=f"view:entity:{project.key}",
-    ), expect_successful_response(
-        owner.page,
-        method="GET",
-        path=f"/projects/{project.key}/info/replace",
-        entity_key=project.key,
     ):
         owner.offline = False
 
     expect(owner.locate("[data-role='offline']")).to_be_hidden()
-    refreshed_form = project.info_form
-    expect(refreshed_form.locator("input[name='name']")).to_have_value(
-        project.definition.name
+    probe = browser_fetch(
+        owner,
+        f"/projects/{project.key}/info/replace",
+        method="GET",
     )
-    expect(refreshed_form.locator("textarea[name='description']")).to_have_value(
-        project.definition.description
-    )
+    assert probe["status"] == 200
     after_probe = Entities.fetch_one(project.key, request=Fetch.direct())
     assert after_probe.modified == modified_before_probe
 
 
-# @template projects/info.html::info_form
+# @template projects/model_tasks.html::model_task
 def test_project_revision_notice_only_resets_changed_form(
     get_admin, get_user,
     browser_failures,
@@ -159,79 +145,87 @@ def test_project_revision_notice_only_resets_changed_form(
     owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_project_revision_notice.get(owner)
-
-    owner.go(project)
-    project.user = owner
-    owner_form = project.info_form
-    owner_name = owner_form.locator("input[name='name']")
-    owner_description = owner_form.locator("textarea[name='description']")
-    initial_name = owner_name.input_value()
-    initial_description = owner_description.input_value()
-    local_description = f"Local draft {uuid4().hex[:8]}"
-    local_description_field = SubmissionFields.TEXTAREA.get(
-        "description", submission_value=local_description
+    initial_name = f"Revision Model {uuid4().hex[:8]}"
+    model_task = ModelTask(
+        user=owner,
+        definition=ModelTaskDefinition(name=initial_name, project=None),
     )
-    local_description_field.set_submission_value(owner_form)
-    owner.page.evaluate("window.__revisionResetSentinel = 'mounted'")
-    owner.page.wait_for_function(
-        "() => !document.fonts || document.fonts.status === 'loaded'"
+    model_task.entity = Entities.MODEL_TASK.create(
+        project.entity, {"name": initial_name}
     )
-    _wait_for_services_ready(owner)
-    with browser_failures.expect_http_error(
-        owner,
-        status=503,
-        path="/l/poll",
-        count=0,
-        max_count=1,
-    ), browser_failures.expect_offline(owner):
-        owner.offline = True
-        expect(owner.locate("[data-role='offline']")).to_be_visible()
+    model_task.entity.save()
 
-    remote_name = f"Remote revision {uuid4().hex[:8]}"
-    collaborator.go(project)
-    project.user = collaborator
-    collaborator_form = project.info_form
-    remote_name_field = SubmissionFields.INPUT.get(
-        "name", submission_value=remote_name
-    )
-    remote_name_field.set_submission_value(collaborator_form)
-    with expect_successful_response(
-        collaborator.page,
-        method="PUT",
-        path=f"/projects/{project.key}/update",
-        entity_key=project.key,
-    ):
-        collaborator_form.locator(
-            "button[type='submit']:not([data-role])"
-        ).click()
+    try:
+        owner.go(project)
+        model_task.user = owner
+        owner_form = model_task.open_info()
+        owner_name = owner_form.locator("input[name='name']")
+        expect(owner_name).to_have_value(initial_name)
 
-    with expect_poll_result(
-        owner.page,
-        subscription_id=f"view:entity:{project.key}",
-    ), expect_successful_response(
-        owner.page,
-        method="GET",
-        path=f"/projects/{project.key}/info/replace",
-        entity_key=project.key,
-    ):
-        owner.offline = False
+        local_draft = f"Local draft {uuid4().hex[:8]}"
+        local_name_field = SubmissionFields.INPUT.get(
+            "name", submission_value=local_draft
+        )
+        local_name_field.set_submission_value(owner_form)
+        owner.page.evaluate("window.__revisionResetSentinel = 'mounted'")
+        owner.page.wait_for_function(
+            "() => !document.fonts || document.fonts.status === 'loaded'"
+        )
+        _wait_for_services_ready(owner)
+        with browser_failures.expect_http_error(
+            owner,
+            status=503,
+            path="/l/poll",
+            count=0,
+            max_count=1,
+        ), browser_failures.expect_offline(owner):
+            owner.offline = True
+            expect(owner.locate("[data-role='offline']")).to_be_visible()
 
-    expect(owner.locate("[data-role='offline']")).to_be_hidden()
+        remote_name = f"Remote revision {uuid4().hex[:8]}"
+        collaborator.go(project)
+        model_task.user = collaborator
+        collaborator_form = model_task.open_info()
+        remote_name_field = SubmissionFields.INPUT.get(
+            "name", submission_value=remote_name
+        )
+        remote_name_field.set_submission_value(collaborator_form)
+        with expect_successful_response(
+            collaborator.page,
+            method="PUT",
+            path=f"/projects/{project.key}/update-model/{model_task.key}",
+            entity_key=model_task.key,
+        ):
+            collaborator_form.locator(
+                "button[type='submit']:not([data-role])"
+            ).click()
 
-    project.user = owner
-    owner_form = project.info_form
-    owner_name = owner_form.locator("input[name='name']")
-    owner_description = owner_form.locator("textarea[name='description']")
-    marker = owner_form.locator("[lp-edited-marker]")
-    expect(marker).to_be_visible()
-    expect(marker.get_by_role("button", name="Reset form")).to_be_visible()
-    expect(owner_name).to_have_value(initial_name)
-    expect(owner_description).to_have_value(local_description)
+        with expect_poll_result(
+            owner.page,
+            subscription_id=f"edit:{model_task.key}",
+        ), expect_successful_response(
+            owner.page,
+            method="GET",
+            path=f"/projects/{project.key}/models/{model_task.key}/replace",
+            entity_key=model_task.key,
+        ):
+            owner.offline = False
 
-    marker.get_by_role("button", name="Reset form").click()
-    expect(owner_form.locator("input[name='name']")).to_have_value(remote_name)
-    expect(owner_form.locator("textarea[name='description']")).to_have_value(
-        initial_description
-    )
-    expect(owner_form.locator("[lp-edited-marker]")).to_be_hidden()
-    assert owner.page.evaluate("window.__revisionResetSentinel") == "mounted"
+        expect(owner.locate("[data-role='offline']")).to_be_hidden()
+
+        model_task.user = owner
+        owner_form = model_task.info_form
+        owner_name = owner_form.locator("input[name='name']")
+        marker = owner_form.locator("[lp-edited-marker]")
+        expect(marker).to_be_visible()
+        expect(marker.get_by_role("button", name="Reset form")).to_be_visible()
+        expect(owner_name).to_have_value(local_draft)
+
+        marker.get_by_role("button", name="Reset form").click()
+        expect(model_task.info_form.locator("input[name='name']")).to_have_value(
+            remote_name
+        )
+        expect(model_task.info_form.locator("[lp-edited-marker]")).to_be_hidden()
+        assert owner.page.evaluate("window.__revisionResetSentinel") == "mounted"
+    finally:
+        Entities.delete(model_task.entity)

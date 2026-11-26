@@ -183,7 +183,7 @@ def test_delete_executed_reports_confirms_snapshot_and_preserves_workspace(
     arrival = _report(user, status="complete")
     confirm = dialog.get_by_role("button", name="Delete 1 proposal", exact=True)
     spinner = confirm.locator("#spinner[data-role='icon']")
-    expect(confirm).to_be_focused()
+    expect(dialog.get_by_role("button", name="Cancel")).to_be_focused()
     expect(spinner).to_be_hidden()
     pending_deletes = []
     # Include service-worker-owned requests when holding the server response.

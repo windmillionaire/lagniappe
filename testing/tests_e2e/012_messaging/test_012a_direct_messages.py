@@ -57,7 +57,11 @@ def _go_messages(user, conversation_id=None):
 
 
 def _send_from_modal(user, recipient, body):
-    user.locate("[data-action='compose-message']").click()
+    compose = user.locate("[data-action='compose-message']")
+    if compose.is_visible():
+        compose.click()
+    else:
+        user.locate("[data-action='start-conversation']").click()
     dialog = user.locate("[data-role='message-composer']")
     expect(dialog).to_be_visible()
     recipient_input = dialog.locator("input[data-permission='message']")
@@ -269,8 +273,8 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     recipient = get_user(_managed_definition("Recipient"), creator=owner)
 
     recipient.go(SitePages.HOME)
-    recipient.locate("button[lp-show='directory:DirectoryList']").click()
-    expect(recipient.page.get_by_role("link", name="Messages", exact=True)).to_be_visible()
+    recipient.locate("button[data-role='nav-menu-trigger']").click()
+    expect(recipient.page.get_by_role("menuitem", name="Messages", exact=True)).to_be_visible()
     notifications = recipient.locate("[data-role='notifications']")
     notification_count = recipient.locate("[data-role='notification-count']")
     expect(notification_count).not_to_have_text("...", timeout=15000)
@@ -407,7 +411,7 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_admin, ge
     user.mobile = True
     empty_view = _go_messages(user)
     expect(empty_view.locator("[data-role='conversation-selector']")).to_be_hidden()
-    expect(empty_view.locator("[data-action='compose-message']")).to_be_visible()
+    expect(empty_view.locator("[data-action='compose-message']")).to_be_hidden()
     empty_pane = empty_view.locator("[data-role='message-history'] [data-role='empty']")
     expect(empty_pane).to_be_visible()
     expect(empty_pane).to_contain_text("No conversations yet")

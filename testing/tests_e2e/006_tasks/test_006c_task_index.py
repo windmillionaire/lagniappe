@@ -118,7 +118,7 @@ def test_tasks_table_columns(get_admin, get_user):
         "modified": "Modified",
         "selector": "",
     }
-    visible_columns = {"name", "due_date", "modified", "selector"}
+    visible_columns = {"completed", "name", "due_date", "modified", "selector"}
 
     for column, title in expected_columns.items():
         header = user.locate(f"th[data-column='{column}']")
@@ -346,7 +346,7 @@ def test_task_index_quick_edit_keeps_revealed_completed_column_editable(get_admi
     row = user.locate(f"{TASK_ROW}[data-key='{task.key}']")
     completed = row.locator("td[data-column='completed']")
     expect(row).to_be_visible()
-    expect(completed).to_be_hidden()
+    expect(completed).to_be_visible()
 
     edit_toggle = user.locate("button[lp-show='table:TableEditor']")
     edit_toggle.click()

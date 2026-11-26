@@ -1091,7 +1091,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "aria-label", f"Notifications: {starting_notifications + 4}"
         )
         notifications.click()
-        panel = owner.page.locator("[role='listbox'][data-visible='true']")
+        panel = owner.page.locator("[role='dialog'][data-visible='true']")
         for published in (ask_start, create_start, update_start, organize_start):
             target = panel.locator(
                 f"[data-role='target'][href='/tools/reports/{published['id']}']"

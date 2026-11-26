@@ -45,12 +45,12 @@ def test_page_viewer_reads_page_without_page_editing_affordances(get_admin, get_
     expect(viewer.locate(Page.PAGE_PERMISSIONS_TOGGLE)).not_to_be_attached()
 
     info_form = page.info_form
-    name_field = info_form.locator(Page.INFO_NAME)
-    description_field = info_form.locator(Page.INFO_DESCRIPTION)
-    expect(name_field).to_contain_text("Name")
-    expect(name_field).to_contain_text(page.definition.name)
-    expect(description_field).to_contain_text("Description")
-    expect(description_field).to_contain_text(page.definition.description)
+    expect(viewer.locate(Page.PAGE_TITLE)).to_contain_text(page.definition.name)
+    expect(viewer.locate(Page.PAGE_DESCRIPTION)).to_contain_text(
+        page.definition.description
+    )
+    expect(viewer.locate("[data-page-action='rename']")).not_to_be_attached()
+    expect(viewer.locate("[data-page-action='description']")).not_to_be_attached()
     expect(info_form.locator(FormElements.NAME)).not_to_be_attached()
     expect(info_form.locator(FormElements.DESCRIPTION)).not_to_be_attached()
     expect(info_form.locator("[data-role='categories']")).not_to_be_attached()
@@ -87,7 +87,7 @@ def test_page_viewer_sees_empty_files_tab_without_upload_affordances(get_admin, 
     expect(files).to_be_visible()
     expect(viewer.locate(Page.FILE_LIST)).to_have_attribute("loaded", "")
     expect(viewer.locate(Page.EMPTY_FILE_LIST_ITEM)).to_contain_text(
-        "No files have been uploaded to this page"
+        "No files attached yet"
     )
 
     expect(viewer.locate(Page.UPLOAD_FILE_TOGGLE)).not_to_be_attached()

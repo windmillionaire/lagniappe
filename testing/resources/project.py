@@ -84,13 +84,11 @@ class Project(SiteResource):
     # --- Desktop Tab Nav ---
     DESKTOP_TAB_NAV = "#tabs [lp-nav][data-nav='tabs']"
 
-    # --- Info Tab ---
-    INFO_FORM = "[data-widget='ProjectInfo']"
-    INFO_NAME = "#name"
-    INFO_DESCRIPTION = "#description"
-
-    # --- Filters Tab ---
-    FILTERS_TAB = "#filters"
+    # --- Tasks / Filters Tab ---
+    FILTERS_TAB = "#tasks"
+    TASKS_TAB = "#tasks"
+    TASKS_TABLE = "#project-tasks-table"
+    FILTER_BAR_WIDGET = "[data-widget='FilterBar']"
 
     # --- Project Page Header ---
     PROJECT_TITLE = "[data-nav='view'] [data-role='title']"
@@ -128,24 +126,22 @@ class Project(SiteResource):
     def url_suffix(self):
         return f"projects/{self.key}"
 
-    @property
-    def info_form(self):
-        tabs = Tabs(self.user)
-
-        info_tab = tabs.info
-        expect(info_tab).to_be_visible()
-
-        info_form = info_tab.locator(self.INFO_FORM)
-        expect(info_form).to_have_attribute("rendered", "")
-
-        return info_form
+    def open_actions_menu(self):
+        """Open and return the Project actions menu."""
+        self.user.page.get_by_role("button", name="Project actions").click()
+        menu = self.user.page.get_by_role("menu", name="Project actions")
+        expect(menu).to_be_visible()
+        return menu
 
     @property
     def filter_section(self):
         tabs = Tabs(self.user)
-        filters_tab = tabs.filters
-        expect(filters_tab).to_be_visible()
-        return filters_tab
+        tasks_tab = tabs.tasks
+        expect(tasks_tab).to_be_visible()
+        expect(tasks_tab.locator(f"{self.TASKS_TABLE} tbody")).to_have_attribute(
+            "loaded", ""
+        )
+        return tasks_tab
 
     @property
     def editor(self):

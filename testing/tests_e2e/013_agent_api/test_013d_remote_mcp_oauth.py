@@ -752,7 +752,7 @@ def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pi
     assert 'data-role="external-ai-chatgpt-setup"' in text
     assert "Restart any existing Codex sessions" in text
     assert "MCP-ENDPOINT" not in text
-    assert re.search(r'<details\s+data-role="external-ai-help">', text)
+    assert re.search(r'<details\b[^>]*\bdata-role="external-ai-help"', text)
     assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
     # Another installation must render its own configured URL in the command.
     monkeypatch.setattr(CONFIG, "MCP_RESOURCE", "https://another-installation.run.app/mcp")

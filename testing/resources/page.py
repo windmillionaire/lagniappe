@@ -82,7 +82,7 @@ class Page(SiteResource):
     # Files Tab
     FILE_LIST = "#files [data-widget='BaseList']"
     EMPTY_FILE_LIST_ITEM = "#files [data-widget='BaseList'] [data-role='empty']"
-    UPLOAD_FILE_TOGGLE = "#tabs [lp-show='files:FileUpload']"
+    UPLOAD_FILE_TOGGLE = "#tabs [data-nav='tabs'] [lp-show='files:FileUpload']"
     UPLOAD_FILE_FORM = "[data-widget='FileUpload']"
 
     # Document Tab

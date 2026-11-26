@@ -344,9 +344,9 @@ def test_create_page_task_with_assigned_to(get_admin, get_user):
     assigned_user.go(task)
     notifications = assigned_user.locate("[data-role='notifications']")
     notifications.click()
-    panel = assigned_user.page.locator("[role='listbox'][data-visible='true']")
+    panel = assigned_user.page.locator("[role='dialog'][data-visible='true']")
     assignment = (
-        panel.locator("[role='option']")
+        panel.locator("[role='group']")
         .filter(has_text=f"{user.entity.name} assigned you a task.")
         .filter(has_text=task.definition.name)
     )
@@ -557,8 +557,8 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_admi
     page = Pages.test_create_page_task.get(user)
     user.go(task)
 
-    task_form = _open_page_task_form(page, task)
     expect(task.element.locator(task.CHIP_TRAY_TOGGLE)).to_be_visible()
+    task_form = _open_page_task_form(page, task)
     expect(task_form).to_be_visible()
 
     with expect_successful_response(

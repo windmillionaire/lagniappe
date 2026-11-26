@@ -17,11 +17,9 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import ModelTasks, Projects, Users
 from testing.elements import (
-    Dropdown,
     Filters,
     FormElements,
     ProjectFilterConditions,
-    SpinnerButtons,
     Tabs,
 )
 from testing.utility.network import manual_mutation_headers
@@ -58,21 +56,20 @@ def test_project_viewer_reads_project_without_editing_controls(get_admin, get_us
     viewer.go(project)
     model_task.user = viewer
 
+    expect(viewer.locate("[lp-view]")).to_have_attribute("data-can-edit", "false")
     expect(viewer.locate(project.PROJECT_TITLE)).to_contain_text(
         project.definition.name
     )
+    description_el = viewer.locate(project.PROJECT_DESCRIPTION)
+    expect(description_el).to_have_attribute("data-editable", "false")
+    expect(description_el).to_contain_text(project.definition.description)
     expect(viewer.locate(project.CREATE_MODEL_BUTTON)).not_to_be_attached()
 
-    info_form = project.info_form
-    name_field = info_form.locator(project.INFO_NAME)
-    description_field = info_form.locator(project.INFO_DESCRIPTION)
-    expect(name_field).to_contain_text("Project Name")
-    expect(name_field).to_contain_text(project.definition.name)
-    expect(description_field).to_contain_text("Project Description")
-    expect(description_field).to_contain_text(project.definition.description)
-    expect(info_form.locator(FormElements.NAME)).not_to_be_attached()
-    expect(info_form.locator(FormElements.DESCRIPTION)).not_to_be_attached()
-    expect(info_form.locator(SpinnerButtons.UPDATE.value)).not_to_be_attached()
+    project.user = viewer
+    menu = project.open_actions_menu()
+    expect(menu.locator("[data-project-action='rename']")).not_to_be_attached()
+    expect(menu.locator("[data-project-action='description']")).not_to_be_attached()
+    viewer.page.keyboard.press("Escape")
 
     model_info = model_task.open_info()
     expect(model_info.locator("#name")).to_contain_text("Name")
@@ -86,16 +83,11 @@ def test_project_viewer_reads_project_without_editing_controls(get_admin, get_us
     )
 
     filters = Filters(viewer, project)
-    expect(filters.form).to_have_attribute("data-readonly", "false")
-    expect(filters.run_button).to_be_visible()
-    expect(filters.reset_button).to_be_visible()
-    panel = Dropdown(filters.conditions).open()
-    condition = panel.get_by_role(
-        "option",
-        name=ProjectFilterConditions.NAME.value,
-        exact=True,
-    )
-    expect(condition).to_be_visible()
+    expect(filters.form).to_have_attribute("data-can-edit", "false")
+    expect(filters.save_button).not_to_be_attached()
+    expect(filters.add_trigger).to_be_visible()
+    filters.open_add_popover()
+    expect(filters.field_option(ProjectFilterConditions.NAME.value)).to_be_visible()
 
 
 # @template projects/project.html::main

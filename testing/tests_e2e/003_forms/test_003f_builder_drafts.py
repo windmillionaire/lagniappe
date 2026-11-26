@@ -843,7 +843,7 @@ def test_saved_relabels_preserve_active_task_answers_and_conditions(get_admin, g
         expect(selected_channels).to_contain_text("SMS")
         radio = task_form.locator(f"[id^='{decision.id}-'].form-element")
         expect(radio.locator("[data-role='read']")).to_have_text(decision_label)
-        radio.get_by_role("button", name=f"Edit {decision.title}", exact=True).click()
+        radio.locator("[data-role='read']").click()
         expect(task_form.get_by_role("radio", name=decision_label, exact=True)).to_be_checked()
         expect(task_form.locator(f"input[name='{decision.id}'][value='approved-original']")).to_be_checked()
         table = task_form.locator(f"[id^='{items.id}-'].form-element")

@@ -1296,6 +1296,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert detailed_plan.status_code == 200
     assert detailed_plan.json["proposal"] == proposal
 
+    monkeypatch.setattr(ai_functions, "execute_registered_tool", execute)
     ready_read = client.post(
         "/api/v1/plans/report-key/tools/search_entities",
         headers={"Authorization": "Bearer valid-key"},

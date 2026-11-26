@@ -33,7 +33,6 @@ Category Index Page:
 from playwright.sync_api import expect
 
 from lagniappe.core.entities import Entities
-from testing.elements import Tools
 
 from .core import SiteResource
 
@@ -60,20 +59,16 @@ class Category(SiteResource):
     _initialize = True
     _sync = True
 
-    # --- Tools Panel Widgets ---
-    CREATE_PAGE_TOGGLE = "[lp-show='tools:CreatePage']"
+    # --- Header & Inline Controls ---
+    CREATE_PAGE_TOGGLE = "button[lp-show='tools:CreatePage']"
     CREATE_PAGE_WIDGET = "[data-widget='CreatePage']"
 
-    CATEGORY_INFO_TOGGLE = "[lp-show='tools:CategoryInfo']"
-    CATEGORY_INFO_WIDGET = "[data-widget='CategoryInfo']"
+    CATEGORY_TITLE = "[data-nav='view'] [data-role='title']"
+    CATEGORY_DESCRIPTION = "[data-role='description']"
+    CATEGORY_DEFAULT_FORM = "[data-role='default-form']"
 
-    CATEGORY_FILTERS_TOGGLE = "button[lp-show='filters:Filters']"
-    CATEGORY_FILTERS_COMPONENT = "#filters"
-    CATEGORY_FILTERS_WIDGET = "[data-widget='Filters']"
-
-    SAVED_FILTERS_TOGGLE = (
-        "button[lp-show='tools:SavedFilters'][data-visible='true']"
-    )
+    FILTER_BAR_COMPONENT = "#filter-bar"
+    FILTER_BAR_WIDGET = "[data-widget='FilterBar']"
 
     # --- Page Table ---
     TABLE = "#table"
@@ -121,31 +116,27 @@ class Category(SiteResource):
 
     def new_page_form(self):
         """
-        Open and return the create page form from tools panel.
+        Open and return the create page form from the category header button.
 
         Returns:
             Locator: The CreatePage widget form element
         """
-        tools = Tools(self.user)
-        tools.open()
-        tools.locate(self.CREATE_PAGE_TOGGLE).click()
-        return tools.locate(self.CREATE_PAGE_WIDGET)
+        toggle = self.user.locate(self.CREATE_PAGE_TOGGLE)
+        expect(toggle).to_be_visible()
+        toggle.click()
+        form = self.user.locate(self.CREATE_PAGE_WIDGET)
+        expect(form).to_be_visible()
+        return form
 
-    def category_info_form(self):
-        """
-        Open and return the category info form from tools panel.
-
-        Returns:
-            Locator: The CategoryInfo widget form element
-        """
-        tools = Tools(self.user)
-        tools.open()
-        tools.locate(self.CATEGORY_INFO_TOGGLE).click()
-        return tools.locate(self.CATEGORY_INFO_WIDGET)
+    def open_actions_menu(self):
+        """Open and return the Category actions menu."""
+        self.user.page.get_by_role("button", name="Category actions").click()
+        menu = self.user.page.get_by_role("menu", name="Category actions")
+        expect(menu).to_be_visible()
+        return menu
 
     @property
     def filter_section(self):
-        tools = Tools(self.user)
-        tools.open()
-        tools.locate(self.CATEGORY_FILTERS_TOGGLE).click()
-        return tools.locate(self.CATEGORY_FILTERS_COMPONENT)
+        bar = self.user.locate(self.FILTER_BAR_COMPONENT)
+        expect(bar).to_be_visible()
+        return bar

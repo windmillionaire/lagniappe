@@ -111,19 +111,14 @@ def test_one_category_permissions(get_user):
     expect(category_list.get_item(allowed_category)).to_be_visible()
     expect(category_list.get_item(other_category)).not_to_be_attached()
 
-    expect(user.locate(home.DIRECTORY_LIST).locator("li")).to_have_count(4)
-    expect(
-        user.locate(home.DIRECTORY_LIST).locator('a:has-text("Messages")')
-    ).to_be_attached()
-    expect(
-        user.locate(home.DIRECTORY_LIST).locator('a:has-text("Active Tasks")')
-    ).to_be_attached()
-    expect(
-        user.locate(home.DIRECTORY_LIST).locator('a:has-text("Account Settings")')
-    ).to_be_attached()
-    expect(
-        user.locate(home.DIRECTORY_LIST).locator('button:has-text("Sign out")')
-    ).to_be_attached()
+    directory_root = home.directory.list
+    expect(directory_root.locator('a:has-text("Messages")')).to_be_visible()
+    expect(directory_root.locator('a:has-text("Active Tasks")')).to_be_visible()
+    expect(directory_root.locator('a:has-text("Account Settings")')).to_be_visible()
+    expect(directory_root.locator('button:has-text("Sign out")')).to_be_visible()
+    expect(directory_root.locator('a:has-text("Forms")')).not_to_be_attached()
+    expect(directory_root.locator('a:has-text("Users")')).not_to_be_attached()
+    expect(directory_root.locator('a:has-text("Admin")')).not_to_be_attached()
     expect(user.locate(home.MANUAL_BUTTON)).to_be_visible()
 
     search = HeaderSearch(user)
@@ -148,13 +143,16 @@ def test_admin_permissions(get_user):
     expect(home.project_list.find_item(project_one)).to_be_visible()
 
     directory_list = home.directory
-    expect(directory_list.list.locator("li")).to_have_count(6)
-    expect(directory_list.list.get_by_role("link", name="Messages")).to_be_visible()
+    expect(directory_list.list.get_by_role("menuitem", name="Messages")).to_be_visible()
+    expect(directory_list.list.get_by_role("menuitem", name="Active Tasks")).to_be_visible()
+    expect(directory_list.list.get_by_role("menuitem", name="Forms")).to_be_visible()
+    expect(directory_list.list.get_by_role("menuitem", name="Users")).to_be_visible()
+    expect(directory_list.list.get_by_role("menuitem", name="Admin")).to_be_visible()
     expect(
-        directory_list.list.get_by_role("link", name="Account Settings")
+        directory_list.list.get_by_role("menuitem", name="Account Settings")
     ).to_be_visible()
     expect(
-        directory_list.list.get_by_role("button", name="Sign out")
+        directory_list.list.get_by_role("menuitem", name="Sign out")
     ).to_be_visible()
     expect(user.locate(home.MANUAL_BUTTON)).to_be_visible()
 
@@ -203,7 +201,7 @@ def test_empty_home_model_lists_settle_to_disabled_zero_state(get_user):
     home = user.go(SitePages.HOME)
 
     directory = home.directory.list
-    expect(directory.get_by_role("link", name="Active Tasks")).to_be_visible()
+    expect(directory.get_by_role("menuitem", name="Active Tasks")).to_be_visible()
 
     page_list = user.locate(home.PAGE_LIST)
     page_toggle = user.locate(home.PAGE_LIST_TOGGLE)

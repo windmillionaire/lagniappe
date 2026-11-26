@@ -60,7 +60,7 @@ def test_mobile_nav_visibility_changes_with_viewport(get_admin, get_user):
     )
     expect(model_symbol).to_have_text("automation")
     expect(model_symbol).to_have_attribute("aria-hidden", "true")
-    assert mobile_nav.get_section_title() == "Info"
+    assert mobile_nav.get_section_title() == "Document"
 
 
 def test_mobile_flipper_reveals_section_toggles(get_admin, get_user):
@@ -69,17 +69,17 @@ def test_mobile_flipper_reveals_section_toggles(get_admin, get_user):
     user.go(project)
     mobile_nav = project.mobile_nav
 
-    document_toggle = user.locate(Tabs.DOCUMENT_TOGGLE_MOBILE)
-    expect(document_toggle).to_be_hidden()
+    tasks_toggle = user.locate(Tabs.TASKS_TOGGLE_MOBILE)
+    expect(tasks_toggle).to_be_hidden()
     assert mobile_nav.is_tab_slider_open() is False
 
     mobile_nav.open_tab_slider()
 
-    expect(document_toggle).to_be_visible()
+    expect(tasks_toggle).to_be_visible()
     assert mobile_nav.is_tab_slider_open() is True
 
     mobile_nav.close_tab_slider()
-    expect(document_toggle).to_be_hidden()
+    expect(tasks_toggle).to_be_hidden()
     assert mobile_nav.is_tab_slider_open() is False
 
 
@@ -96,9 +96,9 @@ def test_mobile_section_switching_updates_visible_cards_and_title(get_admin, get
     expect(user.locate(Tabs.DOCUMENT_TAB)).to_be_visible()
     assert mobile_nav.get_section_title() == "Document"
 
-    mobile_nav.select_section("filters")
-    expect(user.locate(project.FILTERS_TAB)).to_be_visible()
-    assert mobile_nav.get_section_title() == "Task Filters"
+    mobile_nav.select_section("tasks")
+    expect(user.locate(Tabs.TASKS_TAB)).to_be_visible()
+    assert mobile_nav.get_section_title() == "Tasks"
 
 
 # @template projects/project.html::main
@@ -168,7 +168,7 @@ def test_resize_from_mobile_models_to_desktop_restores_dual_card_layout(get_admi
     expect(project.model_tasks_card).to_be_visible()
     tabs_card = user.locate(project.TABS_CARD)
     expect(tabs_card).to_be_visible()
-    expect(user.locate(Tabs.INFO_TAB)).to_be_visible()
+    expect(user.locate(Tabs.DOCUMENT_TAB)).to_be_visible()
 
 
 def test_resize_from_mobile_filters_to_desktop_preserves_selected_tab(get_admin, get_user):
@@ -176,13 +176,13 @@ def test_resize_from_mobile_filters_to_desktop_preserves_selected_tab(get_admin,
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)
 
-    project.mobile_nav.select_section("filters")
-    expect(user.locate(project.FILTERS_TAB)).to_be_visible()
+    project.mobile_nav.select_section("tasks")
+    expect(user.locate(Tabs.TASKS_TAB)).to_be_visible()
 
     user.mobile = False
 
     expect(user.locate(project.TABS_CARD)).to_be_visible()
-    expect(user.locate(project.FILTERS_TAB)).to_be_visible()
+    expect(user.locate(Tabs.TASKS_TAB)).to_be_visible()
 
 
 def test_mobile_selected_section_persists_after_reload(get_admin, get_user):

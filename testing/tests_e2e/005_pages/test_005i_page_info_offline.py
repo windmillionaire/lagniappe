@@ -31,7 +31,7 @@ def _fill_form_element(form, selector, value):
     field = form.locator(selector)
     field_input = field.locator("input, textarea").first
     if not field_input.is_visible():
-        field.locator("[data-role='label']").click()
+        field.locator("[data-role='read']").click()
     expect(field_input).to_be_visible()
     field_input.fill(value)
 
@@ -65,7 +65,7 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_admin, browser_fai
 
         _ = Tabs(owner).info
         info_form = page.info_form
-        _fill_form_element(info_form, Page.INFO_NAME, updated_name)
+        _fill_form_element(info_form, "[id^='sync-text-renderer-']", updated_name)
         owner.page.keyboard.press("Tab")
         info_submit = _main_submit(info_form)
         expect(info_submit.locator("[data-icon='builder.unsaved']")).to_be_visible()
@@ -81,19 +81,19 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_admin, browser_fai
     expect(info_submit).to_contain_text("Update Page")
 
     saved_page = Entities.fetch_one(page.key, request=Fetch.direct())
-    assert saved_page.name == updated_name
+    assert saved_page.submission.get("sync-text") == updated_name
 
     notifications = owner.locate("[data-role='notifications']")
     expect(notifications).to_be_visible(timeout=15000)
 
     notifications.click()
     option = owner.page.locator(
-        "[role='listbox'][data-visible='true'] [role='option']"
-    ).filter(has=owner.page.locator("[data-role='target']", has_text=updated_name)).filter(
+        "[role='dialog'][data-visible='true'] [role='group']"
+    ).filter(has=owner.page.locator("[data-role='target']", has_text=saved_page.name)).filter(
         has=owner.page.locator("[data-role='notification-body']", has_text="Offline page update synced.")
     )
     expect(option).to_be_visible()
-    expect(option.locator("[data-role='target']")).to_contain_text(updated_name)
+    expect(option.locator("[data-role='target']")).to_contain_text(saved_page.name)
     expect(option.locator("[data-role='notification-body']")).to_have_text(
         "Offline page update synced."
     )

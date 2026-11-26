@@ -1,10 +1,8 @@
-import re
-
 import pytest
 from playwright.sync_api import expect
 
 from testing.definitions import Categories, Pages, Users
-from testing.elements import Dropdown, MobileTableControls
+from testing.elements import MobileTableControls
 from testing.resources.category import Category
 
 pytestmark = pytest.mark.e2e
@@ -121,11 +119,9 @@ def test_category_mobile_tools_dropdown_opens_new_page_form(get_admin, get_user)
     user.go(Categories.test_empty_category)
 
     user.mobile = True
-    dropdown_button = user.locate("[data-role='tools-dropdown']")
-    expect(dropdown_button).to_be_visible()
-    expect(dropdown_button).to_have_attribute("data-combobox-id", re.compile(".+"))
-
-    Dropdown(dropdown_button).select_by_name("New Page")
+    create_button = user.locate(Category.CREATE_PAGE_TOGGLE)
+    expect(create_button).to_be_visible()
+    create_button.click()
 
     create_page = user.locate(Category.CREATE_PAGE_WIDGET)
     expect(create_page).to_be_visible()

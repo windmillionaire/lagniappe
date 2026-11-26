@@ -163,7 +163,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     assert duplicate_start["status"] == 409
     assert duplicate_start["body"]["already_running"] is True
     assert duplicate_start["body"]["operation"] == job.urlsafe_key
-    expect(form.locator("input[name='name']")).to_have_value(original_name)
+    expect(user.locate(Page.PAGE_TITLE)).to_have_text(original_name)
 
     if CONFIG.hosted_e2e_runner or live_ai_job_quota:
         def verify_submission():

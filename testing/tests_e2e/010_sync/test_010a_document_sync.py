@@ -91,20 +91,24 @@ def test_document_presence_appears_and_clears(get_admin, get_user, browser_failu
     with browser_failures.expect_offline(collaborator):
         collaborator.offline = True
         expect(collaborator.locate("[data-role='offline']")).to_be_visible()
-    with expect_successful_response(
-        owner.page,
-        method="POST",
-        path="/l/poll",
-        request_payload_contains=(
-            f'"closed_documents":["{document_sync_id}"]'
-        ),
-    ):
-        _ = Tabs(owner).info
+    try:
+        with expect_successful_response(
+            owner.page,
+            method="POST",
+            path="/l/poll",
+            request_payload_contains=(
+                f'"closed_documents":["{document_sync_id}"]'
+            ),
+        ):
+            _ = Tabs(owner).tasks
 
-    with expect_poll_result(
-        collaborator.page,
-        subscription_id=f"document:{document_sync_id}",
-    ):
-        collaborator.offline = False
+        with expect_poll_result(
+            collaborator.page,
+            subscription_id=f"document:{document_sync_id}",
+        ):
+            collaborator.offline = False
+    finally:
+        if collaborator.offline:
+            collaborator.offline = False
 
     expect(collaborator_editor.toolbar.locator("button[title='Users']")).to_have_count(0)

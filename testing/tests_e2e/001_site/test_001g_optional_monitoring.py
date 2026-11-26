@@ -79,8 +79,9 @@ def test_optional_monitoring_does_not_gate_controls(
                 wait_until="domcontentloaded",
             )
             if layout == "page":
-                user.page.get_by_role("button", name="Edit Name", exact=True).click()
-                name = user.page.locator("#name input[name='name']")
+                user.page.get_by_role("button", name="Page actions", exact=True).click()
+                user.page.locator("[data-page-action='rename']:visible").click()
+                name = user.page.locator("[data-role='rename-form'] input[name='name']")
                 expect(name).to_be_visible()
                 name.fill("Unsaved monitoring probe")
                 expect(name).to_have_value("Unsaved monitoring probe")

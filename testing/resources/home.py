@@ -111,7 +111,7 @@ class HomePage(SitePage):
     COMPLETE_TASK_CHECKBOX = "input[data-role='complete']"
 
     # --- User Page Section ---
-    USER_PAGE_BUTTON = "a[data-kind='user']:has-text('My Page')"
+    USER_PAGE_BUTTON = "main a[data-kind='user']:has-text('My Page')"
 
     # --- Starred Section ---
     # Template: lagniappe/web/templates/home/home.html
@@ -138,12 +138,12 @@ class HomePage(SitePage):
     )
 
     # --- Directory Section ---
-    # Template: lagniappe/web/templates/home/home.html (inline)
-    # Contains navigation links to Tasks, Forms, Users
-    DIRECTORY_COMPONENT = "#directory[lp-component]"
-    DIRECTORY_LIST_TOGGLE = "button[lp-show='directory:DirectoryList'][data-toggle]"
-    DIRECTORY_LIST = "#directory ul[data-widget='DirectoryList']"
-    MANUAL_BUTTON = "a[href='/manual/'][data-kind='page']:has-text('Manual')"
+    # Template: lagniappe/web/templates/nav.html (workspace directory menu)
+    # Contains navigation links to Tasks, Forms, Users, Admin, Account Settings
+    DIRECTORY_COMPONENT = "[data-role='nav-menu']"
+    DIRECTORY_LIST_TOGGLE = "button[data-role='nav-menu-trigger']"
+    DIRECTORY_LIST = "[data-role='nav-menu-panel']"
+    MANUAL_BUTTON = "main a[href='/manual/'][data-kind='page']:has-text('Manual')"
 
     # --- Tools Section ---
     # Template: lagniappe/web/templates/home/home.html
@@ -289,15 +289,14 @@ class HomePage(SitePage):
     @property
     def directory(self):
         """
-        Get the directory list after opening and ensuring it's loaded.
+        Get the workspace directory menu panel after opening it.
         """
-        directory = List(self.user.locate(self.DIRECTORY_LIST))
-        if not directory.is_visible:
+        panel = self.user.locate(self.DIRECTORY_LIST)
+        if not panel.is_visible():
             self.user.locate(self.DIRECTORY_LIST_TOGGLE).click()
 
-        assert directory.is_loaded
-        expect(directory.list).to_be_visible()
-        return directory
+        expect(panel).to_be_visible()
+        return List(panel)
 
     def create_manual_project(self, project):
         definition = project.definition

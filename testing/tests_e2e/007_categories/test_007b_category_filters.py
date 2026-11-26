@@ -7,7 +7,7 @@ import pytest
 
 from testing.definitions import Categories, Forms, Pages, Users
 from testing.resources import Page
-from testing.elements import FormElements, FormSelect, SpinnerButtons, Table, Tools
+from testing.elements import FormElements, FormSelect, SpinnerButtons, Table
 from testing.elements.filters import CategoryFilterConditions, Filters
 from testing.utility.polling import expect_poll_result
 from testing.utility.reconnect import expect_reconnect_refresh
@@ -75,7 +75,7 @@ def _attached_form_filter_context(user):
     filters = Filters(user, category)
     filters.set_condition(attached_form)
     expect(filters.badges).to_contain_text(attached_form.definition.name)
-    expect(filters.form_conditions).to_be_visible()
+    expect(filters.add_popover).to_have_attribute("data-visible", "true")
 
     return filters, matching_page, excluded_page
 
@@ -102,19 +102,23 @@ def test_category_filter_select_includes_form_from_created_page(get_admin):
     user.reload(category)
     filters = Filters(user, category)
     filters.set_condition(form)
-    expect(filters.form_conditions).to_be_visible()
+    expect(filters.badges).to_contain_text(form.definition.name)
+    expect(filters.field_option("Inspection Notes")).to_be_visible()
 
 
 def test_category_filters_form_opens(get_admin):
     user = get_admin()
     category = Categories.test_create_page.get(user)
     user.go(category)
-    filters = category.filter_section
+    filters = Filters(user, category)
 
-    expect(filters).to_be_visible()
-    expect(filters.locator("[data-role='conditions']")).to_be_visible()
-    expect(filters.locator("button[data-role='run']")).to_be_visible()
-    expect(filters.locator("button[data-role='save']")).to_be_visible()
+    expect(filters.add_trigger).to_be_visible()
+    expect(filters.saved_trigger).to_be_visible()
+    filters.open_add_popover()
+    expect(filters.field_option(CategoryFilterConditions.NAME.value)).to_be_visible()
+    expect(
+        filters.field_option(CategoryFilterConditions.DESCRIPTION.value)
+    ).to_be_visible()
 
 
 def test_category_filters_require_at_least_one_condition(get_admin):
@@ -123,8 +127,9 @@ def test_category_filters_require_at_least_one_condition(get_admin):
     user.go(category)
     filters = Filters(user, category)
 
-    filters.run_button.click()
-    expect(filters.error).to_contain_text("Please add at least one filter condition")
+    expect(filters.bar_actions).to_have_attribute("data-visible", "false")
+    expect(filters.save_button).to_be_hidden()
+    expect(filters.reset_button).to_be_hidden()
 
 
 def test_category_saved_filters_empty_state(get_admin):
@@ -132,17 +137,9 @@ def test_category_saved_filters_empty_state(get_admin):
     category = Categories.test_empty_category.get(user)
     user.go(category)
 
-    tools = Tools(user)
-    tools.open()
-
-    with user.page.expect_response("**/filters/*/get"):
-        tools.locate(category.SAVED_FILTERS_TOGGLE).click()
-
-    saved = tools.locate("[data-role='saved-filters']")
-    expect(saved).to_be_visible()
-    expect(saved.locator("[data-role='empty']")).to_contain_text(
-        "No filters saved yet"
-    )
+    filters = Filters(user, category)
+    saved = filters.open_saved_popover(expect_fetch=True)
+    expect(saved).to_contain_text("No saved filters yet")
 
 
 def test_category_saved_filters_hide_create_page_tool(get_admin):
@@ -150,40 +147,27 @@ def test_category_saved_filters_hide_create_page_tool(get_admin):
     category = Categories.test_empty_category.get(user)
     user.go(category)
 
-    tools = Tools(user)
-    tools.open()
-    tools.locate(category.CREATE_PAGE_TOGGLE).click()
-    create_page = tools.locate(category.CREATE_PAGE_WIDGET)
+    create_page = category.new_page_form()
     expect(create_page).to_be_visible()
 
-    tools.locate(category.CATEGORY_INFO_TOGGLE).click()
-    expect(tools.locate(category.CATEGORY_INFO_WIDGET)).to_be_visible()
-    expect(create_page).to_be_hidden()
-
-    with user.page.expect_response("**/filters/*/get"):
-        tools.locate(category.SAVED_FILTERS_TOGGLE).click()
-
-    saved = tools.locate("[data-role='saved-filters']")
+    filters = Filters(user, category)
+    saved = filters.open_saved_popover(expect_fetch=True)
     expect(saved).to_be_visible()
-    expect(create_page).to_be_hidden()
+    expect(saved).to_contain_text("No saved filters yet")
+
+    filters.open_add_popover()
+    expect(saved).to_have_attribute("data-visible", "false")
+    expect(filters.add_popover).to_have_attribute("data-visible", "true")
 
 
 def test_category_url_tool_opens_saved_filters(get_admin):
     user = get_admin()
     category = Categories.test_empty_category.get(user)
-    user.go(category, query_params={"tool": "saved-filters"})
+    user.go(category, query_params={"tool": "create-page"})
 
     tools = user.locate("#tools")
     expect(tools).to_be_visible()
-    expect(tools.locator(category.SAVED_FILTERS_TOGGLE)).to_have_attribute(
-        "data-selected", "true"
-    )
-
-    saved = tools.locator("[data-role='saved-filters']")
-    expect(saved).to_be_visible()
-    expect(saved.locator("[data-role='empty']")).to_contain_text(
-        "No filters saved yet"
-    )
+    expect(tools.locator(category.CREATE_PAGE_WIDGET)).to_be_visible()
 
 
 def test_category_filter_by_page_name(get_admin):
@@ -336,21 +320,26 @@ def test_category_saved_filter_save_and_run(get_admin, browser_failures):
     filters.name_contains("Urgent").add_filter()
 
     saved_filter = filters.save_filter()
-    filter_key = saved_filter.get_attribute("data-key")
+    filter_key = saved_filter["key"]
+    filter_url = saved_filter["url"]
 
     user.reload(category)
-    tools = Tools(user)
-    tools.open()
-    with user.page.expect_response("**/filters/*/get"):
-        tools.locate(category.SAVED_FILTERS_TOGGLE).click()
+    reloaded_filters = Filters(user, category)
+    reloaded_saved = reloaded_filters.open_saved_popover(expect_fetch=True)
+    apply_btn = reloaded_saved.locator("button:not([data-role='saved-delete'])").filter(
+        has_text="Urgent"
+    ).first
+    expect(apply_btn).to_be_visible()
+    expect(apply_btn).to_contain_text(CategoryFilterConditions.NAME.value)
 
-    reloaded_saved = tools.locate("[data-role='saved-filters']")
-    reloaded_filter = reloaded_saved.locator(f"li[data-key='{filter_key}']")
-    expect(reloaded_filter).to_be_visible()
-    expect(reloaded_filter).to_contain_text(CategoryFilterConditions.NAME.value)
+    with user.page.expect_response("**/filters/*/test?**"):
+        apply_btn.click()
+    _expect_result_includes_excludes(
+        reloaded_filters.run(), matching_page, excluded_page
+    )
 
-    with user.page.expect_navigation():
-        reloaded_filter.locator("a[href*='/filters/']").click()
+    base_url = category.url.rsplit("/categories/", 1)[0]
+    user.navigate(f"{base_url}{filter_url}")
     user.page.wait_for_selector("[lp-view][initialized]")
 
     root = user.locate("[lp-view]")
