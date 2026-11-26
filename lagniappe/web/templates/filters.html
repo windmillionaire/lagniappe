@@ -209,13 +209,14 @@
   </div>
 {% endmacro %}
 
-{% macro filter_bar(entity, kind=None, in_card=False, table_target=None) %}
+{% macro filter_bar(entity, kind=None, in_card=False, card_kind=None, table_target=None) %}
   {% set resolved_kind = kind or ('task' if entity.entity_kind == 'project' else 'page') %}
   <div id="filter-bar"
        lp-component
        data-default="FilterBar"
        data-visible="true"
        data-persistent="true"
+       {% if in_card %}data-kind="{{ card_kind or resolved_kind }}"{% endif %}
        class="{{ styles.filterBar.inCard if in_card else styles.filterBar.container }}">
     <div data-widget="FilterBar"
          data-persistent="true"
@@ -260,7 +261,7 @@
       </div>
       <div data-role="bar-actions"
            data-visible="false"
-           class="{{ styles.filterBar.actions }}">
+           class="{{ styles.filterBar.inCardActions if in_card else styles.filterBar.actions }}">
         <span data-role="match-status" class="{{ styles.filterBar.status }}"></span>
         {% if entity.allowed(Action.EDIT) %}
           <button type="button"

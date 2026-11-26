@@ -323,11 +323,24 @@ td [data-role="quick-edit-error"] {
 	white-space: normal;
 }
 
-/* @style table.default */
+/* @style table.default table.card */
 @media (min-width: 640px) {
 	table#table:not([data-embedded]) {
 		margin-inline: -0.75rem;
 		width: calc(100% + 1.5rem);
+	}
+
+	table[data-card-table="true"] {
+		& > tbody > tr > td[data-column="name"] {
+			max-width: none;
+			white-space: normal;
+
+			& > div,
+			& span {
+				white-space: normal;
+				overflow-wrap: anywhere;
+			}
+		}
 	}
 }
 

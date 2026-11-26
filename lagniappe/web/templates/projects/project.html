@@ -92,7 +92,7 @@
        data-tab="true"
        data-default="ModelTaskList"
        data-kind="model-task"
-       class="{{ styles.card.secondary }}">
+       class="{{ styles.card.secondary }} sm:group-data-[tasks-expanded=true]/view:hidden">
     <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="model-tasks">
       <div data-role="header" class="{{ styles.layout.nav.header }}">
         <span class="text-default-dark" data-role="title">Model Tasks</span>
@@ -123,6 +123,7 @@
        data-kind="project"
        data-secondary="true"
        data-can-edit="{{ can_edit_project|yesno }}"
+       data-tasks-expanded="false"
        class="group/view max-w-7xl mx-auto"
        data-readonly="{{ project.readonly|yesno }}">
     <div class="{{ styles.layout.view.header }}">
@@ -146,8 +147,25 @@
         <div lp-nav
              class="{{ styles.layout.nav.title }}"
              data-nav="tabs">
-          <span class="text-default-dark" data-role="title">{{ 'Document' if render_document else 'Tasks' }}</span>
-          {{ controls.page_controls() }}
+          <div data-role="header" class="{{ styles.layout.nav.header }}">
+            <span class="text-default-dark" data-role="title">{{ 'Document' if render_document else 'Tasks' }}</span>
+            <button type="button"
+                    data-role="tasks-expand"
+                    data-kind="task"
+                    data-visible="false"
+                    data-active="false"
+                    aria-pressed="false"
+                    aria-label="Expand tasks"
+                    title="Expand tasks"
+                    class="{{ styles.toggle.tabAction }} max-sm:hidden">
+              <span class="grid shrink-0">
+                {{ render_icon("maximize", "[grid-area:1/1] group-data-[active=true]/toggle:invisible") }}
+                {{ render_icon("minimize", "[grid-area:1/1] invisible group-data-[active=true]/toggle:visible") }}
+              </span>
+              <span data-role="tasks-expand-label">Expand</span>
+            </button>
+            {{ controls.page_controls() }}
+          </div>
           {{ toggles('tabs') }}
         </div>
         {% if render_document %}{{ document_tab(project) }}{% endif %}

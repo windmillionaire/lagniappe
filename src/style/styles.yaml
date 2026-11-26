@@ -1465,8 +1465,12 @@ table:
     surfaces: [server]
     css: [src/style/tables.css]
   cardWrap:
-    classes: w-full min-w-0 overflow-x-auto sm:border-t sm:border-base-light/50
-    intent: horizontally scrollable wrapper separating a card-hosted index table from its filter bar
+    classes: w-full min-w-0 sm:px-2 sm:pb-2
+    intent: outer inset spacing aligning a bordered card-hosted index table with its filter bar
+    surfaces: [server]
+  cardFrame:
+    classes: min-w-0 overflow-x-auto max-w-full sm:rounded-md sm:border sm:border-kind-default sm:bg-white sm:px-2
+    intent: bordered scrollable container framing a card-hosted index table on desktop without double-bordering mobile cards
     surfaces: [server]
   embedded:
     classes: w-full table-auto border-collapse divide-y sm:text-sm min-w-max bg-white
@@ -1844,8 +1848,8 @@ filterBar:
     intent: outer spacing wrapper for the single-row inline filter chip bar above index tables
     surfaces: [server]
   inCard:
-    classes: px-4 pt-4 pb-3 sm:px-6
-    intent: padded wrapper for the inline filter chip bar when hosted inside a primary card tab
+    classes: mx-4 mt-2 mb-3 rounded-md bg-kind-bg p-3 sm:mx-2 sm:mt-0 sm:mb-2 sm:p-4
+    intent: tinted card-inset wrapper for the inline filter chip bar matching form panels
     surfaces: [server]
   row:
     classes: flex flex-col gap-2
@@ -1882,6 +1886,10 @@ filterBar:
   actions:
     classes: flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-base-bg px-3 py-1.5
     intent: compact tinted summary and action tray shown directly below active filter chips
+    surfaces: [server]
+  inCardActions:
+    classes: flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-white/80 px-3 py-1.5
+    intent: light neutral summary and action tray contrasting cleanly inside a kind-tinted card filter bar
     surfaces: [server]
   status:
     classes: text-xs font-medium text-base-medium

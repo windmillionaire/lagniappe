@@ -26,10 +26,12 @@
        data-kind="task"
        data-parent-nav="tabs"
        class="flex flex-col">
-    {{ filter_bar(project, kind="task", in_card=True, table_target="project-tasks-table") }}
+    {{ filter_bar(project, kind="task", in_card=True, card_kind="project", table_target="project-tasks-table") }}
     {% if tasks_index %}
       <div class="{{ styles.table.cardWrap }}">
-        {{ table(none, tasks_index, table_id="project-tasks-table", card=True) }}
+        <div class="{{ styles.table.cardFrame }}" data-kind="task">
+          {{ table(none, tasks_index, table_id="project-tasks-table", card=True) }}
+        </div>
       </div>
     {% endif %}
   </div>

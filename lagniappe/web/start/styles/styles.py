@@ -445,7 +445,8 @@ STYLES = {
 		"container": "min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white",
 		"default": "w-full table-auto border-collapse divide-y sm:text-sm mt-4",
 		"card": "w-full table-auto border-collapse divide-y sm:text-sm",
-		"cardWrap": "w-full min-w-0 overflow-x-auto sm:border-t sm:border-base-light/50",
+		"cardWrap": "w-full min-w-0 sm:px-2 sm:pb-2",
+		"cardFrame": "min-w-0 overflow-x-auto max-w-full sm:rounded-md sm:border sm:border-kind-default sm:bg-white sm:px-2",
 		"embedded": "w-full table-auto border-collapse divide-y sm:text-sm min-w-max bg-white",
 		"body": "sm:divide-y w-full sm:divide-base-light/50",
 		"thead": {
@@ -568,7 +569,7 @@ STYLES = {
 	},
 	"filterBar": {
 		"container": "mt-4 px-4 sm:px-0",
-		"inCard": "px-4 pt-4 pb-3 sm:px-6",
+		"inCard": "mx-4 mt-2 mb-3 rounded-md bg-kind-bg p-3 sm:mx-2 sm:mt-0 sm:mb-2 sm:p-4",
 		"row": "flex flex-col gap-2",
 		"chipsGroup": "flex min-w-0 flex-row flex-wrap items-center gap-2",
 		"chips": "contents",
@@ -577,6 +578,7 @@ STYLES = {
 		"icon": "icon-sm text-base-medium",
 		"chevron": "icon-xs text-base-medium",
 		"actions": "flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-base-bg px-3 py-1.5",
+		"inCardActions": "flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-white/80 px-3 py-1.5",
 		"status": "text-xs font-medium text-base-medium",
 		"saveButton": "inline-flex cursor-pointer items-center gap-1 rounded-md border border-kind-light bg-white px-2.5 py-1 text-xs font-semibold text-kind-dark transition-colors hover:bg-kind-bg disabled:pointer-events-none disabled:opacity-50",
 		"clearButton": "cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-base-medium transition-colors hover:bg-white hover:text-base-dark disabled:pointer-events-none disabled:opacity-50",

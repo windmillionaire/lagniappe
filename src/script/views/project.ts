@@ -1,5 +1,6 @@
 import { captureError } from "../shared/errors.ts";
 import { request } from "../shared/index.ts";
+import { withTransition } from "../shared/transitions.ts";
 import type { LoadedWidget } from "../types/widgets";
 import type { FilterBar, SavedConditionData } from "../widgets/filterBar.ts";
 import type { IndexTable } from "../widgets/tables/indexTable.ts";
@@ -8,7 +9,7 @@ import type {
 	TableVisibilityState,
 } from "../widgets/tables/visibilityState.ts";
 import type { SubcomponentEvent } from "./base/component.ts";
-import Entity from "./base/entity.ts";
+import Entity, { type PreparedEntityLayout } from "./base/entity.ts";
 import type { ViewRoot } from "./base/shell.ts";
 
 interface StatusBarResponse {
@@ -35,15 +36,18 @@ class Project extends Entity {
 		indexTable: LoadedIndexTable | null;
 	}> | null;
 	declare _suppressNextTasksLoad: boolean;
+	declare _tasksExpanded: boolean;
 	declare _onProjectClick: (event: MouseEvent) => void;
 
 	constructor(node: ViewRoot) {
 		super(node);
 		this._defaultTabId = this._tabElement("document") ? "document" : "tasks";
 		this._suppressNextTasksLoad = false;
+		this._tasksExpanded = false;
 		this._tasksReadyPromise = null;
 		this.TableVisibilityState = null;
 		this._onProjectClick = (event) => {
+			if (this._handleTasksExpandClick(event)) return;
 			if (this._handleHeaderClick(event)) return;
 			if (this._handleModelTaskFilterClick(event)) return;
 		};
@@ -70,12 +74,66 @@ class Project extends Entity {
 		}
 	}
 
+	_commitLayoutBody(prepared: PreparedEntityLayout) {
+		const tabId = super._commitLayoutBody(prepared);
+		this._syncTasksExpand(tabId);
+		return tabId;
+	}
+
 	_tabChange(event: SubcomponentEvent) {
 		super._tabChange(event);
-		if (event.detail.subcomponent.name === "tasks") {
+		const name = event.detail.subcomponent.name;
+		if (event.detail.subcomponent.elt.dataset.tab === "true") {
+			if (name !== "tasks" && this._tasksExpanded) {
+				this._tasksExpanded = false;
+			}
+			this._syncTasksExpand(name);
+		}
+		if (name === "tasks") {
 			const shouldLoad = !this._suppressNextTasksLoad;
 			void this._ensureTasksTab({ loadRows: shouldLoad }).catch(captureError);
 		}
+	}
+
+	_syncTasksExpand(activeTabId?: string | null) {
+		const tabId =
+			activeTabId ??
+			(this._tabElement("tasks")?.dataset.visible === "true"
+				? "tasks"
+				: "document");
+		const expanded = tabId === "tasks" && this._tasksExpanded && !this.mobile;
+		this.elt.dataset.tasksExpanded = expanded ? "true" : "false";
+
+		const button = this.elt.querySelector<HTMLButtonElement>(
+			"button[data-role='tasks-expand']",
+		);
+		if (!button) return;
+		button.dataset.visible = tabId === "tasks" ? "true" : "false";
+		button.dataset.active = expanded ? "true" : "false";
+		button.setAttribute("aria-pressed", expanded ? "true" : "false");
+		const label = expanded ? "Collapse" : "Expand";
+		const title = expanded ? "Show Model Tasks" : "Expand tasks";
+		button.setAttribute("aria-label", title);
+		button.title = title;
+		const labelEl = button.querySelector<HTMLElement>(
+			"[data-role='tasks-expand-label']",
+		);
+		if (labelEl) labelEl.textContent = label;
+	}
+
+	_handleTasksExpandClick(event: MouseEvent): boolean {
+		const target = event.target as Element | null;
+		const button = target?.closest<HTMLButtonElement>(
+			"button[data-role='tasks-expand']",
+		);
+		if (!button || !this.elt.contains(button)) return false;
+		event.preventDefault();
+		event.stopPropagation();
+		this._tasksExpanded = !this._tasksExpanded;
+		void withTransition(() => this._syncTasksExpand("tasks"), {
+			label: "project:tasks-expand",
+		});
+		return true;
 	}
 
 	_handleHeaderClick(event: MouseEvent): boolean {
