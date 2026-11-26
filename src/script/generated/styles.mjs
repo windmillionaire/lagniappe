@@ -444,6 +444,8 @@ const STYLES = {
   "table": {
     "container": "min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white",
     "default": "w-full table-auto border-collapse divide-y sm:text-sm mt-4",
+    "card": "w-full table-auto border-collapse divide-y sm:text-sm",
+    "cardWrap": "w-full min-w-0 overflow-x-auto sm:border-t sm:border-base-light/50",
     "embedded": "w-full table-auto border-collapse divide-y sm:text-sm min-w-max bg-white",
     "body": "sm:divide-y w-full sm:divide-base-light/50",
     "thead": {
@@ -566,6 +568,7 @@ const STYLES = {
   },
   "filterBar": {
     "container": "mt-4 px-4 sm:px-0",
+    "inCard": "px-4 pt-4 pb-3 sm:px-6",
     "row": "flex flex-col gap-2",
     "chipsGroup": "flex min-w-0 flex-row flex-wrap items-center gap-2",
     "chips": "contents",

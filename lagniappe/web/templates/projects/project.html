@@ -2,9 +2,8 @@
 {% set view_entry = "project" %}
 {% import 'controls.html' as controls %}
 {% import 'menus.html' as menus %}
-{% from 'projects/filters.html' import task_filters %}
+{% from 'projects/filters.html' import project_tasks_tab %}
 {% from 'projects/document.html' import document_tab %}
-{% from 'projects/info.html' import info_tab %}
 {% from 'projects/model_tasks.html' import create_model_task, model_task_list %}
 {% set can_edit_project = project.allowed(Action.EDIT) %}
 {% set render_document = project.get_asset('document') or can_edit_project %}
@@ -14,6 +13,10 @@
       <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
         <span data-role="title">{{- project.name -}}</span>
         {% call menus.title("Project actions") %}
+          {% if can_edit_project %}
+            {{ menus.project_action("Rename", "edit", "rename", "project") }}
+            {{ menus.project_action("Edit description" if project.description else "Add description", "textarea", "description", "project", "description-action-label") }}
+          {% endif %}
           {{ menus.star(is_starred(project)) }}
           {% if project.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
         {% endcall %}
@@ -44,17 +47,11 @@
               class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
     {% endif %}
     <button type="button"
-            lp-show="info:active"
-            data-kind="project"
-            aria-label="Info"
-            title="Info"
-            class="{{ styles.entity.tabIcon }}">{{ render_icon("info") }}</button>
-    <button type="button"
-            lp-show="filters:active"
+            lp-show="tasks:active"
             data-kind="task"
-            aria-label="Filter Tasks"
-            title="Filter Tasks"
-            class="{{ styles.entity.tabIcon }}">{{ render_icon("filter.list") }}</button>
+            aria-label="Tasks"
+            title="Tasks"
+            class="{{ styles.entity.tabIcon }}">{{ render_icon("task") }}</button>
   </nav>
 {% endmacro %}
 
@@ -125,12 +122,15 @@
        data-hash="{{ project.hash }}"
        data-kind="project"
        data-secondary="true"
+       data-can-edit="{{ can_edit_project|yesno }}"
        class="group/view max-w-7xl mx-auto"
        data-readonly="{{ project.readonly|yesno }}">
     <div class="{{ styles.layout.view.header }}">
       {{ view_header(project) }}
       <div data-role="description"
-           class="{{ styles.entity.description }} hidden empty:hidden sm:flex">
+           data-editable="{{ can_edit_project|yesno }}"
+           {% if can_edit_project %}title="Click to edit description"{% endif %}
+           class="{{ styles.entity.description }}">
         {%- if project.description -%}
           <span>{{- project.description -}}</span>
         {%- endif -%}
@@ -146,13 +146,12 @@
         <div lp-nav
              class="{{ styles.layout.nav.title }}"
              data-nav="tabs">
-          <span class="text-default-dark" data-role="title">Info</span>
+          <span class="text-default-dark" data-role="title">{{ 'Document' if render_document else 'Tasks' }}</span>
           {{ controls.page_controls() }}
           {{ toggles('tabs') }}
         </div>
-        {{ info_tab(project) }}
         {% if render_document %}{{ document_tab(project) }}{% endif %}
-        {{ task_filters(project) }}
+        {{ project_tasks_tab(project, tasks_index) }}
       </div>
     </div>
   </div>

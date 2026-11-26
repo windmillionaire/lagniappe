@@ -536,7 +536,20 @@ def category_info(category: models.Category) -> tuple[str, int]:
 
 
 def project_view(project: models.Project) -> tuple[str, int]:
-    return render_template("projects/project.html", project=project), 200
+    tasks_index = SimpleNamespace(
+        table=project.index().table,
+        is_filter=False,
+        route=url_for("projects.tasks", key=project.urlsafe_key),
+        append=None,
+    )
+    return (
+        render_template(
+            "projects/project.html",
+            project=project,
+            tasks_index=tasks_index,
+        ),
+        200,
+    )
 
 
 def project_info(project: models.Project) -> tuple[str, int]:
@@ -843,18 +856,24 @@ def new_filter(filter: models.Filter) -> tuple[str, int]:
     return template(filter), 200
 
 
-def _serialize_bar_filter(filter_entity: models.Filter) -> dict[str, object]:
+def _serialize_bar_conditions(
+    filter_entity: models.Filter,
+) -> list[dict[str, object]]:
     badge_template = get_template_attribute("badge.html", "badge")
-    unavailable = bool(getattr(filter_entity, "unavailable", False))
     conditions: list[dict[str, object]] = []
-    if not unavailable:
-        for condition in filter_entity.conditions:
-            conditions.append(
-                {
-                    "badge": str(badge_template(condition.details)),
-                    "definition": condition.contract_condition,
-                }
-            )
+    for condition in filter_entity.conditions:
+        conditions.append(
+            {
+                "badge": str(badge_template(condition.details)),
+                "definition": condition.contract_condition,
+            }
+        )
+    return conditions
+
+
+def _serialize_bar_filter(filter_entity: models.Filter) -> dict[str, object]:
+    unavailable = bool(getattr(filter_entity, "unavailable", False))
+    conditions = [] if unavailable else _serialize_bar_conditions(filter_entity)
     return {
         "key": filter_entity.urlsafe_key,
         "fingerprint": filter_entity.fingerprint,
@@ -894,6 +913,10 @@ def saved_filters_bar(
         jsonify({"filters": [_serialize_bar_filter(f) for f in filters]}),
         200,
     )
+
+
+def filter_bar_conditions(filter_entity: models.Filter) -> tuple[Response, int]:
+    return jsonify({"conditions": _serialize_bar_conditions(filter_entity)}), 200
 
 
 def saved_filters(

@@ -21,18 +21,20 @@
   </tr>
 {% endmacro %}
 
-{% macro table(entities, parent, table_id=None) %}
+{% macro table(entities, parent, table_id=None, card=False) %}
+  {% set resolved_id = table_id or ('table' if not parent.table.embedded else 'embedded-table') %}
   <table lp-component
-         {% if entities is undefined and not parent.is_filter %}lp-prefetch{% endif %}
-         id="{{ table_id or ('table' if not parent.table.embedded else 'embedded-table') }}"
+         {% if entities is undefined and not parent.is_filter and not card %}lp-prefetch{% endif %}
+         id="{{ resolved_id }}"
+         {% if card %}data-card-table="true"{% endif %}
          data-kind="{{ parent.table.kind }}"
          data-preload='{{ parent.table.preload|tojson }}'
          data-default="{{ 'IndexTable' if not parent.table.embedded else 'EmbeddedTable' }}"
          data-persistent="true"
          data-filter="{{ parent.is_filter|yesno }}"
-         data-visible="false"
-         class="{{ styles.table.default if not parent.table.embedded else styles.table.embedded }}">
-    <thead class="{{ styles.table.thead.default if not parent.table.embedded else styles.table.thead.embedded }}">
+         data-visible="{{ 'true' if card else 'false' }}"
+         class="{{ styles.table.card if card else (styles.table.default if not parent.table.embedded else styles.table.embedded) }}">
+    <thead class="{{ styles.table.thead.embedded if (card or parent.table.embedded) else styles.table.thead.default }}">
       <tr data-role="column-header">
         {% for col in parent.table.columns %}
           <th class="{{ table_header_class(col) }}"
@@ -60,7 +62,7 @@
               data-column="selector">
             <button type="button"
                     class="{{ styles.toggle.container }} inline-grid"
-                    lp-show="table:TableVisibility"
+                    lp-show="{{ resolved_id }}:TableVisibility"
                     data-toggle="true"
                     data-kind="{{ parent.table.kind }}"
                     aria-label="Choose visible columns"
@@ -73,14 +75,14 @@
       <tr data-widget="TableVisibility" data-visible="false"></tr>
       <tr data-widget="TableSorting" data-visible="false"></tr>
     </thead>
-    {{ rows(entities, parent) }}
+    {{ rows(entities, parent, card=card) }}
   </table>
 {% endmacro %}
 
-{% macro rows(entities, parent) %}
+{% macro rows(entities, parent, card=False) %}
   {% set entities = entities if entities is iterable else [] %}
   <tbody class="{{ styles.table.body }}"
-         {% if entities is undefined and not parent.is_filter %}lp-prefetch{% endif %}
+         {% if entities is undefined and not parent.is_filter and not card %}lp-prefetch{% endif %}
          {% if parent.route %}data-route="{{ parent.route }}"{% endif %}
          data-persistent="true"
          data-widget="{{ 'IndexTable' if not parent.table.embedded else 'EmbeddedTable' }}">

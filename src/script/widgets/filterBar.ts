@@ -28,7 +28,7 @@ interface FilterFieldsResponse {
 	feedback?: string;
 }
 
-interface SavedConditionData {
+export interface SavedConditionData {
 	badge: string;
 	definition: Record<string, unknown>;
 }
@@ -188,18 +188,39 @@ export class FilterBar {
 	}
 
 	_indexTable(): IndexTable | null {
-		const tableComp = this.view.components.table;
+		const tableId = this.target.dataset.tableTarget || "table";
+		const tableComp =
+			this.view.components[tableId] ?? this.view.components.table;
 		const widget = tableComp?.widgets?.IndexTable as IndexTable | undefined;
 		return widget || null;
 	}
 
 	_clampPopover(popover: HTMLElement) {
+		popover.style.left = "";
+		popover.style.right = "";
 		popover.classList.remove("right-0");
 		popover.classList.add("left-0");
+		const margin = 12;
 		const rect = popover.getBoundingClientRect();
-		if (rect.right > window.innerWidth - 12) {
+		if (rect.right > window.innerWidth - margin) {
 			popover.classList.remove("left-0");
 			popover.classList.add("right-0");
+			const flipped = popover.getBoundingClientRect();
+			if (flipped.left < margin) {
+				popover.classList.remove("right-0");
+				const parentRect = popover.offsetParent?.getBoundingClientRect();
+				if (parentRect) {
+					const maxLeft = Math.max(
+						margin,
+						window.innerWidth - margin - flipped.width,
+					);
+					const desiredLeft = Math.min(
+						Math.max(margin, parentRect.left),
+						maxLeft,
+					);
+					popover.style.left = `${Math.round(desiredLeft - parentRect.left)}px`;
+				}
+			}
 		}
 	}
 
@@ -339,14 +360,18 @@ export class FilterBar {
 	}
 
 	_applySavedFilter(item: SavedFilterItem) {
+		void this.applyConditions(item.conditions);
+	}
+
+	async applyConditions(conditions: SavedConditionData[]) {
 		this._resetChipsState();
-		for (const cond of item.conditions) {
+		for (const cond of conditions) {
 			const badgeEl = parseHtmlElement(cond.badge);
 			if (!badgeEl) continue;
 			this._appendChip(badgeEl, JSON.stringify(cond.definition));
 		}
 		this.closePopovers();
-		void this._runFilter();
+		await this._runFilter();
 	}
 
 	async _deleteSavedFilter(item: SavedFilterItem, button: HTMLButtonElement) {
@@ -424,7 +449,12 @@ export class FilterBar {
 		this.addPopover.appendChild(list);
 
 		const coreFields = this.conditions.filter((c) => !c.hash);
-		const formOptions = this.conditions.filter((c) => Boolean(c.hash && c.key));
+		const modelTaskOptions = this.conditions.filter((c) =>
+			Boolean(c.hash && c.key && c.field === "model"),
+		);
+		const formOptions = this.conditions.filter((c) =>
+			Boolean(c.hash && c.key && c.field !== "model"),
+		);
 
 		const renderList = (query: string): HTMLButtonElement | null => {
 			const needle = query.trim().toLowerCase();
@@ -478,10 +508,15 @@ export class FilterBar {
 					);
 				}
 				appendGroup(
-					formOptions.length || this._activeForm ? "Fields" : null,
+					modelTaskOptions.length || formOptions.length || this._activeForm
+						? "Fields"
+						: null,
 					coreFields,
 					this.key,
 				);
+				if (modelTaskOptions.length) {
+					appendGroup("Model Tasks", modelTaskOptions, this.key);
+				}
 				if (formOptions.length) {
 					appendGroup("Forms", formOptions, this.key);
 				}
@@ -549,6 +584,21 @@ export class FilterBar {
 			if (this._activeForm.conditions.length) {
 				this._renderFieldPicker(true);
 				this._clampPopover(this.addPopover);
+			} else {
+				this.closePopovers();
+			}
+			return;
+		}
+
+		if (response.html) {
+			const definitionInput = response.html.querySelector<HTMLInputElement>(
+				'input[name="definition"]',
+			);
+			const badgeEl = response.html.querySelector<HTMLElement>(".lp-badge");
+			if (badgeEl && definitionInput) {
+				this._appendChip(badgeEl, definitionInput.value);
+				this.closePopovers();
+				void this._runFilter();
 			} else {
 				this.closePopovers();
 			}

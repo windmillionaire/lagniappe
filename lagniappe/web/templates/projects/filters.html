@@ -1,4 +1,5 @@
-{% from 'filters.html' import filter_form, filter_item %}
+{% from 'filters.html' import filter_bar, filter_form, filter_item %}
+{% from 'table.html' import table %}
 
 {% macro saved_filters(project, filters=None) %}
   <ul lp-load
@@ -14,6 +15,24 @@
       {% endfor -%}
     {%- endif -%}
   </ul>
+{% endmacro %}
+
+{% macro project_tasks_tab(project, tasks_index=None) %}
+  <div id="tasks"
+       lp-component
+       data-visible="false"
+       data-tab="true"
+       data-title="Tasks"
+       data-kind="task"
+       data-parent-nav="tabs"
+       class="flex flex-col">
+    {{ filter_bar(project, kind="task", in_card=True, table_target="project-tasks-table") }}
+    {% if tasks_index %}
+      <div class="{{ styles.table.cardWrap }}">
+        {{ table(none, tasks_index, table_id="project-tasks-table", card=True) }}
+      </div>
+    {% endif %}
+  </div>
 {% endmacro %}
 
 {% macro task_filters(project) %}

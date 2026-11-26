@@ -133,16 +133,18 @@
       <button type="submit" class="{{ styles.button.submit }}"></button>
     </form>
     <div class="{{ styles.list.links.container }}" data-role="status">
-      <div lp-link
-           class="{{ styles.list.links.item }} bg-project-bg/50"
+      <div data-project-task-filter
+           data-filter-route="{{ url_for('projects.status', key=project_key, task_key=task_key, completed='true', format='bar') }}"
+           class="{{ styles.list.links.item }} bg-project-bg/50 cursor-pointer"
            data-kind="project">
         <a class="{{ styles.link.title }}"
            data-role="title"
            href="{{ url_for('projects.status', key=project_key, task_key=task_key, completed='true') }}">Completed</a>
         {{ render_icon("next", "text-project-default") }}
       </div>
-      <div lp-link
-           class="{{ styles.list.links.item }} bg-task-bg/50"
+      <div data-project-task-filter
+           data-filter-route="{{ url_for('projects.status', key=project_key, task_key=task_key, completed='false', format='bar') }}"
+           class="{{ styles.list.links.item }} bg-task-bg/50 cursor-pointer"
            data-kind="task">
         <a class="{{ styles.link.title }}"
            data-role="title"

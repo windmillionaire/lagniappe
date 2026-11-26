@@ -331,9 +331,10 @@ td [data-role="quick-edit-error"] {
 	}
 }
 
-/* @style table.default table.embedded */
+/* @style table.default table.card table.embedded */
 @media (max-width: 639.98px) {
-	table#table:not([data-embedded]) {
+	table#table:not([data-embedded]),
+	table[data-card-table="true"] {
 		&,
 		& > thead,
 		& > tbody,
@@ -408,6 +409,13 @@ td [data-role="quick-edit-error"] {
 			color: var(--kind-dark);
 			background-color: var(--kind-bg);
 			padding: 0.625rem 0.75rem;
+			white-space: normal;
+			overflow-wrap: anywhere;
+
+			& * {
+				white-space: normal;
+				overflow-wrap: anywhere;
+			}
 
 			&::before {
 				display: none;

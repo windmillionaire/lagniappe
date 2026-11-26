@@ -209,18 +209,20 @@
   </div>
 {% endmacro %}
 
-{% macro filter_bar(entity) %}
+{% macro filter_bar(entity, kind=None, in_card=False, table_target=None) %}
+  {% set resolved_kind = kind or ('task' if entity.entity_kind == 'project' else 'page') %}
   <div id="filter-bar"
        lp-component
        data-default="FilterBar"
        data-visible="true"
        data-persistent="true"
-       class="{{ styles.filterBar.container }}">
+       class="{{ styles.filterBar.inCard if in_card else styles.filterBar.container }}">
     <div data-widget="FilterBar"
          data-persistent="true"
          data-visible="true"
          data-key="{{ entity.urlsafe_key }}"
-         data-kind="{{ 'task' if entity.entity_kind == 'project' else 'page' }}"
+         data-kind="{{ resolved_kind }}"
+         {% if table_target %}data-table-target="{{ table_target }}"{% endif %}
          data-can-edit="{{ entity.allowed(Action.EDIT)|yesno }}"
          data-conditions='{{ entity.properties.filters.preload|tojson }}'
          class="{{ styles.filterBar.row }}">
@@ -263,7 +265,7 @@
         {% if entity.allowed(Action.EDIT) %}
           <button type="button"
                   data-role="save-filter"
-                  data-kind="{{ 'task' if entity.entity_kind == 'project' else 'page' }}"
+                  data-kind="{{ resolved_kind }}"
                   class="{{ styles.filterBar.saveButton }}">Save filter</button>
         {% endif %}
         <button type="button"

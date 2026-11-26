@@ -10,7 +10,9 @@ if TYPE_CHECKING:
     from typing import Unpack
     from werkzeug.datastructures import MultiDict
 
-from flask import request
+from types import SimpleNamespace
+
+from flask import request, url_for
 from flask_login import current_user
 
 from lagniappe.core import exceptions
@@ -208,6 +210,48 @@ def _status_filter(project, model, completed):
     return filter
 
 
+@projects.route("<key>/tasks", methods=["GET"])
+@permission(Resource.PROJECT, Action.VIEW)
+def tasks(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
+    project = kwargs["entity"]
+    restrictions = current_user.properties.restrictions.task
+    dated = database_get.tasks_with_due_dates(
+        limit=None,
+        project=project,
+        hashes=restrictions,
+    )
+    undated = database_get.tasks_without_due_dates(
+        limit=None,
+        project=project,
+        hashes=restrictions,
+    )
+    cached = Entities.fetch(
+        *dated.results,
+        *undated.results,
+        request=Fetch.nested(
+            because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION
+        ),
+    )
+    project_tasks = sort_tasks(
+        [
+            task
+            for task in cached
+            if isinstance(task, Entities.TASK)
+            and task.allowed(Action.VIEW, user=current_user)
+        ]
+    )
+    project_index = project.index()
+    table_parent = SimpleNamespace(
+        table=project_index.table,
+        is_filter=False,
+        route=url_for("projects.tasks", key=project.urlsafe_key),
+        append=None,
+    )
+    return responses.rows(project_tasks, table_parent)
+
+
 @projects.route("<key>/status/<task_key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def status(
@@ -219,6 +263,9 @@ def status(
         return responses.not_found("Model task not found")
     completed = request.args.get("completed") == "true"
     filter = _status_filter(project, model, completed)
+
+    if request.args.get("format") == "bar":
+        return responses.filter_bar_conditions(filter)
 
     db = database_get.tasks(
         model=model,

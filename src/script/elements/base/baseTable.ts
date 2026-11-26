@@ -154,7 +154,7 @@ export class BaseTable<
 			return;
 		}
 
-		if (target.closest("button[lp-show='table:TableVisibility']")) {
+		if (target.closest("button[lp-show$=':TableVisibility']")) {
 			return;
 		} else if (this.header?.contains(target)) {
 			const header = target.closest<HTMLTableCellElement>("th[data-ordering]");

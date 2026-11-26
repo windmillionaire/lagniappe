@@ -1459,6 +1459,15 @@ table:
     intent: default presentation within table
     surfaces: [server]
     css: [src/style/tables.css]
+  card:
+    classes: w-full table-auto border-collapse divide-y sm:text-sm
+    intent: full-width index table embedded inside a primary card tab without negative bleed
+    surfaces: [server]
+    css: [src/style/tables.css]
+  cardWrap:
+    classes: w-full min-w-0 overflow-x-auto sm:border-t sm:border-base-light/50
+    intent: horizontally scrollable wrapper separating a card-hosted index table from its filter bar
+    surfaces: [server]
   embedded:
     classes: w-full table-auto border-collapse divide-y sm:text-sm min-w-max bg-white
     intent: embedded presentation within table
@@ -1833,6 +1842,10 @@ filterBar:
   container:
     classes: mt-4 px-4 sm:px-0
     intent: outer spacing wrapper for the single-row inline filter chip bar above index tables
+    surfaces: [server]
+  inCard:
+    classes: px-4 pt-4 pb-3 sm:px-6
+    intent: padded wrapper for the inline filter chip bar when hosted inside a primary card tab
     surfaces: [server]
   row:
     classes: flex flex-col gap-2

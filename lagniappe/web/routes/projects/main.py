@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 from lagniappe.core.entities.project import ProjectData
 from lagniappe.core.entities.model_task import ModelTaskData
 
-from flask import abort, request
+from flask import abort, jsonify, request
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import filters
@@ -71,6 +71,55 @@ def update(
     Entities.save(project, *project.model_tasks)
 
     return responses.project_info(project)
+
+
+@projects.route("/<key>/patch", methods=["PATCH"])
+@permission(Resource.PROJECT, Action.EDIT)
+def patch(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
+    project = kwargs["entity"]
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return responses.bad_request("Invalid project patch payload")
+
+    schema_id = payload.get("schema_id")
+    value = payload.get("value")
+
+    if schema_id == "name":
+        data: ProjectData = {
+            "name": str(value) if value is not None else "",
+            "description": project.description,
+        }
+    elif schema_id == "description":
+        data = {
+            "name": project.name,
+            "description": str(value) if value is not None else "",
+        }
+    else:
+        return responses.bad_request(f"Unsupported project field '{schema_id}'")
+
+    try:
+        project.update(data)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
+
+    Entities.save(project, *project.model_tasks)
+
+    return responses.entity_response(
+        (
+            jsonify(
+                {
+                    "name": project.name,
+                    "description": project.description or "",
+                    "fingerprint": project.fingerprint,
+                }
+            ),
+            200,
+        ),
+        project,
+        *project.model_tasks,
+    )
 
 
 class _GeneratedForm(TypedDict):

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from typing import Unpack
 
 from types import SimpleNamespace
-from flask import request
+from flask import request, url_for
 from flask_login import current_user
 
 from lagniappe.core import exceptions
@@ -79,14 +79,14 @@ def _filter_results_response(entity, compiled):
             pages = [item for item in results if isinstance(item, Entities.PAGE)]
             return responses.rows(pages, table_parent)
         if isinstance(entity, Entities.PROJECT):
-            new_filter.table.embedded = False
+            project_index = entity.index()
             tasks = sort_tasks(
                 [item for item in results if isinstance(item, Entities.TASK)]
             )
             table_parent = SimpleNamespace(
-                table=new_filter.table,
+                table=project_index.table,
                 is_filter=True,
-                route=None,
+                route=url_for("projects.tasks", key=entity.urlsafe_key),
                 append=None,
             )
             return responses.rows(tasks, table_parent)
