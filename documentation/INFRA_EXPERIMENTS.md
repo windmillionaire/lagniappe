@@ -98,6 +98,14 @@ content lengths, source/version/instance, and operation aggregates.
 App Engine's static-file responses bypass Flask and have no app summary;
 capture their timing and sizes in the browser.
 
+For the Project stage comparison, send `X-Lagniappe-Experiments-Project-Stage`
+on the stage status GET. With experiments diagnostics enabled, `reuse` selects
+the usual catalog read and `reload` resolves the same selected stage afresh.
+Both collect a bounded trace, echo the arm in `X-Lagniappe-Experiment`, and
+record the process and instance. Pair consecutive requests in balanced order,
+check the ordered rows, then compare client time and Datastore calls within
+each `stage.*` phase. Count calls outside the handler phases separately.
+
 A service worker can return a cached response with an older request ID. Check
 the matching log timestamp against the browser request before attributing that
 server work to the current attempt. Page-level network captures may omit the

@@ -595,7 +595,10 @@ def _canonical_condition(entry: FilterField, comparator: Comparator, value: obje
     }
 
 
-def compile_filter_contract(parent: FilterParent, contract: object, user: FieldUser, *, allow_default_source: bool = False) -> CompiledFilter:
+def compile_filter_contract(
+    parent: FilterParent, contract: object, user: FieldUser, *,
+    allow_default_source: bool = False, reuse_catalog_values: bool = True,
+) -> CompiledFilter:
     """Validate a v1 DTO against the current authorized field catalog."""
     _validate_parent(parent, user)
     if not isinstance(contract, dict):
@@ -684,7 +687,7 @@ def compile_filter_contract(parent: FilterParent, contract: object, user: FieldU
             form_scopes.add(entry.source.hash)
 
         comparator = _comparator(condition.get("comparator"), entry.field, index)
-        if entry.field.is_entity_valued and not known:
+        if reuse_catalog_values and entry.field.is_entity_valued and not known:
             _remember_filter_entity(known, parent)
             for field in catalog.values():
                 for entity in (field.allowed_values or {}).values():

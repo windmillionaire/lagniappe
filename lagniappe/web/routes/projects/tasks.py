@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from typing import Unpack
     from werkzeug.datastructures import MultiDict
 
-from flask import request
+from flask import g, request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
@@ -20,6 +20,7 @@ from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.core.tools.filters import compile_filter_contract
 from lagniappe.core.tools.entity_patches import prepare_patch
 from lagniappe.core.tools.tasks.ordering import sort_tasks
+from lagniappe.core.tools.measurements import span
 from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
 from lagniappe.web.auth import authenticated_user, permission
 from lagniappe.web import responses
@@ -186,6 +187,7 @@ def _status_filter(project, model, completed):
             ],
         },
         current_user,
+        reuse_catalog_values=g.get("experiments_variant") != "project-stage:reload",
     )
     filter = Entities.FILTER.create(project, compiled, temporary=True)
     # identifier = f"{project.hash}-{model.hash}-{status_value}"
@@ -203,22 +205,28 @@ def status(
     key: str, task_key: str, **kwargs: Unpack[EntityContext[models.Project]]
 ) -> ResponseReturnValue:
     project = kwargs["entity"]
-    model = _project_model(project, task_key)
+    with span("stage", "resolve_model"):
+        model = _project_model(project, task_key)
     if not model:
         return responses.not_found("Model task not found")
     completed = request.args.get("completed") == "true"
-    filter = _status_filter(project, model, completed)
+    with span("stage", "build_filter"):
+        filter = _status_filter(project, model, completed)
 
-    db = database_get.tasks(
-        model=model,
-        completed=completed,
-        hashes=current_user.properties.restrictions.task,
-        limit=None,
-    )
-    cached = Entities.fetch(
-        *db.results,
-        request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
-    )
+    with span("stage", "query_tasks"):
+        db = database_get.tasks(
+            model=model,
+            completed=completed,
+            hashes=current_user.properties.restrictions.task,
+            limit=None,
+        )
+    with span("stage", "load_relations"):
+        cached = Entities.fetch(
+            *db.results,
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+        )
     filter.route = request.full_path.removesuffix("?")
 
-    return responses.filtered_task_index(sort_tasks([task for task in cached if isinstance(task, Entities.TASK)]), filter)
+    with span("stage", "render_results"):
+        tasks = sort_tasks([task for task in cached if isinstance(task, Entities.TASK)])
+        return responses.filtered_task_index(tasks, filter)

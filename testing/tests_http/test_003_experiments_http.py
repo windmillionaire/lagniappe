@@ -472,3 +472,36 @@ def test_experiments_comparison_metadata_survives_304(monkeypatch):
         assert records[-1].get("experiment") == expected
         assert (isinstance(records[-1].get("process"), int)) == bool(expected)
         assert "invalid-private-value" not in json.dumps(records[-1])
+
+
+@pytest.mark.parametrize("enabled,mode,endpoint,variant,tag", [
+    (True, "summary", "projects.status", "reuse", "project-stage:reuse"),
+    (True, "summary", "projects.status", "reload", "project-stage:reload"),
+    (True, "summary", "projects.status", "unknown", None),
+    (True, "summary", "other", "reload", None),
+    (False, "summary", "projects.status", "reload", None),
+    (True, "off", "projects.status", "reload", None),
+])
+def test_stage_trial_traces_only_selected_requests(monkeypatch, enabled, mode, endpoint, variant, tag):
+    flask_app = Flask("stage-trial")
+    records = []
+    monkeypatch.setattr(measurements, "emit", records.append)
+    initialize_measurements(flask_app, SimpleNamespace(
+        EXPERIMENTS_ENABLED=enabled, EXPERIMENTS_DIAGNOSTICS=mode, EXPERIMENTS_SOURCE_ID="fixture",
+    ))
+
+    @flask_app.get("/stage", endpoint=endpoint)
+    def stage():
+        with measurements.span("stage", "build_filter"), measurements.span("datastore", "lookup"):
+            return "ok"
+
+    response = flask_app.test_client().get("/stage", headers={"X-Lagniappe-Experiments-Project-Stage": variant})
+    assert response.headers.get("X-Lagniappe-Experiment") == tag
+    if not enabled or mode == "off":
+        assert not records
+    elif tag:
+        assert records[0]["experiment"] == tag
+        assert isinstance(records[0]["process"], int)
+        assert [event["operation"] for event in records[0]["trace"]] == ["datastore.lookup", "stage.build_filter"]
+    else:
+        assert "experiment" not in records[0] and "trace" not in records[0]

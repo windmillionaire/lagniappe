@@ -623,3 +623,28 @@ def test_filter_tools_are_registered_for_ask():
     )
     assert "get_filter_schema" in planner.REPORT_READ_TOOLS
     assert "query_workspace_filter" in planner.REPORT_READ_TOOLS
+
+
+@pytest.mark.unit
+def test_stage_filter_can_compare_fresh_and_catalogued_model_reads(monkeypatch):
+    project, model, _, _ = _workspace_filter_fixture()
+    lookups = []
+    monkeypatch.setattr(contract.cache, "get_details_by_hash", lambda hashes: {
+        model.hash: {"id": model.urlsafe_key}
+    })
+
+    def fetch(*keys, request):
+        lookups.append(keys)
+        return [model]
+
+    monkeypatch.setattr(contract.Entities, "fetch", fetch)
+    payload = {"version": 1, "conditions": [
+        {"source_id": project.hash, "field": "model", "comparator": "eq", "values": [model.hash]},
+        {"source_id": project.hash, "field": "completed", "comparator": "is_true", "values": []},
+    ]}
+    reuse = contract.compile_filter_contract(project, payload, object())
+    assert not lookups
+    reload = contract.compile_filter_contract(project, payload, object(), reuse_catalog_values=False)
+    assert lookups == [(model.key,)]
+    assert reload.contract == reuse.contract == payload
+    assert reload.related == reuse.related

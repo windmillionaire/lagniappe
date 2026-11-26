@@ -37,9 +37,13 @@ def initialize_measurements(app: Flask, config: Config) -> None:
 
     @app.before_request
     def begin() -> None:
-        g.experiments_measurement = measurements.Measurement(
-            config.EXPERIMENTS_DIAGNOSTICS
-        )
+        mode = config.EXPERIMENTS_DIAGNOSTICS
+        if request.endpoint == "projects.status" and request.method == "GET":
+            variant = request.headers.get("X-Lagniappe-Experiments-Project-Stage")
+            if variant in ("reuse", "reload"):
+                g.experiments_variant = f"project-stage:{variant}"
+                mode = "trace"
+        g.experiments_measurement = measurements.Measurement(mode)
         g.experiments_token = measurements.CURRENT.set(g.experiments_measurement)
 
     @app.after_request
