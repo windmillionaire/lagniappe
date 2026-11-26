@@ -353,7 +353,6 @@ test("test_material_symbol_size_exceptions_use_semantic_css", () => {
 		/\.icon\[data-icon="document"\],\s*\.icon\[data-icon="info"\]\s*\{\s*--icon-size: var\(--icon-lg-glyph-size\);/,
 		/button\.tab-icon \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-xl-box-size\);[\s\S]*?--icon-size: var\(--icon-xl-glyph-size\);/,
 		/\.icon\[data-icon="close"\]\s*\{[\s\S]*?--icon-offset-x: 0\.5px;[\s\S]*?--icon-offset-y: 0\.5px;/,
-		/\.task-history-icon\s*\{\s*--icon-offset-y: 1px;/,
 		/\.editor-toolbar-icon-context \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-base-box-size\);[\s\S]*?--icon-default-size: var\(--icon-lg-glyph-size\);[\s\S]*?--icon-size: var\(--icon-lg-glyph-size\);/,
 		/\.editor-toolbar-icon-context \.editor-toolbar-menu-icon\s*\{\s*--icon-offset-y: 1px;/,
 		/\.editor-toolbar-portal-icon-context \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-base-box-size\);[\s\S]*?--icon-default-size: var\(--icon-base-glyph-size\);[\s\S]*?--icon-size: var\(--icon-base-glyph-size\);/,

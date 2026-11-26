@@ -19,7 +19,7 @@ _AUDITED_DIRECT_IMPORTS = {
     "lagniappe/core/tools/services/identity_platform.py": frozenset({"requests"}),
     "lagniappe/core/tools/email/ai.py": frozenset({"requests"}),
     # Provider retry classification owns the SDK transport exception types.
-    "lagniappe/core/tools/ai/provider_policy.py": frozenset({"httpx"}),
+    "lagniappe/core/tools/ai/provider_policy.py": frozenset({"httpx", "httpx2"}),
 }
 
 

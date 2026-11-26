@@ -6,6 +6,7 @@ import zipfile
 
 from google.genai import errors as genai_errors
 import httpx
+import httpx2
 import pytest
 
 from config import ai_models as config_ai_models
@@ -564,6 +565,7 @@ def test_deferred_ai_config_uses_short_sdk_retry_profile():
 @pytest.mark.unit
 def test_ai_provider_transient_error_classification():
     assert ai_core.is_provider_transient_error(httpx.ReadTimeout("stalled"))
+    assert ai_core.is_provider_transient_error(httpx2.ReadTimeout("stalled"))
     assert ai_core.is_provider_transient_error(
         genai_errors.ServerError(
             503,

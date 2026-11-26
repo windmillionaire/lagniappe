@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 
-DIRECT_HTTP_MODULES = frozenset({"requests", "httpx", "urllib.request"})
+DIRECT_HTTP_MODULES = frozenset({"requests", "httpx", "httpx2", "urllib.request"})
 
 
 def direct_http_imports(path: Path) -> frozenset[str]:
@@ -24,8 +24,8 @@ def direct_http_imports(path: Path) -> frozenset[str]:
             module = node.module or ""
             if module == "requests" or module.startswith("requests."):
                 imports.add("requests")
-            elif module == "httpx" or module.startswith("httpx."):
-                imports.add("httpx")
+            elif module.split(".", 1)[0] in {"httpx", "httpx2"}:
+                imports.add(module.split(".", 1)[0])
             elif module == "urllib.request" or module == "urllib" and any(
                 alias.name == "request" for alias in node.names
             ):

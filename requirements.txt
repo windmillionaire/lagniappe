@@ -19,6 +19,7 @@ pillow==13.0.0
 gunicorn==27.0.1
 requests==2.34.2
 httpx==0.28.1
+httpx2==2.16.2
 PyYAML==6.0.4
 beautifulsoup4==4.15.0
 MarkupSafe==3.0.4

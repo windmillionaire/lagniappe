@@ -6,6 +6,7 @@ from typing import TypedDict
 from google.genai import types
 from google.genai.errors import APIError
 import httpx
+import httpx2
 
 from config.ai_models import (
     AI_REQUEST_TIMEOUT_MS,
@@ -18,7 +19,7 @@ from config.ai_models import (
 )
 
 
-PROVIDER_REQUEST_ERRORS = (APIError, httpx.HTTPError)
+PROVIDER_REQUEST_ERRORS = (APIError, httpx.HTTPError, httpx2.HTTPError)
 
 
 class ProviderErrorDetails(TypedDict):
@@ -112,7 +113,7 @@ def is_provider_quota_error(error: BaseException) -> bool:
 
 def is_provider_transient_error(error: BaseException) -> bool:
     """Return whether a provider error is safe for a deferred retry."""
-    if isinstance(error, (httpx.TimeoutException, httpx.ConnectError)):
+    if isinstance(error, (httpx.TimeoutException, httpx.ConnectError, httpx2.TimeoutException, httpx2.ConnectError)):
         return True
     code = provider_error_details(error).get("code")
     return str(code) in {str(value) for value in AI_RETRY_STATUS_CODES}
