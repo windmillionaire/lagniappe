@@ -51,9 +51,20 @@ def create_update_data(
     return data
 
 
-def _project_model(project: models.Project, task_key: str) -> models.ModelTask | None:
+def _project_model(
+    project: models.Project, task_key: str, *, from_stage_list: bool = False
+) -> models.ModelTask | None:
+    reference: str | models.ModelTask = task_key
+    if from_stage_list:
+        key = database_get.datastore_key(task_key)
+        if key is None:
+            return None
+        stage = next((model for model in project.model_tasks if model.key == key), None)
+        if stage is None:
+            return None
+        reference = stage
     try:
-        return SubmittedReferenceResolver(authenticated_user(), task_key).one(
+        return SubmittedReferenceResolver(authenticated_user(), reference).one(
             task_key,
             expected=Entities.MODEL_TASK,
             action=Action.VIEW,
@@ -187,7 +198,6 @@ def _status_filter(project, model, completed):
             ],
         },
         current_user,
-        reuse_catalog_values=g.get("experiments_variant") != "project-stage:reload",
     )
     filter = Entities.FILTER.create(project, compiled, temporary=True)
     # identifier = f"{project.hash}-{model.hash}-{status_value}"
@@ -206,7 +216,9 @@ def status(
 ) -> ResponseReturnValue:
     project = kwargs["entity"]
     with span("stage", "resolve_model"):
-        model = _project_model(project, task_key)
+        model = _project_model(
+            project, task_key, from_stage_list=g.get("experiments_variant") != "project-stage:direct"
+        )
     if not model:
         return responses.not_found("Model task not found")
     completed = request.args.get("completed") == "true"

@@ -488,3 +488,30 @@ def test_home_tasks_etag_and_poll_revision_share_the_authenticated_snapshot(monk
     assert changed.headers["X-Lagniappe-Poll-Revision"] != first.headers["X-Lagniappe-Poll-Revision"]
     # Every request, including the 304, rechecks the live record with auth.
     assert reads == [(key,)] * 3
+
+
+def test_stage_list_selection_preserves_project_membership_and_view_permission(monkeypatch):
+    from google.cloud.datastore import Entity, Key
+    from lagniappe.web.routes.projects import tasks
+
+    project_key = Key("models", "project", project="offline")
+    other_project_key = Key("models", "other", project="offline")
+    record = Entity(key=project_key)
+    record.update(type="project", hash="project-hash")
+    project = Entities.PROJECT(record)
+    stage = Entity(key=Key("models", "stage", parent=project_key))
+    stage.update(type="model", project=project_key, hash="stage-hash", requires=["project-hash"])
+    monkeypatch.setattr(tasks.database_get, "model_tasks", lambda _project: [stage])
+
+    user_record = Entity(key=Key("users", "reader", project="offline"))
+    user_record.update(type="user", email="reader@example.invalid")
+    actor = Entities.USER(user_record)
+    monkeypatch.setattr(tasks, "authenticated_user", lambda: actor)
+    stage_key = stage.key.to_legacy_urlsafe().decode()
+    assert tasks._project_model(project, stage_key, from_stage_list=True) is None
+    actor.permissions = {"project-hash": "VIEW"}
+    assert tasks._project_model(project, stage_key, from_stage_list=True) is project.model_tasks[0]
+
+    foreign_key = Key("models", "stage", parent=other_project_key).to_legacy_urlsafe().decode()
+    assert tasks._project_model(project, foreign_key, from_stage_list=True) is None
+    assert tasks._project_model(project, "invalid", from_stage_list=True) is None

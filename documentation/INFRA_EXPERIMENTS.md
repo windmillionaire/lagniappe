@@ -99,10 +99,12 @@ App Engine's static-file responses bypass Flask and have no app summary;
 capture their timing and sizes in the browser.
 
 For the Project stage comparison, send `X-Lagniappe-Experiments-Project-Stage`
-on the stage status GET. With experiments diagnostics enabled, `reuse` selects
-the usual catalog read and `reload` resolves the same selected stage afresh.
-Both collect a bounded trace, echo the arm in `X-Lagniappe-Experiment`, and
-record the process and instance. Pair consecutive requests in balanced order,
+on the stage status GET. With experiments diagnostics enabled, `listed` selects
+the stage from the Project’s stage list, the default for ordinary requests.
+The `direct` control fetches the selected stage separately. Filter construction and access
+checks are identical in both arms. Each tagged response echoes the arm in
+`X-Lagniappe-Experiment`. The request log records a bounded trace, process,
+and instance. Pair consecutive requests in balanced order,
 check the ordered rows, then compare client time and Datastore calls within
 each `stage.*` phase. Count calls outside the handler phases separately.
 

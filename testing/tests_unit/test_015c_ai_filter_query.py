@@ -626,7 +626,7 @@ def test_filter_tools_are_registered_for_ask():
 
 
 @pytest.mark.unit
-def test_stage_filter_can_compare_fresh_and_catalogued_model_reads(monkeypatch):
+def test_stage_filter_reuses_catalogued_model_without_fetching_it_again(monkeypatch):
     project, model, _, _ = _workspace_filter_fixture()
     lookups = []
     monkeypatch.setattr(contract.cache, "get_details_by_hash", lambda hashes: {
@@ -642,9 +642,7 @@ def test_stage_filter_can_compare_fresh_and_catalogued_model_reads(monkeypatch):
         {"source_id": project.hash, "field": "model", "comparator": "eq", "values": [model.hash]},
         {"source_id": project.hash, "field": "completed", "comparator": "is_true", "values": []},
     ]}
-    reuse = contract.compile_filter_contract(project, payload, object())
+    compiled = contract.compile_filter_contract(project, payload, object())
     assert not lookups
-    reload = contract.compile_filter_contract(project, payload, object(), reuse_catalog_values=False)
-    assert lookups == [(model.key,)]
-    assert reload.contract == reuse.contract == payload
-    assert reload.related == reuse.related
+    assert compiled.contract == payload
+    assert compiled.related == (project, model)

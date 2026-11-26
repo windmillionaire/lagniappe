@@ -475,12 +475,12 @@ def test_experiments_comparison_metadata_survives_304(monkeypatch):
 
 
 @pytest.mark.parametrize("enabled,mode,endpoint,variant,tag", [
-    (True, "summary", "projects.status", "reuse", "project-stage:reuse"),
-    (True, "summary", "projects.status", "reload", "project-stage:reload"),
-    (True, "summary", "projects.status", "unknown", None),
-    (True, "summary", "other", "reload", None),
-    (False, "summary", "projects.status", "reload", None),
-    (True, "off", "projects.status", "reload", None),
+    (True, "summary", "projects.status", "listed", "project-stage:listed"),
+    (True, "summary", "projects.status", "direct", "project-stage:direct"),
+    (True, "summary", "projects.status", "reload", None),
+    (True, "summary", "other", "direct", None),
+    (False, "summary", "projects.status", "direct", None),
+    (True, "off", "projects.status", "direct", None),
 ])
 def test_stage_trial_traces_only_selected_requests(monkeypatch, enabled, mode, endpoint, variant, tag):
     flask_app = Flask("stage-trial")
