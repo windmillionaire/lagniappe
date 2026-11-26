@@ -161,9 +161,10 @@ def eligible_user(user: object) -> TypeGuard[User]:
     )
 
 
-def _user(row):
-    user = Entities.fetch_one(row.get("user"), request=Fetch.direct())
-    if not eligible_user(user) or user.key != row.get("user"):
+def _user(row, *, prefetched=None):
+    user_key = row.get("user")
+    user = Entities.fetch_one(prefetched if prefetched is not None else user_key, request=Fetch.direct())
+    if not eligible_user(user) or user.key != user_key:
         raise OAuthError()
     return user
 
@@ -536,16 +537,17 @@ def authenticate_access(token: str, *, now: datetime | None = None) -> tuple[Use
     grant_name = row.get("grant")
     if not isinstance(grant_name, str):
         raise OAuthError()
-    grant = store.read(grant_name)
+    grant, user_row = store.read_grant_and_user(grant_name, row.get("user"))
     if (
         not _live(grant, now)
         or not _bound(grant, config)
         or grant.get("family") != row.get("family")
         or grant.get("user") != row.get("user")
         or grant.get("client_id") != row.get("client_id")
+        or user_row is None
     ):
         raise OAuthError()
-    user = _user(row)
+    user = _user(row, prefetched=user_row)
     if _grant_name(user, row["client_id"]) != row["grant"]:
         raise OAuthError()
     return user, {

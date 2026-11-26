@@ -6,6 +6,7 @@ import json
 from types import SimpleNamespace
 
 from google.api_core import exceptions as google_exceptions
+from google.cloud import datastore
 import pytest
 
 from lagniappe.core import exceptions
@@ -26,6 +27,7 @@ from lagniappe.core.properties import (
 from lagniappe.core.tools.deferred_jobs import locks as deferred_locks
 from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapters
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import notifications as notification_database
 from lagniappe.core.tools.database import transactions as database_transactions
 from lagniappe.core.tools.database import utility as database_utility
@@ -659,6 +661,35 @@ def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     assert released == [("lock:terminal", "job-terminal")]
 
 
+def test_quiet_targets_read_fresh_form_and_locks_in_one_lookup(monkeypatch):
+    form_key = datastore.Key("forms", 1, project="test")
+    form_row = datastore.Entity(key=form_key)
+    form_row.update({"type": "form"})
+    targets = [
+        SimpleNamespace(urlsafe_key=name, entity_kind=name, db={"form": form_key})
+        for name in ("page", "task")
+    ]
+    lock_keys = {
+        target.urlsafe_key: datastore.Key("locks", target.urlsafe_key, project="test")
+        for target in targets
+    }
+    monkeypatch.setattr(
+        deferred_locks, "deferred_job_lock_key", lambda target, scope: lock_keys[target.urlsafe_key]
+    )
+    lookups = []
+
+    def get_multi(keys):
+        lookups.append(set(keys))
+        return [form_row] if form_key in keys else []
+
+    monkeypatch.setattr(
+        database_get, "DATA", SimpleNamespace(datastore=SimpleNamespace(get_multi=get_multi))
+    )
+
+    assert deferred_job_lock_descriptors(targets) == {}
+    assert lookups == [{form_key, *lock_keys.values()}]
+
+
 @pytest.mark.parametrize("job_id", ["job-key", None])
 def test_form_change_lock_survives_a_missing_job_row(monkeypatch, job_id):
     target = SimpleNamespace(urlsafe_key="target-key", entity_kind="page", db={"form": "form-key"})
@@ -667,7 +698,7 @@ def test_form_change_lock_survives_a_missing_job_row(monkeypatch, job_id):
     monkeypatch.setattr(deferred_locks, "deferred_job_lock_key", lambda *args: "lock-key")
     monkeypatch.setattr(
         deferred_locks.Entities, "fetch",
-        lambda *keys, request: [form] if keys == (form.key,) else [],
+        lambda *keys, request: [form] if form.key in keys else [],
     )
 
     if job_id is None:

@@ -90,6 +90,7 @@ def pilot(monkeypatch):
 
     monkeypatch.setattr(auth.store, "atomic", atomic)
     monkeypatch.setattr(auth.store, "read", lambda key: deepcopy(rows.get(key)))
+    monkeypatch.setattr(auth.store, "read_grant_and_user", lambda name, key: (deepcopy(rows.get(name)), key))
     monkeypatch.setattr(
         external_api,
         "personal_page_reference",

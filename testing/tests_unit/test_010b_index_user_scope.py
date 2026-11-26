@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+from google.cloud import datastore
 
 from lagniappe import CONFIG
 from lagniappe.core.entities import index
@@ -110,6 +111,45 @@ def test_page_index_visibility_uses_explicit_viewer(
 
     assert [page.hash for page in listing.pages] == [f"page-{viewer_suffix}"]
     assert listing.cursor == "next-page"
+
+
+@pytest.mark.unit
+def test_page_index_reuses_owning_category_and_loads_other_categories(monkeypatch, index_boundaries):
+    def row(kind, name, **fields):
+        record = datastore.Entity(datastore.Key(kind, name, project="index-unit"))
+        record.update(type=kind, hash=name, **fields)
+        return record
+
+    category = index.Entities.CATEGORY(row("category", "primary"))
+    other = row("category", "secondary")
+    secondary_match = row("page", "secondary-match", model=other.key, categories=[category.key])
+    primary_match = row("page", "primary-match", model=category.key)
+    invisible = row("page", "invisible", model=category.key)
+    pages = [secondary_match, invisible, primary_match]
+    for page in pages:
+        page["requires"] = [page["hash"]]
+    viewer = _viewer("a", {"secondary-match": "VIEW", "primary-match": "VIEW"})
+
+    monkeypatch.setattr(
+        index.database_get, "pages",
+        lambda *args, **kwargs: SimpleNamespace(results=pages, next_cursor="next"),
+    )
+    lookups = []
+
+    def fetch_rows(keys):
+        lookups.extend(keys)
+        return [other] if other.key in keys else []
+
+    monkeypatch.setattr(index.database_get, "entities", fetch_rows)
+    listing = category.index(user=viewer)
+
+    secondary, primary = listing.pages
+    assert [secondary.hash, primary.hash] == ["secondary-match", "primary-match"]
+    assert secondary.model.key == other.key
+    assert category in secondary.categories
+    assert primary.model is category
+    assert listing.cursor == "next"
+    assert lookups == [other.key]
 
 
 @pytest.mark.unit

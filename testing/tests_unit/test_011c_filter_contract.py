@@ -5,6 +5,9 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
+from google.cloud.datastore import Key
+
+from config.datastore import encode_urlsafe_key
 
 from lagniappe.core.definitions import Comparator, FieldType, FilterOptions
 from lagniappe.core.entities.filter import Filter as FilterEntity
@@ -37,8 +40,8 @@ class _Entity:
         self.kind = kind
         self.hash = hash_value
         self.name = hash_value
-        self.urlsafe_key = f"key-{hash_value}"
-        self.key = self.urlsafe_key
+        self.key = Key(kind, hash_value, project="offline-filter-tests")
+        self.urlsafe_key = encode_urlsafe_key(self.key)
         self.filters = SimpleNamespace(fields=fields or {}, entity_fields={})
         self._allowed = allowed
 
@@ -117,10 +120,8 @@ def test_compile_filter_contract_rederives_types_authorizes_entities_and_bounds_
     parent, category = _fixture()
     monkeypatch.setattr(
         contract.Entities,
-        "fetch_one",
-        lambda value, request: (
-            category if value in {category.hash, category.urlsafe_key} else None
-        ),
+        "fetch",
+        lambda *keys, request: [category] if category.key in keys else [],
     )
     payload = {
         "version": 1,
@@ -159,6 +160,77 @@ def test_compile_filter_contract_rederives_types_authorizes_entities_and_bounds_
     ]
     with pytest.raises(contract.FilterContractError, match="too many values"):
         contract.compile_filter_contract(parent, too_many, object())
+
+
+@pytest.mark.unit
+def test_filter_batches_hash_and_key_references_and_reuses_them_across_conditions(monkeypatch):
+    parent, first = _fixture()
+    second = _Entity("category", "category-two")
+    batches = []
+    hash_batches = []
+
+    def details(hashes):
+        hash_batches.append(list(hashes))
+        return {second.hash: {"id": second.urlsafe_key}}
+
+    def fetch(*keys, request):
+        batches.append(set(keys))
+        return [second, first]  # The backend need not preserve submitted order.
+
+    monkeypatch.setattr(contract.cache, "get_details_by_hash", details)
+    monkeypatch.setattr(contract.Entities, "fetch", fetch)
+    condition = {"source_id": parent.hash, "field": "categories", "comparator": "contains_any"}
+    compiled = contract.compile_filter_contract(parent, {
+        "version": 1,
+        "conditions": [
+            {**condition, "values": [first.urlsafe_key, f"hash:{second.hash}", first.urlsafe_key]},
+            {**condition, "values": [second.urlsafe_key, first.hash]},
+        ],
+    }, object())
+    assert [item.value for item in compiled.definitions] == [
+        [first.hash, second.hash, first.hash], [second.hash, first.hash],
+    ]
+    assert batches == [{first.key, second.key}]
+    assert hash_batches == [[second.hash]]
+
+
+@pytest.mark.unit
+def test_filter_validates_entity_references_in_submitted_order(monkeypatch):
+    parent, denied = _fixture()
+    denied._allowed = False
+    monkeypatch.setattr(contract.Entities, "fetch", lambda *keys, request: [denied])
+    condition = {"source_id": parent.hash, "field": "categories", "comparator": "contains_any"}
+    for values, expected_code in (([denied.urlsafe_key, 23], "unavailable"), ([23, denied.urlsafe_key], "shape")):
+        with pytest.raises(contract.FilterContractError) as rejected:
+            contract.compile_filter_contract(parent, {
+                "version": 1, "conditions": [{**condition, "values": values}],
+            }, object())
+        assert (rejected.value.code, rejected.value.path) == (expected_code, "conditions[0].values")
+
+
+@pytest.mark.unit
+def test_filter_assignee_batch_uses_the_visible_account_page(monkeypatch):
+    class Account(_Entity):
+        pass
+
+    parent, _ = _fixture()
+    parent.filters.fields["assigned_to"] = _Field(
+        "assigned_to", FieldType.STRING, FilterOptions.STRING.value,
+        entity_valued=True, index="user",
+    )
+    account = Account("user", "account")
+    page = _Entity("page", "account-page")
+    account.page = page
+    monkeypatch.setattr(contract.Entities, "USER", Account)
+    monkeypatch.setattr(contract.Entities, "fetch", lambda *keys, request: [account])
+    payload = {"version": 1, "conditions": [{
+        "source_id": parent.hash, "field": "assigned_to",
+        "comparator": "in", "values": [account.urlsafe_key],
+    }]}
+    assert contract.compile_filter_contract(parent, payload, object()).definitions[0].value == [page.hash]
+    page._allowed = False
+    with pytest.raises(contract.FilterContractError, match="assignee is unavailable"):
+        contract.compile_filter_contract(parent, payload, object())
 
 
 @pytest.mark.unit

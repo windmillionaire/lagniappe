@@ -69,9 +69,18 @@ def deferred_job_lock_descriptors(targets: Iterable[Entity | str | None] | None,
     targets = [target for target in targets or () if target]
     target_keys = [_target_key(target) for target in targets]
     lock_keys = [deferred_job_lock_key(target, scope) for target in targets]
+    form_keys = {
+        getattr(target, "db", {}).get("form")
+        for target in targets
+        if scope == AUTOFILL_FORM_LOCK_SCOPE
+        and getattr(target, "entity_kind", None) in {"page", "task"}
+    } - {None}
+    # Lock fields and pending Form changes are stored on the roots. Read both
+    # fresh in one lookup; neither needs its relations to find the job.
+    roots = Entities.fetch(*lock_keys, *form_keys, request=Fetch.root())
     locks = {
         lock.target: lock
-        for lock in Entities.fetch(*lock_keys, request=Fetch.direct())
+        for lock in roots
         if isinstance(lock, Entities.DEFERRED_JOB_LOCK) and lock.operation
     }
     jobs = {
@@ -92,15 +101,9 @@ def deferred_job_lock_descriptors(targets: Iterable[Entity | str | None] | None,
     if scope == AUTOFILL_FORM_LOCK_SCOPE:
         from ..forms.contracts import PENDING, pending_change
 
-        form_keys = {
-            getattr(target, "db", {}).get("form")
-            for target in targets
-            if getattr(target, "entity_kind", None) in {"page", "task"}
-        } - {None}
-        forms = Entities.fetch(*form_keys, request=Fetch.root()) if form_keys else []
         pending: dict[Key, str] = {}
-        for form in forms:
-            if form.key is None or not form.db.get(PENDING):
+        for form in roots:
+            if form.key is None or form.key not in form_keys or not form.db.get(PENDING):
                 continue
             change = pending_change(form.db)
             job_id = change.get("job") if change else None

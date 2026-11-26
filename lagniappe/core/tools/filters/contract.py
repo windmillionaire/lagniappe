@@ -27,6 +27,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, dates
+from lagniappe.core.tools.database import get as database_get
 
 
 type FilterParent = Category | Project
@@ -381,15 +382,50 @@ def _comparator(value, field, index):
     return comparator
 
 
-def _entity_filter_value(entry, value, user, index):
+def _remember_filter_entity(known: dict[str, Entity], entity: Entity) -> None:
+    known[entity.hash] = known[f"hash:{entity.hash}"] = entity
+    if key := entity.urlsafe_key:
+        known[key] = entity
+
+
+def _load_filter_values(values: list[object], path: str, known: dict[str, Entity]) -> None:
+    """Resolve one condition's uncached references together, before per-value authorization."""
+    keys = {}
+    hashes = {}
+    for value in values:
+        try:
+            identifier = _bounded_text(value, path)
+        except FilterContractError:
+            # Validation below reports the first error in submitted order.
+            break
+        if identifier in known or identifier in keys or identifier in hashes:
+            continue
+        key = database_get.datastore_key(identifier)
+        if key is not None:
+            keys[identifier] = key
+        else:
+            hashes[identifier] = identifier.removeprefix("hash:")
+
+    if hashes:
+        details = cache.get_details_by_hash(hashes.values())
+        for identifier, token in hashes.items():
+            key = database_get.datastore_key(details.get(token, {}).get("id"))
+            if key is not None:
+                keys[identifier] = key
+
+    if keys:
+        entities = {
+            entity.key: entity
+            for entity in Entities.fetch(*keys.values(), request=Fetch.direct())
+        }
+        for identifier, key in keys.items():
+            if entity := entities.get(key):
+                _remember_filter_entity(known, entity)
+                known[identifier] = entity
+
+
+def _entity_filter_value(entry, entity, user, index):
     path = f"conditions[{index}].values"
-    identifier = _bounded_text(value, path)
-    entity = Entities.fetch_one(identifier, request=Fetch.direct())
-    if not entity:
-        normalized = identifier.removeprefix("hash:")
-        details = cache.get_details_by_hash([normalized]).get(normalized)
-        if details and (entity_id := details.get("id")):
-            entity = Entities.fetch_one(entity_id, request=Fetch.direct())
     if not entity or not entity.allowed(Action.VIEW, user=user):
         _error(
             f"Filter condition {index + 1} references an unavailable entity.",
@@ -511,7 +547,7 @@ def _timestamp_condition(comparator, values):
     return comparator, value["start"]
 
 
-def _condition_value(entry, comparator, values, user, index, related):
+def _condition_value(entry, comparator, values, user, index, related, known):
     path = f"conditions[{index}].values"
     if not isinstance(values, list):
         _error(f"{path} must be a list.", path=path, code="shape")
@@ -528,9 +564,11 @@ def _condition_value(entry, comparator, values, user, index, related):
         _error(f"{path} requires a value.", path=path, code="value")
 
     if entry.field.is_entity_valued:
+        _load_filter_values(values, path, known)
         normalized = []
         for value in values:
-            normalized_value, entity = _entity_filter_value(entry, value, user, index)
+            entity = known.get(_bounded_text(value, path))
+            normalized_value, entity = _entity_filter_value(entry, entity, user, index)
             normalized.append(normalized_value)
             related[entity.hash] = entity
     else:
@@ -586,6 +624,7 @@ def compile_filter_contract(parent: FilterParent, contract: object, user: FieldU
     definitions = []
     canonical = []
     related: dict[str, Entity] = {parent.hash: parent}
+    known: dict[str, Entity] = {}
     form_scopes = set()
 
     for index, condition in enumerate(conditions):
@@ -645,6 +684,11 @@ def compile_filter_contract(parent: FilterParent, contract: object, user: FieldU
             form_scopes.add(entry.source.hash)
 
         comparator = _comparator(condition.get("comparator"), entry.field, index)
+        if entry.field.is_entity_valued and not known:
+            _remember_filter_entity(known, parent)
+            for field in catalog.values():
+                for entity in (field.allowed_values or {}).values():
+                    _remember_filter_entity(known, entity)
         comparator, value = _condition_value(
             entry,
             comparator,
@@ -652,6 +696,7 @@ def compile_filter_contract(parent: FilterParent, contract: object, user: FieldU
             user,
             index,
             related,
+            known,
         )
         definition = FilterDefinition(
             entry.source.hash,

@@ -4,6 +4,9 @@ from datetime import datetime, time, UTC
 from types import SimpleNamespace
 
 import pytest
+from google.cloud.datastore import Key
+
+from config.datastore import encode_urlsafe_key
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -57,6 +60,8 @@ class _Entity:
     ):
         self.kind = kind
         self.hash = hash_value
+        self.key = Key(kind, hash_value, project="offline-filter-tests")
+        self.urlsafe_key = encode_urlsafe_key(self.key)
         self.name = name
         self.reserved = False
         self.filters = filters or SimpleNamespace(fields={}, entity_fields={})
@@ -350,10 +355,17 @@ def test_compile_filter_definitions_rejects_unknown_fields_comparators_and_value
 
     unrelated = _Entity("model", "other-model", "Other")
     monkeypatch.setattr(
-        ai_query.Entities,
-        "fetch_one",
-        lambda value, request: unrelated if value == unrelated.hash else model,
+        contract.cache, "get_details_by_hash",
+        lambda hashes: {unrelated.hash: {"id": unrelated.urlsafe_key}} if unrelated.hash in hashes else {},
     )
+    monkeypatch.setattr(
+        ai_query.Entities, "fetch",
+        lambda *keys, request: [unrelated] if unrelated.key in keys else [],
+    )
+    selected = ai_query.compile_filter_definitions(
+        project, [{"field": "model", "comparator": "eq", "values": [model.hash]}], user,
+    )
+    assert selected[0].value == model.hash
     with pytest.raises(exceptions.ValidationError, match="not valid for model"):
         ai_query.compile_filter_definitions(
             project,

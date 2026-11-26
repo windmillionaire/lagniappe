@@ -266,10 +266,15 @@ class PageIndex(Index):
         )
         self.cursor = db.next_cursor
 
+        # The owning Category is already loaded. Pages may also reference other
+        # Categories, so let the relation loader resolve the remaining keys.
+        loaded = (
+            Entities.fetch(*db.results, self._category, request=Fetch.direct())
+            if db.results else []
+        )
         self._pages = [
-            cast("Page", page)
-            for page in Entities.fetch(*db.results, request=Fetch.direct())
-            if page.allowed(Action.VIEW, user=self.user)
+            page for page in loaded
+            if isinstance(page, Entities.PAGE) and page.allowed(Action.VIEW, user=self.user)
         ]
 
         self.append = (

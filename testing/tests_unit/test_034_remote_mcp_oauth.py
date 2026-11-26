@@ -77,6 +77,7 @@ def oauth(monkeypatch):
 
     monkeypatch.setattr(store, "atomic", atomic)
     monkeypatch.setattr(store, "read", lambda name: deepcopy(rows.get(name)))
+    monkeypatch.setattr(store, "read_grant_and_user", lambda name, key: (deepcopy(rows.get(name)), key))
     document = {
         "client_id": config["client_id"],
         "redirect_uris": [config["redirect_uri"]],
@@ -708,6 +709,41 @@ def test_oauth_store_uses_one_transaction_and_unindexed_records(monkeypatch):
     assert reads == [transaction]
     assert puts[0].key.name == "c-digest"
     assert set(puts[0].exclude_from_indexes) == {"user", "expires_at"}
+
+
+def test_access_reads_current_grant_and_user_in_one_lookup(monkeypatch):
+    from google.cloud.datastore import Entity, Key
+    from unittest.mock import Mock
+
+    config = {"issuer": "https://issuer.test", "resource": "https://mcp.test"}
+    monkeypatch.setattr(auth, "settings", lambda: config)
+    database = Mock(spec=["key", "get", "get_multi"])
+    database.key.side_effect = lambda kind, name: Key(kind, name, project="offline")
+    monkeypatch.setattr(store.DATA, "_datastore_client", database)
+
+    actor = Entity(database.key("users", "actor"))
+    actor.update({"type": "user", "active": True})
+    grant_name = auth._grant_name(auth.Entities.USER(actor), CLIENT_ID)
+    grant = Entity(database.key("mcp_oauth", grant_name))
+    grant.update(config, client_id=CLIENT_ID, family="family", user=actor.key,
+                 expires_at=NOW + timedelta(minutes=5))
+    token = auth._secret("a")
+    access = Entity(database.key("mcp_oauth", auth._name(token, "a")))
+    access.update(grant, grant=grant_name, generation=1, issued_at=NOW)
+    rows = {row.key: row for row in (access, actor, grant)}
+    database.get.side_effect = lambda key, **kwargs: rows.get(key)
+    database.get_multi.side_effect = lambda keys: [rows[key] for key in reversed(keys) if key in rows]
+
+    user, credential = auth.authenticate_access(token, now=NOW)
+    assert user.key == actor.key and credential["active"]
+    database.get.assert_called_once_with(access.key, transaction=None)
+    database.get_multi.assert_called_once_with([grant.key, actor.key])
+
+    for missing in (actor, grant):
+        del rows[missing.key]
+        with pytest.raises(auth.OAuthError, match="invalid_grant"):
+            auth.authenticate_access(token, now=NOW)
+        rows[missing.key] = missing
 
 
 def test_oauth_secrets_are_redacted_from_diagnostics():
