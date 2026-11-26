@@ -488,8 +488,8 @@ const STYLES = {
       "drawer": "mx-4 mb-4 pt-3.5 border-t border-base-light/50 flex flex-col gap-3 sm:mx-6"
     },
     "rename": {
-      "form": "flex min-w-0 flex-1 flex-row items-center gap-1.5",
-      "input": "min-w-0 flex-1 rounded-md border border-task-default bg-white px-2 py-0.5 text-base font-medium text-base-dark focus:outline-none focus:ring-2 focus:ring-task-default/20"
+      "form": "flex min-w-0 max-w-full flex-row items-center",
+      "input": "w-80 max-w-full -mb-px border-b border-dashed border-base-medium bg-transparent p-0 text-base font-medium leading-relaxed text-base-dark focus:border-task-default focus:outline-none"
     },
     "schedule": {
       "root": "lp-schedule flex flex-col gap-4"
