@@ -241,12 +241,31 @@ export class DueDate {
 	}
 
 	_syncClearDueButton() {
-		if (!this.clearDueButton) return;
 		const input = this.groups.dueDate?.querySelector<HTMLInputElement>(
 			"input[name='due-date']",
 		);
-		const hasValue = Boolean(input?.value || this.schedule.due);
-		this.clearDueButton.hidden = !hasValue;
+		const value = input?.value || this.schedule.due || "";
+		if (this.clearDueButton) {
+			this.clearDueButton.hidden = !value;
+		}
+		const targets: [string, string][] = [
+			["today", todayIsoDate()],
+			["tomorrow", addDaysIsoDate(1)],
+			["next-week", addDaysIsoDate(7)],
+		];
+		for (const [role, iso] of targets) {
+			const btn = this.groups.dueDate?.querySelector<HTMLButtonElement>(
+				`button[data-role='${role}']`,
+			);
+			if (!btn) continue;
+			const active = Boolean(value) && value === iso;
+			if (active) {
+				btn.dataset.accent = "true";
+			} else {
+				delete btn.dataset.accent;
+			}
+			btn.setAttribute("aria-pressed", active ? "true" : "false");
+		}
 	}
 
 	_setDueInputValue(value: string) {
@@ -593,7 +612,7 @@ export class DueDate {
 		sep.className = "lp-schedule-sep";
 		sep.setAttribute("aria-hidden", "true");
 
-		const todayBtn = quickChip({ text: "Today", role: "today", accent: true });
+		const todayBtn = quickChip({ text: "Today", role: "today" });
 		const tomorrowBtn = quickChip({ text: "Tomorrow", role: "tomorrow" });
 		const nextWeekBtn = quickChip({ text: "Next week", role: "next-week" });
 		const clearBtn = quickChip({
