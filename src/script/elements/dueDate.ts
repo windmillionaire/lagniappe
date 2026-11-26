@@ -618,7 +618,7 @@ export class DueDate {
 		const clearBtn = quickChip({
 			text: "Clear",
 			role: "remove-due-date",
-			icon: "x",
+			icon: "clear",
 		});
 		clearBtn.hidden = !this.schedule.due;
 		this.clearDueButton = clearBtn;

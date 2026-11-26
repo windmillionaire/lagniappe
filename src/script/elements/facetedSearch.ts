@@ -16,13 +16,21 @@ export class FacetedSearchElement extends BaseElement {
 		);
 	}
 
+	get value() {
+		if (this.combobox) {
+			const selected = this.combobox.selectedOptions;
+			return selected.length > 0 ? selected : null;
+		}
+		return this.values.length > 0 ? this.values : null;
+	}
+
 	get values() {
 		let submission: unknown = this.submission;
 		if (typeof submission === "string") {
 			submission = JSON.parse(submission);
-			return (Array.isArray(submission) ? submission : [submission]).filter(
-				isFacetOption,
-			);
+		}
+		if (Array.isArray(submission)) {
+			return submission.filter(isFacetOption);
 		}
 		return isFacetOption(submission) ? [submission] : [];
 	}

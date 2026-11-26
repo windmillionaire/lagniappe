@@ -261,6 +261,77 @@ export class BaseElement {
 		return true;
 	}
 
+	get previewSubmission(): unknown {
+		return "value" in this
+			? (this as { value?: unknown }).value
+			: this.submission;
+	}
+
+	_ensureEditButton(label: Element) {
+		if (label.querySelector("[data-role='edit']")) return;
+		const button = document.createElement("button");
+		button.type = "button";
+		button.dataset.role = "edit";
+		button.ariaLabel = `Edit ${this.label}`;
+		button.title = `Edit ${this.label}`;
+		button.className = `group-data-[mode=edit]/element:hidden ${STYLES.form.icon}`;
+		setIcon(
+			button.appendChild(document.createElement("span")),
+			"edit",
+			"icon-xs",
+		);
+		const editText = button.appendChild(document.createElement("span"));
+		editText.textContent = "Edit";
+
+		const firstAction = label.querySelector(
+			"[data-role='history-fill'], [data-role='clear'], [data-role='close']",
+		);
+		if (firstAction) {
+			label.insertBefore(button, firstAction);
+		} else {
+			label.appendChild(button);
+		}
+	}
+
+	refreshRead(): HTMLElement | null {
+		if (this.readonly || this.schema.type === "table") return null;
+		const elt = this._elt;
+		if (!elt) return null;
+
+		const prevSubmission = this._submission;
+		this.submission = this.previewSubmission;
+		const hasValue = this.hasSubmission;
+
+		let nextRead: HTMLElement | null = null;
+		if (hasValue) {
+			this._read = null;
+			nextRead = this.read;
+		}
+		this._submission = prevSubmission;
+
+		if (!nextRead) return null;
+
+		nextRead.dataset.role = "read";
+		nextRead.classList.add("cursor-pointer", "transition-colors");
+
+		const existingRead = elt.querySelector(":scope > [data-role='read']");
+		if (existingRead) {
+			existingRead.replaceWith(nextRead);
+		} else {
+			elt.appendChild(nextRead);
+		}
+
+		const label =
+			elt.dataset?.role === "label"
+				? elt
+				: elt.querySelector("[data-role='label']");
+		if (label) {
+			this._ensureEditButton(label);
+		}
+
+		return nextRead;
+	}
+
 	create() {
 		let elt: FormElementTarget | null;
 		if (this.readonly && this.schema.type !== "table") {
@@ -297,19 +368,7 @@ export class BaseElement {
 			if (!this.readonly && this.hasSubmission) {
 				read.classList.add("cursor-pointer", "transition-colors");
 				if (label) {
-					const button = label.appendChild(document.createElement("button"));
-					button.type = "button";
-					button.dataset.role = "edit";
-					button.ariaLabel = `Edit ${this.label}`;
-					button.title = `Edit ${this.label}`;
-					button.className = `group-data-[mode=edit]/element:hidden ${STYLES.form.icon}`;
-					setIcon(
-						button.appendChild(document.createElement("span")),
-						"edit",
-						"icon-xs",
-					);
-					const editText = button.appendChild(document.createElement("span"));
-					editText.textContent = "Edit";
+					this._ensureEditButton(label);
 				}
 			} else if (this.readonly) {
 				elt.classList.add("flex", "flex-col", "gap-1");
@@ -328,11 +387,27 @@ export class BaseElement {
 			clearButton.className = `group-data-[mode=read]/element:hidden ${STYLES.form.icon}`;
 			setIcon(
 				clearButton.appendChild(document.createElement("span")),
-				"x",
+				"clear",
 				"icon-xs text-delete-default",
 			);
 			const clearText = clearButton.appendChild(document.createElement("span"));
 			clearText.textContent = "Clear";
+
+			const closeButton = label.appendChild(document.createElement("button"));
+			closeButton.type = "button";
+			closeButton.dataset.role = "close";
+			closeButton.dataset.kind = "default";
+			closeButton.ariaLabel = `Close ${this.label}`;
+			closeButton.title = `Close ${this.label}`;
+			closeButton.hidden = !this.hasSubmission;
+			closeButton.className = `group-data-[mode=read]/element:hidden ${STYLES.form.icon}`;
+			setIcon(
+				closeButton.appendChild(document.createElement("span")),
+				"x",
+				"icon-xs text-delete-default",
+			);
+			const closeText = closeButton.appendChild(document.createElement("span"));
+			closeText.textContent = "Close";
 		}
 
 		elt._lp_element = this;

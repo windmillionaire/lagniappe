@@ -112,7 +112,9 @@ type FormCombobox = {
 };
 
 type WidgetTarget = HTMLElement & { _lp_widget?: FormWidget };
-type FormFieldTarget = HTMLElement & { _lp_element?: { clear?(): void } };
+type FormFieldTarget = HTMLElement & {
+	_lp_element?: { clear?(): void; refreshRead?(): HTMLElement | null };
+};
 
 type ResetState = {
 	target: HTMLElement;
@@ -721,8 +723,13 @@ export class FormWidget {
 		const clearButton = element.querySelector<HTMLButtonElement>(
 			"[data-role='label'] [data-role='clear']",
 		);
-		if (!clearButton) return;
-		clearButton.hidden = !this._hasFieldValue(element);
+		const closeButton = element.querySelector<HTMLButtonElement>(
+			"[data-role='label'] [data-role='close']",
+		);
+		if (!clearButton && !closeButton) return;
+		const hasValue = this._hasFieldValue(element);
+		if (clearButton) clearButton.hidden = !hasValue;
+		if (closeButton) closeButton.hidden = !hasValue;
 	}
 
 	_syncFieldClearEvent(e: Event) {
@@ -756,6 +763,23 @@ export class FormWidget {
 		);
 	}
 
+	_exitFieldEdit(element: FormFieldTarget) {
+		document.dispatchEvent(new CustomEvent("lp:close-date-picker"));
+		const field =
+			element._lp_element ?? this.form?.renderer?.elements.get(element.id);
+		const read =
+			field && "refreshRead" in field && typeof field.refreshRead === "function"
+				? field.refreshRead()
+				: element.querySelector<HTMLElement>(":scope > [data-role='read']");
+		if (!read) return;
+		void withTransition(
+			() => {
+				element.dataset.mode = "read";
+			},
+			{ label: "form:close-field" },
+		);
+	}
+
 	_click(e: MouseEvent) {
 		if (this.readonly) return;
 
@@ -763,7 +787,8 @@ export class FormWidget {
 		if (!target?.closest) return;
 
 		const element = target.closest<FormFieldTarget>(".form-element");
-		const role = target.closest<HTMLElement>("[data-role]")?.dataset.role;
+		const roleTarget = target.closest<HTMLElement>("[data-role]");
+		const role = roleTarget?.dataset.role;
 
 		if (!element) return;
 
@@ -771,6 +796,13 @@ export class FormWidget {
 			e.preventDefault();
 			e.stopPropagation();
 			this._enterFieldEdit(element);
+			return;
+		}
+
+		if (role === "close" && roleTarget?.closest("[data-role='label']")) {
+			e.preventDefault();
+			e.stopPropagation();
+			this._exitFieldEdit(element);
 			return;
 		}
 

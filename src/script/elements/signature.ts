@@ -13,6 +13,13 @@ export class SignatureElement extends BaseElement {
 		return this.signatureInput?.value ?? null;
 	}
 
+	get previewSubmission(): unknown {
+		if (this.signature?.fileInput?.files?.length && this.signature.canvas) {
+			return this.signature.canvas.toDataURL("image/png");
+		}
+		return this.signatureInput?.value ? this.submission : null;
+	}
+
 	changed(value: unknown) {
 		if (areEqual(this.value, value)) return false;
 		return true;

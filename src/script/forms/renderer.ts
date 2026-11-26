@@ -29,6 +29,7 @@ export interface RenderedFormElement {
 	active?(value: unknown): boolean;
 	addHistoryFill?(value: unknown): boolean;
 	clear?(): void;
+	refreshRead?(): HTMLElement | null;
 	destroy?(): void;
 }
 

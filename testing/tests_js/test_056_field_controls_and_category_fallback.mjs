@@ -222,7 +222,7 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 		await flush();
 		assert.equal(emailElt.dataset.mode, "read");
 
-		// Clicking the read value box switches into edit mode and exposes neutral Clear divider action.
+		// Clicking the read value box switches into edit mode and exposes Clear (clear icon) and Close (x icon).
 		nameRead.dispatchEvent(
 			new MouseEvent("click", { bubbles: true, cancelable: true }),
 		);
@@ -231,30 +231,91 @@ test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_hi
 		const nameClear = nameElt.querySelector(
 			"[data-role='label'] [data-role='clear']",
 		);
+		const nameClose = nameElt.querySelector(
+			"[data-role='label'] [data-role='close']",
+		);
 		assert.ok(nameClear);
+		assert.ok(nameClose);
 		assert.ok(nameClear.classList.contains("form-field-action"));
+		assert.ok(nameClose.classList.contains("form-field-action"));
 		assert.equal(nameClear.dataset.kind, "default");
+		assert.equal(nameClose.dataset.kind, "default");
+		assert.equal(
+			nameClear.querySelector("[data-icon]")?.dataset.icon,
+			"clear",
+			"Form element Clear should use the same clear icon as select clear",
+		);
+		assert.equal(
+			nameClose.querySelector("[data-icon]")?.dataset.icon,
+			"x",
+			"Form element Close should use the x icon",
+		);
 		assert.equal(nameClear.hidden, false);
+		assert.equal(nameClose.hidden, false);
 
-		// Clearing empties the input and hides the Clear action.
+		// Editing and clicking Close returns to the updated read view.
+		const nameInput = nameElt.querySelector("input");
+		nameInput.value = "Hive 2";
+		nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+		nameClose.click();
+		await flush();
+		assert.equal(nameElt.dataset.mode, "read");
+		assert.equal(
+			nameElt.querySelector("[data-role='read']")?.textContent,
+			"Hive 2",
+		);
+
+		// Re-opening edit mode and clearing empties the input and hides both Clear and Close.
+		nameElt
+			.querySelector("[data-role='read']")
+			.dispatchEvent(
+				new MouseEvent("click", { bubbles: true, cancelable: true }),
+			);
+		await flush();
+		assert.equal(nameElt.dataset.mode, "edit");
+		assert.equal(nameClear.hidden, false);
+		assert.equal(nameClose.hidden, false);
 		nameClear.click();
-		assert.equal(nameElt.querySelector("input").value, "");
+		assert.equal(nameInput.value, "");
 		assert.equal(nameClear.hidden, true);
+		assert.equal(nameClose.hidden, true);
 
-		// Initially-empty radio gets a hidden Clear action that appears once an option is chosen.
+		// Initially-empty radio gets hidden Clear and Close actions that appear once an option is chosen;
+		// Close returns a read view with an Edit action, and Clear hides both.
 		const radioElt = form.querySelector("#queen");
 		const radioClear = radioElt.querySelector(
 			"[data-role='label'] [data-role='clear']",
 		);
+		const radioClose = radioElt.querySelector(
+			"[data-role='label'] [data-role='close']",
+		);
 		assert.ok(radioClear);
+		assert.ok(radioClose);
 		assert.equal(radioClear.hidden, true);
+		assert.equal(radioClose.hidden, true);
 		const yesRadio = radioElt.querySelector("input[type='radio'][value='yes']");
 		yesRadio.checked = true;
 		yesRadio.dispatchEvent(new Event("change", { bubbles: true }));
 		assert.equal(radioClear.hidden, false);
+		assert.equal(radioClose.hidden, false);
+		radioClose.click();
+		await flush();
+		assert.equal(radioElt.dataset.mode, "read");
+		assert.equal(
+			radioElt.querySelector("[data-role='read']")?.textContent,
+			"Yes",
+		);
+		assert.ok(
+			radioElt.querySelector("[data-role='label'] [data-role='edit']"),
+			"Closing an initially-empty field with a value should expose Edit",
+		);
+		radioElt.querySelector("[data-role='label'] [data-role='edit']").click();
+		await flush();
+		assert.equal(radioElt.dataset.mode, "edit");
 		radioClear.click();
 		assert.equal(yesRadio.checked, false);
 		assert.equal(radioClear.hidden, true);
+		assert.equal(radioClose.hidden, true);
 
 		// History fill stays lazy, sits before Clear in the label row, and restores value.
 		let resolveHistory;

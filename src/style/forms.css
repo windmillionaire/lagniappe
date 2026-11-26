@@ -180,7 +180,8 @@ input[role="combobox"] {
 			:is(
 					[data-role="edit"],
 					[data-role="history-fill"],
-					[data-role="clear"]
+					[data-role="clear"],
+					[data-role="close"]
 				):is(:hover, :focus-visible)
 		) {
 		& :where(.form-input:not(:disabled)) {
