@@ -273,6 +273,20 @@ export class PageTaskList extends BaseList {
 			return;
 		}
 
+		const widgetClose = target.closest<HTMLElement>(
+			"[data-role='controls'] [lp-control='close']",
+		);
+		if (widgetClose && this.target.contains(widgetClose)) {
+			const taskRow = widgetClose.closest<HTMLLIElement>(
+				"li[lp-component][data-kind='task']",
+			);
+			if (taskRow) {
+				this.chips?.closeChip(taskRow);
+				setTaskTrayOpen(taskRow, false);
+			}
+			return;
+		}
+
 		const chipClose = target.closest<HTMLElement>("[data-role='chip-close']");
 		if (
 			chipClose?.dataset.role === "chip-close" &&

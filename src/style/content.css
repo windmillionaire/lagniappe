@@ -229,14 +229,17 @@
 }
 
 /* @style task.chip.add */
-[data-role="task-chips"]:not([data-tray-open="true"]) > .task-chip-add {
+li[data-open="false"]
+	[data-role="task-chips"]:not([data-tray-open="true"])
+	> .task-chip-add {
 	display: none;
 }
 
 /* @style task.chip.add */
-[data-role="task-chips"]:not([data-tray-open="true"]):not(
-	:has(> :not(.task-chip-add))
-) {
+li[data-open="false"]
+	[data-role="task-chips"]:not([data-tray-open="true"]):not(
+		:has(> :not(.task-chip-add))
+	) {
 	display: none;
 }
 

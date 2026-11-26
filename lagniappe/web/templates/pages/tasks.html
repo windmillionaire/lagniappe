@@ -172,29 +172,29 @@
            data-role="nav-toggles"
            data-nav="{{ t.hash }}">
         {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
+        {% if can_edit_chips %}
+          <button type="button"
+                  class="{{ styles.toggle.container }}"
+                  data-role="chip-tray-toggle"
+                  data-kind="task"
+                  data-active="false"
+                  data-visible="true"
+                  aria-expanded="false"
+                  aria-label="Add task details"
+                  title="Add task details">
+            {{ render_icon("plus") }}
+          </button>
+          <button type="button"
+                  class="{{ styles.toggle.container }}"
+                  data-role="chip-close"
+                  data-kind="close"
+                  data-visible="false"
+                  aria-label="Close"
+                  title="Close">
+            {{ render_icon("close") }}
+          </button>
+        {% endif %}
       </nav>
-      {% if can_edit_chips %}
-        <button type="button"
-                class="{{ styles.toggle.container }}"
-                data-role="chip-tray-toggle"
-                data-kind="task"
-                data-active="false"
-                data-visible="true"
-                aria-expanded="false"
-                aria-label="Add task details"
-                title="Add task details">
-          {{ render_icon("plus") }}
-        </button>
-        <button type="button"
-                class="{{ styles.toggle.container }}"
-                data-role="chip-close"
-                data-kind="close"
-                data-visible="false"
-                aria-label="Close"
-                title="Close">
-          {{ render_icon("close") }}
-        </button>
-      {% endif %}
       <div class="{{ styles.form.header.controls }} {{ styles.task.controlGroup }}"
            data-role="controls"
            data-visible="false">
@@ -583,7 +583,7 @@
                 data-kind="task"
                 class="{{ styles.task.chip.add }}">
           {{ render_icon("textarea", (styles.badge.icon)) }}
-          <span>+ Description</span>
+          <span>Description</span>
         </button>
       {%- endif -%}
       {%- if not t.due_date and not t.schedule -%}
@@ -592,7 +592,7 @@
                 data-kind="task"
                 class="{{ styles.task.chip.add }}">
           {{ render_icon("dueDate", (styles.badge.icon)) }}
-          <span>+ Schedule</span>
+          <span>Schedule</span>
         </button>
       {%- endif -%}
       {%- if not t.form and can_form -%}
@@ -601,7 +601,7 @@
                 data-kind="form"
                 class="{{ styles.task.chip.add }}">
           {{ render_icon("form", (styles.badge.icon)) }}
-          <span>+ Form</span>
+          <span>Form</span>
         </button>
       {%- endif -%}
       {%- if not t.project and not t.model and can_project -%}
@@ -610,7 +610,7 @@
                 data-kind="project"
                 class="{{ styles.task.chip.add }}">
           {{ render_icon("project", (styles.badge.icon)) }}
-          <span>+ Project</span>
+          <span>Project</span>
         </button>
       {%- endif -%}
       {%- if not t.assigned_to and can_assign_any -%}
@@ -619,7 +619,7 @@
                 data-kind="user"
                 class="{{ styles.task.chip.add }}">
           {{ render_icon("user", (styles.badge.icon)) }}
-          <span>+ Assignee</span>
+          <span>Assignee</span>
         </button>
       {%- endif -%}
       {%- if can_upload -%}
@@ -628,7 +628,7 @@
                 data-kind="file"
                 class="{{ styles.task.chip.add }}">
           {{ render_icon("file", (styles.badge.icon)) }}
-          <span>+ File</span>
+          <span>File</span>
         </button>
       {%- endif -%}
     {%- endif -%}
