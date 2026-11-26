@@ -136,11 +136,24 @@
        data-widget="MobileTableControls"
        data-visible="false"
        class="{{ styles.index.mobile.controls }}">
+    <div data-role="mobile-controls-header"
+         class="{{ styles.index.mobile.header }}">
+      <span>Column</span>
+      <div class="flex shrink-0 flex-row items-center gap-3">
+        <span class="w-9 text-center">Sort</span>
+        <span class="w-9 text-center">Show</span>
+      </div>
+    </div>
     {% for column in columns %}
       <div class="{{ styles.index.mobile.row }}"
            data-column="{{ column.field }}">
-        <span class="text-base">{{ column.title }}</span>
-        <div class="flex flex-row items-center gap-2">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <span class="text-sm font-semibold text-base-dark">{{ column.title }}</span>
+          <span data-role="sort-status"
+                data-visible="false"
+                class="{{ styles.index.mobile.status }}"></span>
+        </div>
+        <div class="flex shrink-0 flex-row items-center gap-3">
           {{ filter_toggle('Sort or filter ' ~ column.title, visible=false) }}
           {{ column_visibility('Toggle ' ~ column.title ~ ' column') }}
         </div>

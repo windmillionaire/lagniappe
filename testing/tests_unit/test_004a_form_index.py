@@ -77,7 +77,7 @@ def test_form_index_table(get_test_entities):
             "field": "modified",
             "title": "Modified",
             "icon": "date",
-            "ordering": "numeric",
+            "ordering": "date",
             "selected": True,
             "link": True,
             "parent": True,

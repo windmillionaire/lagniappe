@@ -151,9 +151,27 @@
 
 /* @style index.mobile.controls */
 #mobile-controls .action-icon-button {
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: var(--radius-md);
 	&:hover {
-		background-color: transparent;
+		background-color: color-mix(in oklch, white 70%, transparent);
 		outline: none;
+	}
+	&:focus-visible {
+		background-color: white;
+		outline: 2px solid var(--kind-light);
+		outline-offset: 0;
+	}
+	&[data-toggle="filter"] {
+		color: var(--color-base-medium);
+		&[data-expanded="true"],
+		&[data-active="true"] {
+			color: var(--kind-dark);
+			background-color: white;
+			box-shadow: var(--shadow-xs);
+			outline: 1px solid color-mix(in oklch, var(--kind-light) 70%, transparent);
+		}
 	}
 }
 

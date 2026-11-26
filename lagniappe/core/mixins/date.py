@@ -98,7 +98,7 @@ class DateMixin(_DateHost):
         return None
 
     # Column Attributes
-    _ordering = Ordering.NUMERIC
+    _ordering = Ordering.DATE
 
     @property
     def column_value(self) -> datetime | None:

@@ -265,8 +265,11 @@ const STYLES = {
       "iconContext": "index-header-icon-context"
     },
     "mobile": {
-      "controls": "rounded-md bg-kind-bg p-4 text-base flex flex-col gap-2 font-semibold mt-4",
-      "row": "flex flex-row items-center justify-between gap-4 group/form"
+      "controls": "rounded-md border border-kind-light/40 bg-kind-bg p-3 text-base flex flex-col font-semibold mt-4",
+      "header": "flex flex-row items-center justify-between gap-3 border-b border-base-light/40 pb-2 mb-0.5 text-xs font-semibold uppercase tracking-wide text-base-medium",
+      "row": "flex flex-row items-center justify-between gap-3 py-1.5 group/form",
+      "status": "inline-flex items-center rounded-full border border-kind-light/70 bg-white/90 px-2 py-0.5 text-xs font-medium text-kind-dark",
+      "unchecked": "text-base-medium invisible group-data-[active=false]/toggle:visible"
     },
     "tools": {
       "dropdown": {
@@ -471,7 +474,11 @@ const STYLES = {
       }
     },
     "filters": {
-      "title": "font-semibold align-middle",
+      "title": "font-semibold align-middle group-data-[sorting=true]/header:text-kind-dark",
+      "bar": "p-3 border-t border-base-light/50 bg-kind-bg",
+      "barLabel": "text-xs font-semibold uppercase tracking-wide text-base-medium",
+      "panel": "mt-0.5 mb-2 flex flex-col gap-2 rounded-md border border-kind-light/45 bg-white/90 p-2.5 shadow-xs",
+      "option": "table-sort-option inline-flex cursor-pointer items-center gap-2 rounded-md border border-base-light/60 bg-white px-3 py-1.5 text-sm font-medium text-base-dark transition-colors",
       "icon": {
         "container": "ml-1.5 inline-grid align-middle text-slate-400",
         "active": "[grid-area:1/1] group-data-[sorting=true]/header:invisible hover:text-kind-default",

@@ -30,7 +30,7 @@ class LastLogin(DateMixin, ColumnMixin, DBProperty[datetime, "User"]):
     _id = "last_login"
     _label = "Last Login"
     _icon = "login"
-    _ordering = Ordering.NUMERIC
+    _ordering = Ordering.DATE
 
 
 class Email(ColumnMixin, DBProperty[str, "User"]):

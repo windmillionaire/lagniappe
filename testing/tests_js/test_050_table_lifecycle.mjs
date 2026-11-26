@@ -615,3 +615,99 @@ test("test_table_sorting_destroy_removes_controls_and_rejects_queued_toggles", a
 		replacement.destroy();
 	}
 });
+
+test("test_table_sorting_date_and_time_labels_and_mobile_status_states", async (t) => {
+	createBrowser(t);
+	const { TableSorting } = await esmock.strict(
+		"../../src/script/widgets/tables/sorting.ts",
+		{
+			"../../src/script/shared/transitions.ts": {
+				withTransition: (commit) => {
+					commit();
+					return Promise.resolve();
+				},
+			},
+		},
+	);
+
+	document.body.innerHTML =
+		"<main><table><thead><tr>" +
+		'<th data-column="modified" data-ordering="date"><span data-role="title">Modified</span><button data-toggle="filter">Sort</button></th>' +
+		'<th data-column="start_time" data-ordering="time"><span data-role="title">Start</span><button data-toggle="filter">Sort</button></th>' +
+		'</tr><tr data-widget="TableSorting"></tr></thead><tbody>' +
+		'<tr data-key="old"><td data-column="modified" data-sort-value="100">Jan 1</td><td data-column="start_time" data-sort-value="60">09:00</td></tr>' +
+		'<tr data-key="new"><td data-column="modified" data-sort-value="200">Feb 1</td><td data-column="start_time" data-sort-value="120">10:00</td></tr>' +
+		"</tbody></table>" +
+		'<div id="mobile-controls">' +
+		'<div data-column="modified"><span data-role="sort-status" data-visible="false"></span><button data-toggle="filter" data-active="false" data-expanded="false" aria-expanded="false">Sort</button></div>' +
+		'<div data-column="start_time"><span data-role="sort-status" data-visible="false"></span><button data-toggle="filter" data-active="false" data-expanded="false" aria-expanded="false">Sort</button></div>' +
+		"</div></main>";
+
+	const view = {
+		elt: document.querySelector("main"),
+		hash: "date-time-sort",
+		mobile: true,
+	};
+	const component = {
+		elt: document.querySelector("table"),
+		preload: () => [],
+	};
+	const sorting = new TableSorting({
+		view,
+		component,
+		target: document.querySelector("[data-widget=TableSorting]"),
+	});
+	sorting.init();
+
+	const modToggle = document.querySelector(
+		'#mobile-controls [data-column="modified"] button[data-toggle="filter"]',
+	);
+	const modStatus = document.querySelector(
+		'#mobile-controls [data-column="modified"] [data-role="sort-status"]',
+	);
+	view.elt.dispatchEvent(
+		new CustomEvent("toggle-column-filter", { detail: { column: "modified" } }),
+	);
+	assert.equal(modToggle.dataset.expanded, "true");
+	assert.equal(modToggle.getAttribute("aria-expanded"), "true");
+	assert.equal(modToggle.dataset.active, "false");
+	assert.equal(modStatus.dataset.visible, "false");
+
+	const modLabels = Array.from(
+		document.querySelectorAll('#mobile-controls [data-sorts="modified"] label'),
+		(elt) => elt.textContent.trim(),
+	);
+	assert.deepEqual(modLabels, ["None", "Oldest → Newest", "Newest → Oldest"]);
+
+	const timeLabels = Array.from(
+		document.querySelectorAll(
+			'#mobile-controls [data-sorts="start_time"] label',
+		),
+		(elt) => elt.textContent.trim(),
+	);
+	assert.deepEqual(timeLabels, [
+		"None",
+		"Earliest → Latest",
+		"Latest → Earliest",
+	]);
+
+	const descRadio = document.querySelector(
+		'#mobile-controls [data-sorts="modified"] input[value="desc"]',
+	);
+	descRadio.checked = true;
+	descRadio.dispatchEvent(new Event("change", { bubbles: true }));
+
+	assert.equal(modToggle.dataset.active, "true");
+	assert.equal(modStatus.dataset.visible, "true");
+	assert.equal(modStatus.textContent, "Newest → Oldest");
+	assert.deepEqual(
+		Array.from(document.querySelectorAll("tbody tr"), (tr) => tr.dataset.key),
+		["new", "old"],
+	);
+
+	sorting.reset();
+	assert.equal(modToggle.dataset.active, "false");
+	assert.equal(modToggle.dataset.expanded, "false");
+	assert.equal(modStatus.dataset.visible, "false");
+	sorting.destroy();
+});

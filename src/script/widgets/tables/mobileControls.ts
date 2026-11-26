@@ -41,10 +41,9 @@ export class MobileTableControls {
 			.forEach((button) => {
 				const column =
 					button.closest<HTMLElement>("[data-column]")?.dataset.column;
-				button.dataset.active =
-					column !== undefined && visibleColumns.includes(column)
-						? "true"
-						: "false";
+				const active = column !== undefined && visibleColumns.includes(column);
+				button.dataset.active = active ? "true" : "false";
+				button.setAttribute("aria-pressed", active ? "true" : "false");
 			});
 	}
 
@@ -53,10 +52,10 @@ export class MobileTableControls {
 			e.target instanceof Element ? e.target.closest("button") : null;
 		if (!button) return;
 
-		const active = button.dataset.active === "false";
-		button.dataset.active = active ? "true" : "false";
-
 		if (button.matches("[data-toggle='visibility']")) {
+			const active = button.dataset.active === "false";
+			button.dataset.active = active ? "true" : "false";
+			button.setAttribute("aria-pressed", active ? "true" : "false");
 			this._dispatchVisibilityToggle(button, active);
 		} else if (button.matches("[data-toggle='filter']")) {
 			this._dispatchFilterToggle(button);

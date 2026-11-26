@@ -84,7 +84,7 @@ class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty[dat
     _icon = "date"
 
     # Column Attributes
-    _ordering = Ordering.NUMERIC
+    _ordering = Ordering.DATE
     _editable = True
 
     # Form Attributes
@@ -143,7 +143,7 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[datetime]):
     _icon = "time"
 
     # Column Attributes
-    _ordering = Ordering.NUMERIC
+    _ordering = Ordering.TIME
     _editable = True
 
     # Form Attributes

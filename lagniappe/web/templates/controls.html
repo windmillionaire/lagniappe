@@ -63,10 +63,11 @@
           class="{{ styles.toggle.container }}"
           data-active="false"
           data-toggle="visibility"
+          aria-pressed="false"
           aria-label="{{ label }}"
           title="{{ label }}">
-    {{ render_icon("selected", styles.toggle.icon.enabled, "invisible") }}
-    {{ render_icon("unselected", styles.toggle.icon.disabled, "visible") }}
+    {{ render_icon("selected", styles.toggle.icon.enabled) }}
+    {{ render_icon("unselected", styles.index.mobile.unchecked) }}
   </button>
 {% endmacro %}
 
@@ -74,12 +75,13 @@
   <button type="button"
           class="{{ styles.toggle.container }}"
           data-active="false"
+          data-expanded="false"
           data-visible="{{ visible|yesno }}"
           data-toggle="filter"
+          aria-expanded="false"
           aria-label="{{ label }}"
           title="{{ label }}">
-    {{ render_icon("filter.active", styles.toggle.icon.disabled) }}
-    {{ render_icon("filter.inactive", styles.toggle.icon.enabled) }}
+    {{ render_icon("filter.active") }}
   </button>
 {% endmacro %}
 

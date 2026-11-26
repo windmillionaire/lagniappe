@@ -1,4 +1,5 @@
 import { primitives } from "../../elements/primitives.ts";
+import { STYLES } from "../../generated/styles.mjs";
 import { sessionStore } from "../../shared/storage.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import type { LoadedWidget } from "../../types/widgets.d.ts";
@@ -126,14 +127,19 @@ export class TableSorting {
 					const current = this.sorts.get(column);
 					if (!current) return;
 					const sort = this._enableSort(current);
-					if (sort.active) {
-						const toggle = this.toggles.get(column);
-						if (toggle) toggle.dataset.active = "true";
-					}
 					const container = this.containers.get(column);
 					if (!container) return;
-					const visible = container.dataset.visible === "true";
-					container.dataset.visible = visible ? "false" : "true";
+					const nextVisible = container.dataset.visible !== "true";
+					container.dataset.visible = nextVisible ? "true" : "false";
+					const toggle = this.toggles.get(column);
+					if (toggle) {
+						toggle.dataset.expanded = nextVisible ? "true" : "false";
+						toggle.setAttribute(
+							"aria-expanded",
+							nextVisible ? "true" : "false",
+						);
+						toggle.dataset.active = sort.active ? "true" : "false";
+					}
 				},
 				{ label: "table-sorting:toggle-mobile" },
 			);
@@ -168,7 +174,7 @@ export class TableSorting {
 				const ordering = th.dataset.ordering;
 				if (!column || !ordering) return;
 				this.headers.set(column, th);
-				th.dataset.sorting = "false";
+				this._clearSortIndicator(column);
 				this._enableSort(this._createSort(column, ordering));
 			});
 	}
@@ -206,7 +212,7 @@ export class TableSorting {
 				const ordering = th.dataset.ordering;
 				if (!column || !ordering) return;
 				this.headers.set(column, th);
-				th.dataset.sorting = "false";
+				this._clearSortIndicator(column);
 				const sort = this._enableSort(this._createSort(column, ordering));
 				sort.restore(saved.sorts[column]);
 			});
@@ -265,13 +271,77 @@ export class TableSorting {
 		return Array.from(this.sorts.values()).some((sort) => sort.active);
 	}
 
+	_columnTitle(column: string) {
+		const header = this.headers.get(column);
+		const title = header
+			?.querySelector<HTMLElement>("[data-role='title']")
+			?.textContent?.trim();
+		return title || column;
+	}
+
+	_clearSortIndicator(column: string) {
+		const header = this.headers.get(column);
+		if (header) header.dataset.sorting = "false";
+
+		const title = this._columnTitle(column);
+		const desktopButton = header?.querySelector<HTMLButtonElement>(
+			"button[data-toggle='filter']",
+		);
+		if (desktopButton) {
+			const label = `Sort or filter ${title}`;
+			desktopButton.title = label;
+			desktopButton.setAttribute("aria-label", label);
+		}
+
+		if (this.view.mobile) {
+			const toggle = this.toggles.get(column);
+			if (toggle) {
+				toggle.dataset.active = "false";
+				toggle.dataset.expanded = "false";
+				toggle.setAttribute("aria-expanded", "false");
+			}
+			const status = document
+				.getElementById("mobile-controls")
+				?.querySelector<HTMLElement>(
+					`[data-column="${column}"] [data-role="sort-status"]`,
+				);
+			if (status) {
+				status.textContent = "";
+				status.dataset.visible = "false";
+			}
+		}
+	}
+
 	_markSortActive(sort: Sort) {
 		const header = this.headers.get(sort.column);
 		if (header) header.dataset.sorting = "true";
+		const summary = sort.summary;
+		const title = this._columnTitle(sort.column);
+
+		const desktopButton = header?.querySelector<HTMLButtonElement>(
+			"button[data-toggle='filter']",
+		);
+		if (desktopButton && summary) {
+			desktopButton.title = `Sorted: ${summary} (click to clear)`;
+			desktopButton.setAttribute(
+				"aria-label",
+				`Clear ${title} sort (${summary})`,
+			);
+		}
+
 		if (!this.view.mobile) return;
 
 		const toggle = this.toggles.get(sort.column);
 		if (toggle) toggle.dataset.active = "true";
+		const status = document
+			.getElementById("mobile-controls")
+			?.querySelector<HTMLElement>(
+				`[data-column="${sort.column}"] [data-role="sort-status"]`,
+			);
+		if (status) {
+			status.textContent = summary ?? "";
+			status.dataset.visible = summary ? "true" : "false";
+		}
 	}
 
 	_setSortingToggles() {
@@ -419,7 +489,7 @@ export class TableSorting {
 	_createCell(column: string) {
 		const cell = document.createElement("td");
 		cell.colSpan = this.component.elt.querySelectorAll("th").length;
-		cell.className = `p-3 border-t bg-kind-bg border-slate-300`;
+		cell.className = STYLES.table.filters.bar;
 		cell.dataset.sorts = column;
 		cell.dataset.visible = "false";
 		this.target.appendChild(cell);
@@ -428,7 +498,7 @@ export class TableSorting {
 
 	_createSection(column: string) {
 		const section = document.createElement("div");
-		section.className = `flex flex-col gap-2 p-4 bg-white outline-kind-default rounded-md outline-1`;
+		section.className = STYLES.table.filters.panel;
 		section.dataset.sorts = column;
 		section.dataset.visible = "false";
 		const controls = document.getElementById("mobile-controls");
@@ -439,11 +509,17 @@ export class TableSorting {
 	_createCheckboxElement(sort: CheckboxSort) {
 		const container = this.containers.get(sort.column);
 		if (!container) return;
-		const element = container.appendChild(document.createElement("div"));
 		if (sort.options === null) return;
 
+		if (!this.view.mobile) {
+			const label = container.appendChild(document.createElement("div"));
+			label.className = `${STYLES.table.filters.barLabel} mb-2`;
+			label.textContent = this._columnTitle(sort.column);
+		}
+		const element = container.appendChild(document.createElement("div"));
+
 		if (Object.keys(sort.options).length > 4 && !this.view.mobile) {
-			element.className = `grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-4`;
+			element.className = `grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3`;
 		} else if (!this.view.mobile) {
 			element.className = `flex flex-row flex-wrap gap-4`;
 		} else {
@@ -456,7 +532,14 @@ export class TableSorting {
 		const container = this.containers.get(sort.column);
 		if (!container) return;
 		const element = container.appendChild(document.createElement("fieldset"));
-		element.className = `flex flex-row flex-wrap gap-4`;
+		element.className = this.view.mobile
+			? `flex flex-row flex-wrap gap-2`
+			: `flex flex-row flex-wrap items-center gap-2.5`;
+		if (!this.view.mobile) {
+			const label = element.appendChild(document.createElement("span"));
+			label.className = `${STYLES.table.filters.barLabel} mr-1`;
+			label.textContent = this._columnTitle(sort.column);
+		}
 		sort.createOptions(element);
 	}
 
@@ -492,12 +575,7 @@ export class TableSorting {
 			container.remove();
 			this.containers.delete(sort.column);
 		}
-		const header = this.headers.get(sort.column);
-		if (header) header.dataset.sorting = "false";
-		if (this.view.mobile) {
-			const toggle = this.toggles.get(sort.column);
-			if (toggle) toggle.dataset.active = "false";
-		}
+		this._clearSortIndicator(sort.column);
 	}
 
 	_createSort(column: string, ordering: string) {
@@ -544,7 +622,10 @@ class RadioSort {
 		this.column = column;
 		this.ordering = ordering;
 		this.reordering =
-			this.ordering === "numeric" || this.ordering === "lexical";
+			this.ordering === "numeric" ||
+			this.ordering === "date" ||
+			this.ordering === "time" ||
+			this.ordering === "lexical";
 		this.rowValues = null;
 		this.hiddenRows = null;
 		this.sortedBy = null;
@@ -569,6 +650,14 @@ class RadioSort {
 		return this.active ? { value: this.sortValue } : null;
 	}
 
+	get summary(): string | null {
+		if (!this.active || !this.sortValue) return null;
+		return (
+			this.options.find((option) => option.value === this.sortValue)?.label ??
+			null
+		);
+	}
+
 	get options() {
 		const setOptions = (options: { value: string; label: string }[]) => {
 			if (this.sortValue === null) this.sortValue = this.defaultValue;
@@ -587,6 +676,18 @@ class RadioSort {
 					{ value: "all", label: "All" },
 					{ value: "with", label: "With" },
 					{ value: "without", label: "Without" },
+				]);
+			case "date":
+				return setOptions([
+					{ value: "none", label: "None" },
+					{ value: "asc", label: "Oldest → Newest" },
+					{ value: "desc", label: "Newest → Oldest" },
+				]);
+			case "time":
+				return setOptions([
+					{ value: "none", label: "None" },
+					{ value: "asc", label: "Earliest → Latest" },
+					{ value: "desc", label: "Latest → Earliest" },
 				]);
 			case "numeric":
 				return setOptions([
@@ -612,6 +713,9 @@ class RadioSort {
 					label: option.label,
 					kind: this.orchestrator.kind,
 					checked: this.sortValue === option.value,
+					styles: {
+						label: STYLES.table.filters.option,
+					},
 				}),
 			);
 		}
@@ -721,7 +825,11 @@ class RadioSort {
 			hiddenRows.add(row);
 		});
 
-		if (this.ordering === "numeric") {
+		if (
+			this.ordering === "numeric" ||
+			this.ordering === "date" ||
+			this.ordering === "time"
+		) {
 			visible.sort((a, b) => {
 				const aVal = rowValues.get(a);
 				const bVal = rowValues.get(b);
@@ -784,6 +892,18 @@ class CheckboxSort {
 
 	get state() {
 		return this.active ? { values: this.sortValues } : null;
+	}
+
+	get summary(): string | null {
+		if (!this.active || !this.sortValues.length) return null;
+		if (
+			this.sortValues.length === 1 &&
+			this.options !== null &&
+			this.options !== OPTIONS
+		) {
+			return this.options[this.sortValues[0]] ?? "1 selected";
+		}
+		return `${this.sortValues.length} selected`;
 	}
 
 	get disabled() {

@@ -254,7 +254,7 @@ class Created(DateMixin, ColumnMixin, FilterMixin, DBProperty[datetime]):
         self._write_db_value(datetime.now(UTC))
 
     # Column Attributes
-    _ordering = Ordering.NUMERIC
+    _ordering = Ordering.DATE
     _selected = False
     _editable = False
 
@@ -280,7 +280,7 @@ class Modified(DateMixin, ColumnMixin, FilterMixin, DBProperty[datetime]):
         self._write_db_value(datetime.now(UTC))
 
     # Column Attributes
-    _ordering = Ordering.NUMERIC
+    _ordering = Ordering.DATE
     _selected = False
     _editable = False
 

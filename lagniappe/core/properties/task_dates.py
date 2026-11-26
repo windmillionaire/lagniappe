@@ -109,7 +109,7 @@ class CompletedOn(DateMixin, AIMixin, ColumnMixin, DBProperty[datetime, TaskReco
     _icon = "completed"
 
     # Column Attributes
-    _ordering = Ordering.NUMERIC
+    _ordering = Ordering.DATE
     _editable = False
 
     @property
@@ -145,7 +145,7 @@ class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty[datetime,
     _icon = "dueDate"
 
     # Column Attributes
-    _ordering = Ordering.NUMERIC
+    _ordering = Ordering.DATE
     _editable = True
 
     @property

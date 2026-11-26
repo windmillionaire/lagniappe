@@ -329,6 +329,32 @@ tbody[aria-busy="true"] > tr[lp-entity] {
 	transition: opacity 120ms ease;
 }
 
+/* @style index.mobile.controls */
+#mobile-controls > [data-column] ~ [data-column] {
+	border-top: 1px solid
+		color-mix(in oklch, var(--color-base-light) 35%, transparent);
+}
+
+/* @style table.filters.option table.filters.bar */
+.table-sort-option {
+	&:hover {
+		border-color: var(--kind-light);
+		background-color: color-mix(in oklch, var(--kind-bg) 55%, white);
+	}
+	&:has(> input:checked) {
+		border-color: var(--kind-default);
+		background-color: color-mix(in oklch, var(--kind-bg) 75%, white);
+		color: var(--kind-dark);
+		font-weight: 600;
+	}
+}
+
+/* @style table.filters.option table.filters.bar */
+tr[data-widget="TableSorting"] .table-sort-option:has(> input:checked) {
+	background-color: white;
+	box-shadow: var(--shadow-xs);
+}
+
 /* @style table.default table.card */
 @media (min-width: 640px) {
 	table#table:not([data-embedded]) {

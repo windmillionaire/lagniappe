@@ -8,6 +8,8 @@ class Ordering(Enum):
 
     LEXICAL = "lexical"
     NUMERIC = "numeric"
+    DATE = "date"
+    TIME = "time"
     CATEGORICAL = "categorical"
     EXISTS = "exists"
     BOOLEAN = "boolean"

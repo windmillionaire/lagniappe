@@ -876,13 +876,25 @@ index:
       css: [src/style/icons.css]
   mobile:
     controls:
-      classes: rounded-md bg-kind-bg p-4 text-base flex flex-col gap-2 font-semibold mt-4
+      classes: rounded-md border border-kind-light/40 bg-kind-bg p-3 text-base flex flex-col font-semibold mt-4
       intent: controls presentation within index mobile
       surfaces: [server]
-      css: [src/style/buttons.css]
+      css: [src/style/buttons.css, src/style/tables.css]
+    header:
+      classes: flex flex-row items-center justify-between gap-3 border-b border-base-light/40 pb-2 mb-0.5 text-xs font-semibold uppercase tracking-wide text-base-medium
+      intent: column header labels for the mobile sort and visibility controls drawer
+      surfaces: [server]
     row:
-      classes: flex flex-row items-center justify-between gap-4 group/form
+      classes: flex flex-row items-center justify-between gap-3 py-1.5 group/form
       intent: row presentation within index mobile
+      surfaces: [server]
+    status:
+      classes: inline-flex items-center rounded-full border border-kind-light/70 bg-white/90 px-2 py-0.5 text-xs font-medium text-kind-dark
+      intent: active sort or filter summary badge beside a column title in mobile table controls
+      surfaces: [server]
+    unchecked:
+      classes: text-base-medium invisible group-data-[active=false]/toggle:visible
+      intent: neutral unchecked visibility icon inside mobile table controls
       surfaces: [server]
   tools:
     dropdown:
@@ -1536,9 +1548,28 @@ table:
         surfaces: [server]
   filters:
     title:
-      classes: font-semibold align-middle
+      classes: font-semibold align-middle group-data-[sorting=true]/header:text-kind-dark
       intent: title presentation within table filters
       surfaces: [server]
+    bar:
+      classes: p-3 border-t border-base-light/50 bg-kind-bg
+      intent: desktop table sort and filter control drawer cell
+      surfaces: [frontend]
+      css: [src/style/tables.css]
+    barLabel:
+      classes: text-xs font-semibold uppercase tracking-wide text-base-medium
+      intent: column name label prefix inside the desktop table sort and filter bar
+      surfaces: [frontend]
+    panel:
+      classes: mt-0.5 mb-2 flex flex-col gap-2 rounded-md border border-kind-light/45 bg-white/90 p-2.5 shadow-xs
+      intent: mobile table sort and filter panel tucked beneath its column row
+      surfaces: [frontend]
+    option:
+      classes: table-sort-option inline-flex cursor-pointer items-center gap-2 rounded-md border border-base-light/60 bg-white px-3 py-1.5 text-sm font-medium text-base-dark transition-colors
+      intent: radio pill option shared across desktop and mobile table sort panels
+      surfaces: [frontend]
+      hooks: [table-sort-option]
+      css: [src/style/tables.css]
     icon:
       container:
         classes: ml-1.5 inline-grid align-middle text-slate-400
