@@ -478,7 +478,7 @@ STYLES = {
 		"complete": "order-first mt-0.5 grid size-5 shrink-0 place-items-center self-start",
 		"description": "task-description text-sm whitespace-pre-wrap [overflow-wrap:anywhere] italic px-3 py-2 ring ring-inset font-semibold min-w-0 w-fit max-w-full rounded-md text-base-default ring-task-default/20 bg-base-bg",
 		"quickAdd": {
-			"form": "flex flex-row items-center gap-2 border-b border-base-light/50 bg-task-bg/40 px-4 py-3 sm:px-6",
+			"form": "mx-4 mb-3 flex flex-row items-center gap-2 rounded-md border border-task-light/50 bg-task-bg/50 px-3 py-2 sm:mx-6",
 			"icon": "text-task-default inline-flex shrink-0 items-center justify-center",
 			"input": "min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base text-base-dark placeholder:text-base-medium focus:border-task-light focus:bg-white focus:outline-none focus:ring-2 focus:ring-task-default/15",
 			"submit": "shrink-0 rounded-md bg-task-default px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-task-dark disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-task-default"
@@ -487,8 +487,7 @@ STYLES = {
 			"editable": "lp-badge task-chip-editable ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-white py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
 			"form": "lp-badge task-chip-form ring-form-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-form-bg/70 py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-form-default ring ring-inset transition-colors hover:bg-form-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-form-default",
 			"add": "task-chip-add inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-kind-light bg-base-bg/60 py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default opacity-75 transition-all hover:border-solid hover:bg-kind-bg hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
-			"drawer": "px-4 pb-4 flex flex-col gap-3 sm:px-6",
-			"inlineRow": "flex flex-row items-center gap-1.5"
+			"drawer": "mx-4 mb-4 pt-3.5 border-t border-base-light/50 flex flex-col gap-3 sm:mx-6"
 		},
 		"rename": {
 			"form": "flex min-w-0 flex-1 flex-row items-center gap-1.5",
@@ -529,7 +528,8 @@ STYLES = {
 		"context": "pt-4 border-t flex flex-col gap-2 outline-base-light bg-white",
 		"contextRow": "flex flex-col sm:flex-row gap-3",
 		"header": "text-lg font-bold pt-2 pb-1 text-kind-default",
-		"dropzone": "relative flex h-24 w-full flex-col content-center justify-center rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic",
+		"dropzone": "relative flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic",
+		"chip": "not-italic inline-flex cursor-pointer items-center gap-1 rounded-md border border-base-light/60 bg-white/90 px-2.5 py-1 text-xs font-semibold text-base-default shadow-xs backdrop-blur-xs transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
 		"image": {
 			"container": "relative aspect-square rounded-lg p-4 outline-2 outline-base-light outline-dashed",
 			"text": "absolute top-0 right-0 w-full h-full flex flex-col items-center justify-center",

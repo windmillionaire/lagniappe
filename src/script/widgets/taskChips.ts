@@ -1,10 +1,10 @@
 import type { ComboboxOption } from "../elements/combobox/combobox.ts";
-import { FacetsBox, isFacetOption } from "../elements/combobox/facets.ts";
+import { isFacetOption } from "../elements/combobox/facets.ts";
 import { DueDate } from "../elements/dueDate.ts";
-import { formatting } from "../elements/formatting.ts";
+import { SectionToggle } from "../elements/sectionToggle.ts";
 import { type TaskAsset, TaskUpload } from "../elements/taskUpload.ts";
 import { STYLES } from "../generated/styles.mjs";
-import { createIcon, setIcon } from "../shared/icons.ts";
+import { setIcon } from "../shared/icons.ts";
 import { request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
 import type { RequestResult } from "../types/api";
@@ -324,17 +324,18 @@ export class TaskChipController {
 		const config = {
 			project: {
 				title: "Project Tracking",
+				buttonTitle: "Link a project...",
 				index: "project",
 				kind: "project",
 				name: "project",
 				placeholder: "link a project...",
 				creatable: true,
 				preloadRaw: chips.dataset.projectPreload,
-				clearLabel: "Clear",
 			},
 			form: {
 				title:
 					taskRow.dataset.hasForm === "true" ? "Change Form" : "Attach Form",
+				buttonTitle: "Attach a form...",
 				index: "form",
 				kind: "form",
 				name: "form",
@@ -342,10 +343,10 @@ export class TaskChipController {
 				creatable: true,
 				formType: "task",
 				preloadRaw: chips.dataset.formPreload,
-				clearLabel: "Detach",
 			},
 			assigned_to: {
 				title: "Assigned To",
+				buttonTitle: "Assign to...",
 				index: "user",
 				kind: "user",
 				name: "assigned_to",
@@ -353,102 +354,63 @@ export class TaskChipController {
 				creatable: false,
 				permission: "assign",
 				preloadRaw: chips.dataset.assigneePreload,
-				clearLabel: "Clear",
 			},
 		}[field];
 
-		const existingOption = parseOption(config.preloadRaw);
-		const openLink = existingOption?.id
-			? {
-					href: formatting
-						.url({
-							kind: existingOption.kind || config.kind,
-							index: config.index,
-							...existingOption,
-						})
-						.toString(),
-					label: existingOption.name
-						? `Open ${existingOption.name}`
-						: `Open ${config.title}`,
-				}
-			: null;
-
 		const errorEl = this._drawerErrorElement();
 
-		const row = document.createElement("div");
-		row.className = STYLES.task.chip.inlineRow;
+		const container = document.createElement("div");
+		container.dataset.role = `${field}-chip-select`;
+		container.dataset.kind = config.kind;
 
-		const wrapper = document.createElement("div");
-		wrapper.className = "min-w-0 flex-1";
-		wrapper.setAttribute("lp-select", "");
-		wrapper.dataset.kind = config.kind;
-		wrapper.dataset.role = `${field}-chip-select`;
+		const button = document.createElement("button");
+		button.type = "button";
+		button.setAttribute("lp-select", "");
+		button.className = STYLES.select.button;
+		button.dataset.index = config.index;
+		button.dataset.kind = config.kind;
+		button.dataset.name = config.name;
+		button.dataset.title = config.buttonTitle;
+		button.dataset.placeholder = config.placeholder;
 		if (config.preloadRaw) {
-			wrapper.dataset.preload = config.preloadRaw;
+			button.dataset.preload = config.preloadRaw;
 		}
-
-		const input = document.createElement("input");
-		input.className = STYLES.select.default;
-		input.dataset.index = config.index;
-		input.dataset.kind = config.kind;
-		input.dataset.placeholder = config.placeholder;
-		input.name = config.name;
-		if (config.creatable) input.dataset.creatable = "true";
+		if (config.creatable) button.dataset.creatable = "true";
 		if ("formType" in config && config.formType) {
-			input.dataset.formType = config.formType;
+			button.dataset.formType = config.formType;
 		}
 		if ("permission" in config && config.permission) {
-			input.dataset.permission = config.permission;
+			button.dataset.permission = config.permission;
 		}
-		wrapper.appendChild(input);
-		row.appendChild(wrapper);
+		container.appendChild(button);
 
-		if (openLink) {
-			const link = document.createElement("a");
-			link.href = openLink.href;
-			link.dataset.role = "open-link";
-			link.dataset.kind = existingOption?.kind || config.kind;
-			link.className = STYLES.toggle.container;
-			link.setAttribute("aria-label", openLink.label);
-			link.title = openLink.label;
-			link.appendChild(createIcon("out"));
-			row.appendChild(link);
-		}
+		drawer.replaceChildren(errorEl, container);
 
-		if (existingOption) {
-			const clearBtn = document.createElement("button");
-			clearBtn.type = "button";
-			clearBtn.dataset.role = "clear";
-			clearBtn.dataset.kind = "delete";
-			clearBtn.className = STYLES.toggle.container;
-			const clearText = `${config.clearLabel} ${config.title.toLowerCase()}`;
-			clearBtn.setAttribute("aria-label", clearText);
-			clearBtn.title = config.clearLabel;
-			clearBtn.appendChild(createIcon("clear"));
-			clearBtn.addEventListener("click", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				const data = new FormData();
-				data.append("active", "TaskChip");
-				data.append("chip_field", field);
-				if (field === "project") {
-					data.append("project", "");
-					data.append("model", "");
-				} else {
-					data.append(config.name, "");
-				}
-				void this._saveChip(taskRow, drawer, data, {
-					chipField: field,
-					formChanged: field === "form",
-				});
+		const facet = SectionToggle.facet({ readonly: false }, button);
+		facet.init();
+
+		const baseClear = facet.clear.bind(facet);
+		facet.clear = () => {
+			if (facet.open) {
+				facet.open = false;
+				facet._reconcile();
+				return;
+			}
+			baseClear();
+			const data = new FormData();
+			data.append("active", "TaskChip");
+			data.append("chip_field", field);
+			if (field === "project") {
+				data.append("project", "");
+				data.append("model", "");
+			} else {
+				data.append(config.name, "");
+			}
+			void this._saveChip(taskRow, drawer, data, {
+				chipField: field,
+				formChanged: field === "form",
 			});
-			row.appendChild(clearBtn);
-		}
-
-		drawer.replaceChildren(errorEl, row);
-
-		const box = new FacetsBox(wrapper);
-		box.init();
+		};
 
 		const onUpdated = (e: Event) => {
 			const detail =
@@ -486,13 +448,11 @@ export class TaskChipController {
 			});
 		};
 
-		box.element.addEventListener("updated", onUpdated);
-		box.element.focus({ preventScroll: true });
-		box.showPanel();
+		facet.select?.element.addEventListener("updated", onUpdated);
 
 		return () => {
-			box.element.removeEventListener("updated", onUpdated);
-			box.destroy();
+			facet.select?.element.removeEventListener("updated", onUpdated);
+			facet.destroy();
 		};
 	}
 

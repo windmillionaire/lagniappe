@@ -23,6 +23,22 @@ const MONTHS = [
 	"November",
 	"December",
 ] as const;
+const SHORT_MONTHS = [
+	"Jan",
+	"Feb",
+	"Mar",
+	"Apr",
+	"May",
+	"Jun",
+	"Jul",
+	"Aug",
+	"Sep",
+	"Oct",
+	"Nov",
+	"Dec",
+] as const;
+
+type PickerMode = "days" | "months" | "years";
 
 let activePicker: DatePicker | null = null;
 const pickers = new WeakMap<HTMLInputElement, DatePicker>();
@@ -136,6 +152,7 @@ export class DatePicker {
 	declare cleanupPosition: (() => void) | null;
 	declare viewYear: number;
 	declare viewMonth: number;
+	declare mode: PickerMode;
 	declare _onTriggerClick: (e: MouseEvent) => void;
 	declare _onDocPointerDown: (e: Event) => void;
 	declare _onDocKeydown: (e: KeyboardEvent) => void;
@@ -153,6 +170,7 @@ export class DatePicker {
 		const now = new Date();
 		this.viewYear = now.getFullYear();
 		this.viewMonth = now.getMonth();
+		this.mode = "days";
 
 		this._onTriggerClick = this._handleTriggerClick.bind(this);
 		this._onDocPointerDown = this._handleDocPointerDown.bind(this);
@@ -207,6 +225,7 @@ export class DatePicker {
 		const now = new Date();
 		this.viewYear = parsed ? parsed.year : now.getFullYear();
 		this.viewMonth = parsed ? parsed.month : now.getMonth();
+		this.mode = "days";
 
 		const popover = document.createElement("div");
 		popover.className = STYLES.datePicker.popover;
@@ -297,6 +316,18 @@ export class DatePicker {
 			?.focus({ preventScroll: true });
 	}
 
+	_stepHeader(delta: number) {
+		if (this.mode === "days") {
+			this._shiftMonth(delta);
+		} else if (this.mode === "months") {
+			this.viewYear += delta;
+			this._renderPopover();
+		} else {
+			this.viewYear += delta * 12;
+			this._renderPopover();
+		}
+	}
+
 	_renderPopover() {
 		const popover = this.popover;
 		if (!popover) return;
@@ -307,125 +338,188 @@ export class DatePicker {
 		const header = document.createElement("div");
 		header.className = "lp-dp-header";
 
+		const prevLabel =
+			this.mode === "days"
+				? "Previous month"
+				: this.mode === "months"
+					? "Previous year"
+					: "Previous 12 years";
 		const prevBtn = document.createElement("button");
 		prevBtn.type = "button";
 		prevBtn.className = "lp-dp-nav";
-		prevBtn.setAttribute("aria-label", "Previous month");
-		prevBtn.title = "Previous month";
+		prevBtn.setAttribute("aria-label", prevLabel);
+		prevBtn.title = prevLabel;
 		setIcon(prevBtn.appendChild(document.createElement("span")), "left");
 		prevBtn.addEventListener("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			this._shiftMonth(-1);
+			this._stepHeader(-1);
 		});
 
-		const pickers = document.createElement("div");
-		pickers.className = "lp-dp-selects";
+		const titleGroup = document.createElement("div");
+		titleGroup.className = "lp-dp-title-group";
 
-		const monthSelect = document.createElement("select");
-		monthSelect.className = "lp-dp-select";
-		monthSelect.setAttribute("aria-label", "Month");
-		MONTHS.forEach((name, index) => {
-			const opt = document.createElement("option");
-			opt.value = String(index);
-			opt.textContent = name;
-			opt.selected = index === this.viewMonth;
-			monthSelect.appendChild(opt);
-		});
-		monthSelect.addEventListener("change", () => {
-			this.viewMonth = Number(monthSelect.value);
+		const monthBtn = document.createElement("button");
+		monthBtn.type = "button";
+		monthBtn.className = "lp-dp-title-btn";
+		monthBtn.dataset.role = "dp-month-btn";
+		monthBtn.setAttribute("aria-expanded", String(this.mode === "months"));
+		monthBtn.setAttribute("aria-label", "Choose month");
+		monthBtn.append(
+			document.createTextNode(MONTHS[this.viewMonth]),
+			setIcon(document.createElement("span"), "down", "icon-xs"),
+		);
+		monthBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.mode = this.mode === "months" ? "days" : "months";
 			this._renderPopover();
 		});
 
-		const yearSelect = document.createElement("select");
-		yearSelect.className = "lp-dp-select";
-		yearSelect.setAttribute("aria-label", "Year");
-		const currentYear = new Date().getFullYear();
-		const minYear = Math.min(currentYear - 100, this.viewYear - 5);
-		const maxYear = Math.max(currentYear + 25, this.viewYear + 5);
-		for (let y = minYear; y <= maxYear; y += 1) {
-			const opt = document.createElement("option");
-			opt.value = String(y);
-			opt.textContent = String(y);
-			opt.selected = y === this.viewYear;
-			yearSelect.appendChild(opt);
-		}
-		yearSelect.addEventListener("change", () => {
-			this.viewYear = Number(yearSelect.value);
+		const yearBtn = document.createElement("button");
+		yearBtn.type = "button";
+		yearBtn.className = "lp-dp-title-btn";
+		yearBtn.dataset.role = "dp-year-btn";
+		yearBtn.setAttribute("aria-expanded", String(this.mode === "years"));
+		yearBtn.setAttribute("aria-label", "Choose year");
+		yearBtn.append(
+			document.createTextNode(String(this.viewYear)),
+			setIcon(document.createElement("span"), "down", "icon-xs"),
+		);
+		yearBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.mode = this.mode === "years" ? "days" : "years";
 			this._renderPopover();
 		});
 
-		pickers.append(monthSelect, yearSelect);
+		titleGroup.append(monthBtn, yearBtn);
 
+		const nextLabel =
+			this.mode === "days"
+				? "Next month"
+				: this.mode === "months"
+					? "Next year"
+					: "Next 12 years";
 		const nextBtn = document.createElement("button");
 		nextBtn.type = "button";
 		nextBtn.className = "lp-dp-nav";
-		nextBtn.setAttribute("aria-label", "Next month");
-		nextBtn.title = "Next month";
+		nextBtn.setAttribute("aria-label", nextLabel);
+		nextBtn.title = nextLabel;
 		setIcon(nextBtn.appendChild(document.createElement("span")), "right");
 		nextBtn.addEventListener("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			this._shiftMonth(1);
+			this._stepHeader(1);
 		});
 
-		header.append(prevBtn, pickers, nextBtn);
+		header.append(prevBtn, titleGroup, nextBtn);
 
-		const weekdays = document.createElement("div");
-		weekdays.className = "lp-dp-weekdays";
-		weekdays.setAttribute("aria-hidden", "true");
-		for (const day of WEEKDAYS) {
-			const span = document.createElement("span");
-			span.textContent = day;
-			weekdays.appendChild(span);
-		}
+		const bodyNodes: HTMLElement[] = [];
 
-		const grid = document.createElement("div");
-		grid.className = "lp-dp-grid";
-		grid.setAttribute("role", "grid");
-
-		for (const cell of buildCalendarMonth(this.viewYear, this.viewMonth)) {
-			const btn = document.createElement("button");
-			btn.type = "button";
-			btn.className = "lp-dp-day";
-			btn.dataset.date = cell.iso;
-			if (cell.outside) btn.dataset.outside = "true";
-			if (cell.iso === today) btn.dataset.today = "true";
-			btn.setAttribute(
-				"aria-pressed",
-				cell.iso === selectedIso ? "true" : "false",
-			);
-			btn.textContent = String(cell.day);
-			btn.addEventListener("click", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				this._selectIso(cell.iso);
+		if (this.mode === "months") {
+			const monthGrid = document.createElement("div");
+			monthGrid.className = "lp-dp-picker-grid";
+			monthGrid.dataset.role = "dp-month-grid";
+			SHORT_MONTHS.forEach((shortName, index) => {
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "lp-dp-picker-btn";
+				btn.dataset.month = String(index);
+				btn.textContent = shortName;
+				btn.setAttribute("aria-label", MONTHS[index]);
+				btn.setAttribute("aria-pressed", String(index === this.viewMonth));
+				btn.addEventListener("click", (e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					this.viewMonth = index;
+					this.mode = "days";
+					this._renderPopover();
+				});
+				monthGrid.appendChild(btn);
 			});
-			btn.addEventListener("keydown", (e) => {
-				const parsed = parseIsoDate(cell.iso);
-				if (!parsed) return;
-				let next: Date | null = null;
-				if (e.key === "ArrowLeft") {
-					next = new Date(parsed.year, parsed.month, parsed.day - 1);
-				} else if (e.key === "ArrowRight") {
-					next = new Date(parsed.year, parsed.month, parsed.day + 1);
-				} else if (e.key === "ArrowUp") {
-					next = new Date(parsed.year, parsed.month, parsed.day - 7);
-				} else if (e.key === "ArrowDown") {
-					next = new Date(parsed.year, parsed.month, parsed.day + 7);
-				} else if (e.key === "PageUp") {
-					next = new Date(parsed.year, parsed.month - 1, parsed.day);
-				} else if (e.key === "PageDown") {
-					next = new Date(parsed.year, parsed.month + 1, parsed.day);
-				}
-				if (!next) return;
-				e.preventDefault();
-				e.stopPropagation();
-				this._focusDate(
-					formatIsoDate(next.getFullYear(), next.getMonth(), next.getDate()),
+			bodyNodes.push(monthGrid);
+		} else if (this.mode === "years") {
+			const yearGrid = document.createElement("div");
+			yearGrid.className = "lp-dp-picker-grid";
+			yearGrid.dataset.role = "dp-year-grid";
+			const startYear = Math.floor(this.viewYear / 12) * 12;
+			for (let y = startYear; y < startYear + 12; y += 1) {
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "lp-dp-picker-btn";
+				btn.dataset.year = String(y);
+				btn.textContent = String(y);
+				btn.setAttribute("aria-pressed", String(y === this.viewYear));
+				btn.addEventListener("click", (e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					this.viewYear = y;
+					this.mode = "days";
+					this._renderPopover();
+				});
+				yearGrid.appendChild(btn);
+			}
+			bodyNodes.push(yearGrid);
+		} else {
+			const weekdays = document.createElement("div");
+			weekdays.className = "lp-dp-weekdays";
+			weekdays.setAttribute("aria-hidden", "true");
+			for (const day of WEEKDAYS) {
+				const span = document.createElement("span");
+				span.textContent = day;
+				weekdays.appendChild(span);
+			}
+
+			const grid = document.createElement("div");
+			grid.className = "lp-dp-grid";
+			grid.setAttribute("role", "grid");
+
+			for (const cell of buildCalendarMonth(this.viewYear, this.viewMonth)) {
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "lp-dp-day";
+				btn.dataset.date = cell.iso;
+				if (cell.outside) btn.dataset.outside = "true";
+				if (cell.iso === today) btn.dataset.today = "true";
+				btn.setAttribute(
+					"aria-pressed",
+					cell.iso === selectedIso ? "true" : "false",
 				);
-			});
-			grid.appendChild(btn);
+				btn.textContent = String(cell.day);
+				btn.addEventListener("click", (e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					this._selectIso(cell.iso);
+				});
+				btn.addEventListener("keydown", (e) => {
+					const parsed = parseIsoDate(cell.iso);
+					if (!parsed) return;
+					let next: Date | null = null;
+					if (e.key === "ArrowLeft") {
+						next = new Date(parsed.year, parsed.month, parsed.day - 1);
+					} else if (e.key === "ArrowRight") {
+						next = new Date(parsed.year, parsed.month, parsed.day + 1);
+					} else if (e.key === "ArrowUp") {
+						next = new Date(parsed.year, parsed.month, parsed.day - 7);
+					} else if (e.key === "ArrowDown") {
+						next = new Date(parsed.year, parsed.month, parsed.day + 7);
+					} else if (e.key === "PageUp") {
+						next = new Date(parsed.year, parsed.month - 1, parsed.day);
+					} else if (e.key === "PageDown") {
+						next = new Date(parsed.year, parsed.month + 1, parsed.day);
+					}
+					if (!next) return;
+					e.preventDefault();
+					e.stopPropagation();
+					this._focusDate(
+						formatIsoDate(next.getFullYear(), next.getMonth(), next.getDate()),
+					);
+				});
+				grid.appendChild(btn);
+			}
+
+			bodyNodes.push(weekdays, grid);
 		}
 
 		const footer = document.createElement("div");
@@ -457,7 +551,7 @@ export class DatePicker {
 			footer.appendChild(clearBtn);
 		}
 
-		popover.replaceChildren(header, weekdays, grid, footer);
+		popover.replaceChildren(header, ...bodyNodes, footer);
 	}
 }
 

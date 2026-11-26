@@ -190,11 +190,12 @@ test("test_task_chips_tray_toggle_and_apply_update_preserves_open_form", async (
 		"../../src/script/widgets/taskChips.ts",
 		{
 			"../../src/script/elements/combobox/facets.ts": {
-				FacetsBox: class {},
 				isFacetOption: () => false,
 			},
 			"../../src/script/elements/dueDate.ts": { DueDate: class {} },
-			"../../src/script/elements/formatting.ts": { formatting: {} },
+			"../../src/script/elements/sectionToggle.ts": {
+				SectionToggle: { facet: () => ({ init() {}, destroy() {} }) },
+			},
 			"../../src/script/elements/taskUpload.ts": { TaskUpload: class {} },
 			"../../src/script/shared/index.ts": { request: {} },
 			"../../src/script/shared/transitions.ts": {
@@ -336,12 +337,32 @@ test("test_date_picker_popover_calendar_and_selection", async (t) => {
 	const popover = document.querySelector("[data-role='date-picker-popover']");
 	assert.ok(popover, "Clicking trigger opens the calendar popover");
 	assert.equal(trigger.getAttribute("aria-expanded"), "true");
+	assert.equal(
+		popover.querySelectorAll("select").length,
+		0,
+		"DatePicker uses custom month/year grids instead of native select elements",
+	);
 
-	const dayBtn = popover.querySelector("button[data-date='2026-02-18']");
+	// Switch to custom month grid and pick March, then year grid and pick 2027.
+	popover.querySelector("[data-role='dp-month-btn']").click();
+	const marchBtn = popover.querySelector(
+		"[data-role='dp-month-grid'] button[data-month='2']",
+	);
+	assert.ok(marchBtn);
+	marchBtn.click();
+	assert.ok(popover.querySelector("button[data-date='2026-03-15']"));
+
+	popover.querySelector("[data-role='dp-year-btn']").click();
+	const y2027 = popover.querySelector(
+		"[data-role='dp-year-grid'] button[data-year='2027']",
+	);
+	assert.ok(y2027);
+	y2027.click();
+	const dayBtn = popover.querySelector("button[data-date='2027-03-18']");
 	assert.ok(dayBtn);
 	dayBtn.click();
 
-	assert.equal(input.value, "2026-02-18");
+	assert.equal(input.value, "2027-03-18");
 	assert.equal(inputEvents, 1);
 	assert.equal(changeEvents, 1);
 	assert.equal(

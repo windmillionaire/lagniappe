@@ -277,7 +277,7 @@ li[data-open="TaskForm"] .task-chip-form {
 }
 
 /* @style list.container */
-li[lp-component][data-open="false"]:not([data-chip-open="true"]) {
+li[lp-component][data-open="false"]:not([data-kind="task"]) {
 	@media (min-width: 640px) {
 		[lp-nav][data-toggle="true"]:hover {
 			background-color: var(--kind-bg);

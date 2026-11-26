@@ -356,6 +356,10 @@ class Task(SiteResource):
             else self.open_chip(field)
         )
         combobox = drawer.locator("input[role='combobox']")
+        if not combobox.is_visible():
+            toggle_btn = drawer.locator("button[lp-select]")
+            expect(toggle_btn).to_be_visible()
+            toggle_btn.click()
         expect(combobox).to_be_visible()
         option_id = (
             resource.entity.page.urlsafe_key

@@ -356,28 +356,77 @@ button[lp-select]:disabled {
 }
 
 /* @style datePicker.popover */
-.lp-dp-popover .lp-dp-selects {
+.lp-dp-popover .lp-dp-title-group {
 	display: flex;
 	align-items: center;
 	gap: 0.25rem;
 }
 
 /* @style datePicker.popover */
-.lp-dp-popover .lp-dp-select {
+.lp-dp-popover .lp-dp-title-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.125rem;
 	border: 0;
 	border-radius: 0.375rem;
 	background: transparent;
-	padding: 0.125rem 0.25rem;
+	padding: 0.1875rem 0.4375rem;
 	font-size: 0.875rem;
 	font-weight: 600;
 	color: var(--color-base-dark);
 	cursor: pointer;
+	transition:
+		background-color 100ms ease,
+		color 100ms ease;
 	&:hover {
 		background-color: var(--color-base-bg);
+		color: var(--kind-dark);
+	}
+	&[aria-expanded="true"] {
+		background-color: var(--kind-bg);
+		color: var(--kind-dark);
 	}
 	&:focus-visible {
 		outline: 2px solid var(--kind-default);
 		outline-offset: 1px;
+	}
+}
+
+/* @style datePicker.popover */
+.lp-dp-popover .lp-dp-picker-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.25rem;
+	padding-block: 0.25rem;
+}
+
+/* @style datePicker.popover */
+.lp-dp-popover .lp-dp-picker-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 2.125rem;
+	border: 0;
+	border-radius: 0.375rem;
+	background: transparent;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	color: var(--color-base-dark);
+	cursor: pointer;
+	transition:
+		background-color 100ms ease,
+		color 100ms ease;
+	&:hover {
+		background-color: var(--kind-bg);
+		color: var(--kind-dark);
+	}
+	&:focus-visible {
+		outline: 2px solid var(--kind-default);
+		outline-offset: -1px;
+	}
+	&[aria-pressed="true"] {
+		background-color: var(--kind-default);
+		color: white;
 	}
 }
 
@@ -556,9 +605,6 @@ button[lp-select]:disabled {
 /* @style task.schedule.root */
 .lp-schedule .lp-schedule-date-field {
 	width: 100%;
-	@media (min-width: 640px) {
-		max-width: 13rem;
-	}
 }
 
 /* @style task.schedule.root */

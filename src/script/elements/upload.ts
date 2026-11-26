@@ -1,7 +1,6 @@
 import { STYLES } from "../generated/styles.mjs";
 import { createIcon } from "../shared/icons.ts";
 import { buttons } from "./buttons.ts";
-import { Dropdown, type DropdownItem } from "./combobox/dropdown.ts";
 import { primitives } from "./primitives.ts";
 
 const DEFAULT_DROPZONE_TEXT =
@@ -256,19 +255,13 @@ const processing = ({ aiCreate = true }: ProcessingSettings = {}) => {
 	};
 };
 
-const menuButton = () => {
-	const menuButtonContainer = document.createElement("div");
-	menuButtonContainer.dataset.role = "upload-menu";
-	menuButtonContainer.className = "absolute top-2 right-2";
-	const menuButton = menuButtonContainer.appendChild(
-		document.createElement("button"),
-	);
-	menuButton.className =
-		"size-7 flex items-center justify-center rounded-md opacity-30 bg-base-default text-white";
-	menuButton.type = "button";
-	menuButton.replaceChildren(createIcon("dropdown"));
-
-	return menuButtonContainer;
+const menuButton = (overlay = false) => {
+	const menuContainer = document.createElement("div");
+	menuContainer.dataset.role = "upload-menu";
+	menuContainer.className = overlay
+		? "absolute top-2 right-2 z-10 not-italic flex flex-wrap items-center justify-end gap-1.5 empty:hidden"
+		: "not-italic flex flex-wrap items-center justify-center gap-1.5 empty:hidden";
+	return menuContainer;
 };
 
 const contextDescription = (settings: ContextDescriptionSettings = {}) => {
@@ -336,7 +329,7 @@ const dropzone = (options: DropzoneOptions) => {
 
 	let menu = dropzone.querySelector<HTMLElement>("[data-role='upload-menu']");
 	if (!menu) {
-		menu = menuButton();
+		menu = menuButton(Boolean(element));
 		dropzone.appendChild(menu);
 	}
 
@@ -366,14 +359,20 @@ const dropzone = (options: DropzoneOptions) => {
 	};
 };
 
+interface UploadActionItem {
+	option: string;
+	name: string;
+	icon: string;
+	kind: string;
+	onClick: () => unknown;
+}
+
 export class UploadMenu {
 	declare instance: UploadMenuHost;
-	declare dropdown: Dropdown | null;
-	declare itemBuilders: Partial<Record<string, () => DropdownItem | null>>;
+	declare itemBuilders: Partial<Record<string, () => UploadActionItem | null>>;
 
 	constructor(instance: UploadMenuHost) {
 		this.instance = instance;
-		this.dropdown = null;
 		this.itemBuilders = {
 			remove: () => this._buildRemove(),
 			replace: () => this._buildReplace(),
@@ -396,39 +395,38 @@ export class UploadMenu {
 				const build = this.itemBuilders[option];
 				return typeof build === "function" ? build() : null;
 			})
-			.filter((item) => item !== null);
+			.filter((item): item is UploadActionItem => item !== null);
 	}
 
 	create() {
-		const button = this.button;
-		if (!button) return;
+		const container = this.button;
+		if (!container) return;
 
-		const items = this.items;
-		if (this.dropdown && this.dropdown.parent !== button) {
-			this.dropdown.destroy();
-			this.dropdown = null;
-		}
-
-		if (this.dropdown) {
-			this.dropdown.updateOptions(items);
-			return;
-		}
-
-		const toolbarPortalClass = button.closest?.("[data-role='toolbar']")
-			? ` ${STYLES.editor.toolbar.portalIconContext}`
-			: "";
-		this.dropdown = new Dropdown(button).init({
-			items: items,
-			placement: "bottom-end",
-			styles: {
-				panel: `${STYLES.dropdown.panel}${toolbarPortalClass}`,
-			},
+		const chips = this.items.map((item) => {
+			const chip = document.createElement("button");
+			chip.type = "button";
+			chip.className = STYLES.upload.chip;
+			chip.dataset.kind = item.kind;
+			chip.dataset.uploadAction = item.option;
+			chip.append(createIcon(item.icon, "icon-xs text-kind-default"));
+			const label = document.createElement("span");
+			label.textContent = item.name;
+			chip.append(label);
+			chip.addEventListener("click", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				item.onClick();
+			});
+			return chip;
 		});
+
+		container.replaceChildren(...chips);
 	}
 
-	_buildRemove() {
+	_buildRemove(): UploadActionItem | null {
 		if (!this.instance.fileAttached) return null;
 		return {
+			option: "remove",
 			name: "Remove",
 			icon: "delete",
 			kind: "delete",
@@ -436,8 +434,10 @@ export class UploadMenu {
 		};
 	}
 
-	_buildReplace() {
+	_buildReplace(): UploadActionItem | null {
+		if (!this.instance.fileAttached) return null;
 		return {
+			option: "replace",
 			name: "Replace",
 			icon: "replace",
 			kind: "default",
@@ -445,8 +445,9 @@ export class UploadMenu {
 		};
 	}
 
-	_buildGenerate() {
+	_buildGenerate(): UploadActionItem {
 		return {
+			option: "generate",
 			name: "Generate",
 			icon: "generate",
 			kind: this.instance.kind || "default",
@@ -454,8 +455,9 @@ export class UploadMenu {
 		};
 	}
 
-	_buildPaste() {
+	_buildPaste(): UploadActionItem {
 		return {
+			option: "paste",
 			name: "Paste",
 			icon: "paste",
 			kind: "default",
@@ -464,8 +466,7 @@ export class UploadMenu {
 	}
 
 	destroy() {
-		this.dropdown?.destroy();
-		this.dropdown = null;
+		this.button?.replaceChildren();
 	}
 }
 

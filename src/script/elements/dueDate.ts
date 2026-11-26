@@ -943,7 +943,8 @@ export class DueDate {
 			.querySelector("[data-role='date-input-wrap']")
 			?.classList.add("lp-schedule-date-field");
 
-		periodicOptions.appendChild(
+		const descField = primitives.div({ style: "flex flex-col gap-1" });
+		descField.appendChild(
 			primitives.input({
 				name: "periodic-description",
 				type: "text",
@@ -956,7 +957,8 @@ export class DueDate {
 		const hint = document.createElement("p");
 		hint.className = "text-xs text-base-medium";
 		hint.textContent = "Parsed by AI when you save.";
-		periodicOptions.appendChild(hint);
+		descField.appendChild(hint);
+		periodicOptions.appendChild(descField);
 
 		return periodicOptions;
 	}
