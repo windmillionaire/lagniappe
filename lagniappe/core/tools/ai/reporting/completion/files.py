@@ -7,9 +7,6 @@ from contextlib import nullcontext
 from contextvars import copy_context
 from typing import TYPE_CHECKING, Protocol
 
-import httpx
-from google.genai.errors import APIError
-
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
     from lagniappe.core.entities import types as models
@@ -20,6 +17,7 @@ from lagniappe.core.definitions import LARGE_ASSET_BYTES, DeferredJobPhase
 from ...core import ai_model
 from ...debug import ai_debug
 from ...observability import current_execution_control
+from ...provider_policy import PROVIDER_REQUEST_ERRORS
 from ...summarize import (
     PDF_PAGE_LIMIT_SUMMARY_ERROR,
     UNREADABLE_PDF_SUMMARY_ERROR,
@@ -59,7 +57,7 @@ def use_original_report_files(report: ReportInputFiles) -> bool:
         return True
     try:
         tokens = ai_model.count_file_tokens(parts)
-    except (APIError, httpx.HTTPError) as error:
+    except PROVIDER_REQUEST_ERRORS as error:
         ai_debug("report.upload_token_count.unavailable", error_type=type(error).__name__)
         return False
     return tokens is not None and 0 < tokens <= DIRECT_UPLOAD_TOKEN_BUDGET

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "0.13.7",
+  "version": "0.13.10",
   "allowed_redirect_hosts": [
     "github.com",
     "release-assets.githubusercontent.com"
@@ -10,31 +10,31 @@
       "system": "darwin",
       "architecture": "aarch64",
       "libc": "none",
-      "url": "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-aarch64-apple-darwin.tar.gz",
-      "sha256": "81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731",
-      "archive_size": 14347867,
+      "url": "https://github.com/astral-sh/uv/releases/download/0.13.10/uv-aarch64-apple-darwin.tar.gz",
+      "sha256": "e419bf07533bdbf48795fc793601c834dd79db57a8c49ce8e25cfe3a8639958d",
+      "archive_size": 14700626,
       "member": "uv-aarch64-apple-darwin/uv",
-      "member_sha256": "0f333833a6d011710d3edc0e45b55d3d934aef15bb83a25b29848c241ac513b4"
+      "member_sha256": "4ff271e49765b1d8ed72cfbf720401941efccac6b2997ce87bb05ee790312ab3"
     },
     "darwin-x86_64-none": {
       "system": "darwin",
       "architecture": "x86_64",
       "libc": "none",
-      "url": "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-apple-darwin.tar.gz",
-      "sha256": "20c47e4c1f630b8abaff8c291fa9b9aa300fef92c4fbff95adf198b55287cda7",
-      "archive_size": 17026382,
+      "url": "https://github.com/astral-sh/uv/releases/download/0.13.10/uv-x86_64-apple-darwin.tar.gz",
+      "sha256": "153e03197588204c04fc4c81cc4bafbfa4280222a385e4ee36a87aeec0ae63b4",
+      "archive_size": 17489953,
       "member": "uv-x86_64-apple-darwin/uv",
-      "member_sha256": "b345904c70c5bb715cda5a58cb74b6c53158346e806258e270a774fdaa3d7739"
+      "member_sha256": "4ae0c9d36977fe47218549301930c4f7f9cf6706a9a30d75ad23ed496769d589"
     },
     "linux-x86_64-gnu": {
       "system": "linux",
       "architecture": "x86_64",
       "libc": "gnu",
-      "url": "https://github.com/astral-sh/uv/releases/download/0.13.7/uv-x86_64-unknown-linux-gnu.tar.gz",
-      "sha256": "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83",
-      "archive_size": 16671812,
+      "url": "https://github.com/astral-sh/uv/releases/download/0.13.10/uv-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "bf65ac1a0af10f92c522d91ac096c7c0a39657647b155577e7836c2cbbb4526c",
+      "archive_size": 17113138,
       "member": "uv-x86_64-unknown-linux-gnu/uv",
-      "member_sha256": "4b5e59bc557ff2cd70934beb59d0eaa92820702853d49f0066b50aa11a8f0c52"
+      "member_sha256": "bfe31619b549d39d9031cb2cadc5a95d1258efcad746628a3a6212da4ae5dfbf"
     }
   }
 }

@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import TypedDict
 
 from google.genai import types
+from google.genai.errors import APIError
 import httpx
 
 from config.ai_models import (
@@ -15,6 +16,9 @@ from config.ai_models import (
     AI_RETRY_MAX_DELAY,
     AI_RETRY_STATUS_CODES,
 )
+
+
+PROVIDER_REQUEST_ERRORS = (APIError, httpx.HTTPError)
 
 
 class ProviderErrorDetails(TypedDict):

@@ -78,8 +78,10 @@ attach an IP address or user identity to the event.
 
 ## Data Lagniappe filters before sending
 
-Lagniappe disables Sentry's default collection of personally identifiable
-information and applies additional filtering intended to remove or reduce:
+Lagniappe configures the Python SDK to exclude user identity, request bodies,
+cookies, query values, stack-frame variables, and AI inputs and outputs. Streamed
+spans retain timing, route templates, operation types, and selected numeric
+measurements. Additional filtering on error reports aims to remove or reduce:
 
 - form and JSON values, request and response bodies, and query values;
 - uploaded filenames, file contents, full URLs, and referrers;

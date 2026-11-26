@@ -334,7 +334,7 @@ def test_error_capture_sanitizes_context_without_duplicate_request(monkeypatch):
         "extract_request_info",
         lambda: request_extractions.append(True),
     )
-    monkeypatch.setattr(sentry_sdk, "push_scope", lambda: ScopeManager(scope))
+    monkeypatch.setattr(sentry_sdk, "new_scope", lambda: ScopeManager(scope))
     monkeypatch.setattr(sentry_sdk, "capture_exception", captured.append)
 
     core_exceptions.capture(
@@ -1817,3 +1817,29 @@ def test_sentry_filter_drops_only_expected_ai_document_page_limit():
     filtered = filter_sentry_event(unrelated, {})
     assert filtered is not None
     assert "user" not in filtered
+
+
+def test_streamed_sentry_spans_keep_timing_and_route_without_request_or_ai_content():
+    from lagniappe.core.exceptions.request import sanitize_sentry_span
+
+    span = {
+        "trace_id": "trace", "span_id": "span", "is_segment": True,
+        "status": "ok", "start_timestamp": 1.0, "end_timestamp": 1.5,
+        "name": "GET /files/private-name?code=private-code",
+        "attributes": {
+            "sentry.op": "http.server", "http.route": "/files/<key>",
+            "http.response.status_code": 200, "gen_ai.usage.input_tokens": 12,
+            "url.full": "https://example.test/files/private-name",
+            "http.request.header.authorization": ["Bearer private-token"],
+            "gen_ai.input.messages": ["private prompt"],
+        },
+    }
+    safe = sanitize_sentry_span(span, {})
+    assert safe["name"] == "/files/<key>"
+    assert safe["end_timestamp"] == 1.5 and safe["trace_id"] == "trace"
+    assert safe["attributes"] == {
+        "sentry.op": "http.server", "http.route": "/files/<key>",
+        "http.response.status_code": 200, "gen_ai.usage.input_tokens": 12,
+    }
+    span["attributes"] = {"sentry.op": "db.query"}
+    assert sanitize_sentry_span(span, {})["name"] == "db.query"

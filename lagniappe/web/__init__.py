@@ -26,7 +26,7 @@ from flask import Flask, abort, g, jsonify, request, session
 from flask_wtf.csrf import CSRFProtect
 
 from lagniappe import CONFIG
-from lagniappe.core.exceptions.request import filter_sentry_event, sanitize_sentry_event
+from lagniappe.core.exceptions.request import SENTRY_DATA_COLLECTION, filter_sentry_event, sanitize_sentry_span
 from lagniappe.core.tools import cache
 
 from . import auth
@@ -37,17 +37,19 @@ SENTRY_LOADED = False
 
 if CONFIG.capture_errors:
     import sentry_sdk
+    import logging
+    from sentry_sdk.integrations.logging import LoggingIntegration
     from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
 
     sentry_sdk.init(
         dsn=CONFIG.SENTRY_DSN,
-        send_default_pii=False,
+        data_collection=SENTRY_DATA_COLLECTION,
         traces_sample_rate=CONFIG.SENTRY_TRACES_SAMPLE_RATE,
         profile_session_sample_rate=CONFIG.SENTRY_PROFILE_SESSION_SAMPLE_RATE,
         profile_lifecycle="trace",
         before_send=filter_sentry_event,
-        before_send_transaction=sanitize_sentry_event,
-        integrations=[GoogleGenAIIntegration()],
+        before_send_span=sanitize_sentry_span,
+        integrations=[GoogleGenAIIntegration(), LoggingIntegration(level=None, event_level=logging.ERROR)],
     )
     SENTRY_LOADED = True
 

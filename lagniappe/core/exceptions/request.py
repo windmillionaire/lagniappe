@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast, overload
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk.types import Attributes, DataCollectionUserOptions, Event, Hint, SpanJSON
 import re
 from urllib.parse import urlsplit
 
@@ -28,6 +28,20 @@ _ALLOWED_HEADERS = frozenset(
         "x-requested-with",
     }
 )
+SENTRY_DATA_COLLECTION: DataCollectionUserOptions = {
+    "user_info": False,
+    "http_headers": {"request": {"mode": "allowlist", "terms": sorted(_ALLOWED_HEADERS)}},
+    "http_bodies": [],
+    "cookies": {"mode": "off"},
+    "url_query_params": {"mode": "off"},
+    "gen_ai": {"inputs": False, "outputs": False},
+    "mcp": {"inputs": False, "outputs": False},
+    "graphql": {"document": False, "variables": False},
+    "queues": False,
+    "database_query_data": False,
+    "stack_frame_variables": False,
+}
+
 _DIRECT_SENSITIVE_KEYS = frozenset(
     {
         "authorization",
@@ -132,6 +146,8 @@ def _normalized_key(key):
 
 def _is_sensitive_key(key):
     normalized = _normalized_key(key)
+    if normalized in {"url_path", "url_query", "url_fragment", "http_fragment"}:
+        return True
     if normalized in _DIRECT_SENSITIVE_KEYS or normalized in _PAYLOAD_KEYS:
         return True
 
@@ -367,6 +383,27 @@ def sanitize_sentry_event(event: Event, _hint: Hint | None = None) -> Event:
             sanitized[key] = sanitize_error_context(sanitized[key])
 
     return cast("Event", sanitized)
+
+
+def sanitize_sentry_span(span: SpanJSON, _hint: Hint) -> SpanJSON:
+    """Keep route templates and operation timing without recording raw span descriptions."""
+    attributes = span.get("attributes", {})
+    safe: Attributes = {}
+    for key in ("sentry.op", "sentry.origin", "http.request.method", "http.route", "db.system.name"):
+        value = attributes.get(key)
+        if isinstance(value, str):
+            safe[key] = _sanitize_text(value)
+    for key in (
+        "http.response.status_code", "gen_ai.usage.input_tokens",
+        "gen_ai.usage.output_tokens", "gen_ai.usage.cache_read.input_tokens",
+    ):
+        value = attributes.get(key)
+        if isinstance(value, int):
+            safe[key] = value
+
+    # Integrations may use a raw URL, a Redis command or a query as the span name.
+    name = safe.get("http.route") or safe.get("sentry.op") or "operation"
+    return {**span, "name": str(name), "attributes": safe}
 
 
 def _is_expected_ai_document_limit(event):

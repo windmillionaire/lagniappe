@@ -141,7 +141,7 @@ def capture(
         full_context = sanitize_error_context(full_context)
 
         if full_context:
-            with sentry_sdk.push_scope() as scope:
+            with sentry_sdk.new_scope() as scope:
                 for key, value in full_context.items():
                     if isinstance(value, dict):
                         scope.set_context(key, value)
