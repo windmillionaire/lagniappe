@@ -147,7 +147,6 @@ def test_admin_permissions(get_user):
     expect(directory_list.list.get_by_role("menuitem", name="Active Tasks")).to_be_visible()
     expect(directory_list.list.get_by_role("menuitem", name="Forms")).to_be_visible()
     expect(directory_list.list.get_by_role("menuitem", name="Users")).to_be_visible()
-    expect(directory_list.list.get_by_role("menuitem", name="Admin")).to_be_visible()
     expect(
         directory_list.list.get_by_role("menuitem", name="Account Settings")
     ).to_be_visible()

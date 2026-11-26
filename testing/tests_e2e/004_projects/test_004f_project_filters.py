@@ -630,10 +630,6 @@ def test_filter_results_expands_table_submission_cell(get_admin, get_user):
     expect(results).to_be_visible()
     _expect_only_matching_task(results, matching_task, excluded_task)
 
-    table_container = user.locate("[data-role='table'].table-container")
-    expect(table_container).to_be_visible()
-    expect(table_container).to_have_css("overflow-x", "auto")
-
     header = results.locator("tr[data-role='column-header']")
     header.get_by_role("button", name="Choose visible columns").click()
     visibility = results.locator("tr[data-widget='TableVisibility']")

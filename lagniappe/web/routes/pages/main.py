@@ -458,7 +458,9 @@ def patch(
 
     if schema_id in page.properties:
         field = page.properties[schema_id]
-        if not isinstance(field, Property) or not field.editable:
+        if not isinstance(field, Property) or (
+            not field.editable and schema_id != "description"
+        ):
             return responses.error("Field cannot be edited")
         if schema_id == "name":
             cleaned_name = str(value or "").strip()

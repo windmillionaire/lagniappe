@@ -361,7 +361,7 @@ def test_cancel_generation_restores_previous_image_visibility(get_admin, get_use
         if not initially_visible:
             photo_toggle.click()
             expect(user.locate(page.PHOTO_FORM)).to_be_hidden()
-        UploadDropdown.GENERATE.select(_photo_form(user))
+        UploadDropdown.GENERATE.select(user.locate(page.PHOTO_FORM))
         form = _photo_form(user)
         expect(form.locator("[data-role='generate-image']")).to_be_visible()
         description = form.locator("textarea[name='prompt']")

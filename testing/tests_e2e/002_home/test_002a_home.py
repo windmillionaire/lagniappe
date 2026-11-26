@@ -184,21 +184,21 @@ def test_home_row_affordances_and_section_persistence(get_admin, get_user):
         expect(toggle.locator("span.icon[data-icon='down']")).to_be_visible()
         expect(toggle.locator("span.icon[data-icon='right']")).to_have_count(0)
 
-    starred_toggle = user.locate(home.STARRED_LIST_TOGGLE)
-    starred_list = user.locate(home.STARRED_LIST)
-    expect(starred_toggle).to_have_attribute("aria-expanded", "false")
-    expect(starred_list).to_be_hidden()
+    notes_toggle = user.locate(home.NOTE_LIST_TOGGLE)
+    notes_list = user.locate(home.NOTE_LIST)
+    expect(notes_toggle).to_have_attribute("aria-expanded", "false")
+    expect(notes_list).to_be_hidden()
 
-    starred_toggle.click()
-    expect(starred_list).to_be_visible()
-    expect(starred_toggle).to_have_attribute("aria-expanded", "true")
+    notes_toggle.click()
+    expect(notes_list).to_be_visible()
+    expect(notes_toggle).to_have_attribute("aria-expanded", "true")
 
     user.locate(home.USER_PAGE_BUTTON).click()
     expect(user.page).to_have_url(re.compile(r"/pages/[^/]+$"))
     user.page.go_back()
     home.wait_for_interaction_readiness()
-    reloaded_toggle = user.locate(home.STARRED_LIST_TOGGLE)
-    reloaded_list = user.locate(home.STARRED_LIST)
+    reloaded_toggle = user.locate(home.NOTE_LIST_TOGGLE)
+    reloaded_list = user.locate(home.NOTE_LIST)
     expect(reloaded_list).to_be_visible()
     expect(reloaded_toggle).to_have_attribute("aria-expanded", "true")
 
@@ -208,8 +208,8 @@ def test_home_row_affordances_and_section_persistence(get_admin, get_user):
 
     closed_home = user.go(SitePages.HOME)
     closed_home.wait_for_interaction_readiness()
-    expect(user.locate(closed_home.STARRED_LIST)).to_be_hidden()
-    expect(user.locate(closed_home.STARRED_LIST_TOGGLE)).to_have_attribute(
+    expect(user.locate(closed_home.NOTE_LIST)).to_be_hidden()
+    expect(user.locate(closed_home.NOTE_LIST_TOGGLE)).to_have_attribute(
         "aria-expanded", "false"
     )
 

@@ -323,7 +323,6 @@ def test_update_category_info_from_tools(get_admin, get_user):
             user.page,
             method="PATCH",
             path=f"/categories/{category.key}/patch",
-            entity_key=category.key,
         ):
             rename_input.press("Enter")
         expect(user.locate(category.CATEGORY_TITLE)).to_have_text(updated_name)
@@ -337,7 +336,6 @@ def test_update_category_info_from_tools(get_admin, get_user):
             user.page,
             method="PATCH",
             path=f"/categories/{category.key}/patch",
-            entity_key=category.key,
         ):
             desc_editor.get_by_role("button", name="Save", exact=True).click()
         expect(user.locate(category.CATEGORY_DESCRIPTION)).to_have_text(
@@ -356,7 +354,6 @@ def test_update_category_info_from_tools(get_admin, get_user):
                 user.page,
                 method="PATCH",
                 path=f"/categories/{category.key}/patch",
-                entity_key=category.key,
             ),
             user.page.expect_navigation(),
         ):

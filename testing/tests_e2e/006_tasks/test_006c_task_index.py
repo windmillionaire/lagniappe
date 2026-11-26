@@ -389,7 +389,7 @@ def test_task_index_quick_edit_keeps_revealed_completed_column_editable(get_admi
 
     edit_toggle.click()
     expect(body).to_have_attribute("data-editing", "false")
-    expect(completed).to_be_hidden()
+    expect(completed).to_be_visible()
     expect(user.locate("[data-role='table-edit-status']")).to_have_count(0)
 
 

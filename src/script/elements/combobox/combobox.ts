@@ -561,6 +561,8 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 
 	_documentKeydown(event: KeyboardEvent) {
 		if (this.panelOpen && event.key === "Escape") {
+			event.preventDefault?.();
+			event.stopPropagation?.();
 			this.deactivate();
 		}
 	}

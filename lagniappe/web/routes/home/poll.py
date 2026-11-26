@@ -149,7 +149,7 @@ def poll() -> ResponseReturnValue:
     )
     Entities.fetch(
         *(entity for entity in entities.values()
-          if isinstance(entity, (Entities.TASK, Entities.FILE))),
+          if isinstance(entity, (Entities.TASK, Entities.FILE, Entities.MODEL_TASK))),
         *(entity.task for entity in entities.values()
           if isinstance(entity, Entities.TASK_HISTORY)),
         request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),

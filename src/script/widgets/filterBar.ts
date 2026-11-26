@@ -253,7 +253,13 @@ export class FilterBar {
 	}
 
 	_handleDocumentKeydown(event: KeyboardEvent) {
-		if (event.key !== "Escape" || !this._openPopover) return;
+		if (
+			event.defaultPrevented ||
+			event.key !== "Escape" ||
+			!this._openPopover
+		) {
+			return;
+		}
 		if (document.querySelector(".lp-dp-popover")) return;
 		if (this._optionSelect?.panelOpen) return;
 		event.preventDefault();

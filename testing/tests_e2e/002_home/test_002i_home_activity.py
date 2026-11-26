@@ -300,7 +300,9 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     expect(private_item).to_contain_text("Private")
 
     activity_before = tuple(
-        item.key for item in database_get.activity(user.entity)
+        item.key
+        for item in database_get.activity(user.entity)
+        if item.key.name != "message-aggregate"
     )
     forbidden_body = _unique("Forbidden Home note")
     cookies = {
@@ -320,8 +322,13 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
 
     assert_lagniappe_error_response(response, status=403)
     assert forbidden_body not in response.text
-    assert tuple(item.key for item in database_get.activity(user.entity)) == (
-        activity_before
+    assert (
+        tuple(
+            item.key
+            for item in database_get.activity(user.entity)
+            if item.key.name != "message-aggregate"
+        )
+        == activity_before
     )
 
     reloaded_home = user.go(SitePages.HOME)

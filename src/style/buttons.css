@@ -245,6 +245,10 @@
 	grid-template-columns: auto auto;
 	align-items: center;
 	padding-inline: 0.625rem;
+	&:focus-visible {
+		outline: 2px solid currentColor;
+		outline-offset: 2px;
+	}
 	&[data-visible="false"] {
 		display: none;
 	}
