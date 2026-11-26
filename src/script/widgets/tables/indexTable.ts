@@ -3,6 +3,7 @@ import {
 	type BaseTableAttributes,
 	type TableComponent,
 } from "../../elements/base/baseTable.ts";
+import { STYLES } from "../../generated/styles.mjs";
 import { captureError } from "../../shared/errors.ts";
 import type { RequestResult } from "../../types/api.d.ts";
 import type { TableWidgets } from "./types.d.ts";
@@ -173,6 +174,44 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 		return this.component.elt.querySelector(
 			"th[data-column='selector'] button",
 		);
+	}
+
+	showLoading(label = "Loading…") {
+		this.target.setAttribute("aria-busy", "true");
+		const hasRows = Boolean(this.target.querySelector("tr[lp-entity]"));
+		if (hasRows) return;
+
+		const emptyRow = this.target.querySelector<HTMLTableRowElement>(
+			"tr[data-role='empty']",
+		);
+		if (emptyRow) {
+			emptyRow.dataset.visible = "false";
+			if (this.view.mobile) emptyRow.style.display = "none";
+		}
+
+		let loadingRow = this.target.querySelector<HTMLTableRowElement>(
+			"tr[data-role='loading']",
+		);
+		if (!loadingRow) {
+			const colCount = Math.max(
+				1,
+				this.component.elt.querySelectorAll("thead > tr:first-child > th")
+					.length,
+			);
+			loadingRow = document.createElement("tr");
+			loadingRow.dataset.role = "loading";
+			loadingRow.dataset.visible = "true";
+			loadingRow.setAttribute("aria-live", "polite");
+
+			const cell = document.createElement("td");
+			cell.colSpan = colCount;
+			cell.setAttribute("role", "status");
+			cell.className = STYLES.table.loading.cell;
+			loadingRow.append(cell);
+			this.target.prepend(loadingRow);
+		}
+		const statusCell = loadingRow.querySelector("td");
+		if (statusCell) statusCell.textContent = label;
 	}
 
 	_clearLoadingState() {
@@ -400,6 +439,7 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 		this.target.removeAttribute("loaded");
 		this.loaded = false;
 		this.loading = true;
+		this.showLoading("Loading…");
 
 		let route: string | null | undefined =
 			this.route || this.target.dataset.route;

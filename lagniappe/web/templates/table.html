@@ -26,7 +26,10 @@
   <table lp-component
          {% if entities is undefined and not parent.is_filter and not card %}lp-prefetch{% endif %}
          id="{{ resolved_id }}"
-         {% if card %}data-card-table="true"{% endif %}
+         {% if card %}
+           data-card-table="true"
+           data-isolated="true"
+         {% endif %}
          data-kind="{{ parent.table.kind }}"
          data-preload='{{ parent.table.preload|tojson }}'
          data-default="{{ 'IndexTable' if not parent.table.embedded else 'EmbeddedTable' }}"
@@ -86,6 +89,13 @@
          {% if parent.route %}data-route="{{ parent.route }}"{% endif %}
          data-persistent="true"
          data-widget="{{ 'IndexTable' if not parent.table.embedded else 'EmbeddedTable' }}">
+    {% if card and not entities and not parent.is_filter %}
+      <tr data-role="loading" data-visible="true" aria-live="polite">
+        <td colspan="{{ parent.table.columns|length + 1 }}"
+            role="status"
+            class="{{ styles.table.loading.cell }}">Loading {{ parent.table.kind }}s…</td>
+      </tr>
+    {% endif %}
     {% if not entities and parent.is_filter %}
       {{ empty_row_filter(parent) }}
     {% elif not entities %}

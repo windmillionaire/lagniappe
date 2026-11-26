@@ -210,7 +210,7 @@ export class NavElement {
 
 	_setTitle() {
 		const title = this.settings.title || this.component.elt.dataset.title;
-		if (this.title) this.title.textContent = title || "";
+		if (this.title && title) this.title.textContent = title;
 	}
 
 	enable(component: NavComponent = this.component) {

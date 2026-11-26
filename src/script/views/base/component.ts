@@ -466,6 +466,7 @@ export default class ViewComponent {
 	}
 
 	_setParentComponent() {
+		if (this.elt.dataset.isolated === "true") return;
 		const parentElt = this.parentComponent;
 		const parent = parentElt ? this.view.getComponent(parentElt) : null;
 		const subComponents = parent ? parent.subComponents : this.subComponents;

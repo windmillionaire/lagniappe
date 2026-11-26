@@ -886,12 +886,14 @@ export class FilterBar {
 		}
 
 		this.matchStatus.textContent = "Filtering…";
+		indexTable.showLoading("Filtering…");
 		const response = await request.get(this.endpoints.test, {
 			mode: "rows",
 			contract: this.contract,
 		});
 		if (token !== this._runToken) return;
 		if (!response?.ok || !response.html) {
+			indexTable.setEmptyRowVisibility();
 			this.matchStatus.textContent = response?.error || "Filter failed";
 			return;
 		}

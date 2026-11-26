@@ -1481,6 +1481,7 @@ table:
     classes: sm:divide-y w-full sm:divide-base-light/50
     intent: body presentation within table
     surfaces: [server]
+    css: [src/style/tables.css]
   thead:
     default:
       classes: sticky top-16 z-30 bg-white
@@ -1557,8 +1558,8 @@ table:
   loading:
     cell:
       classes: py-4 text-center text-sm italic text-base-medium
-      intent: low-key single-column loading row inside a delayed entity index table
-      surfaces: [frontend]
+      intent: low-key single-column loading row inside a delayed or lazy-loaded entity table
+      surfaces: [server, frontend]
 
 task:
   actionIconContext:
@@ -1844,8 +1845,8 @@ category:
 
 filterBar:
   container:
-    classes: mt-4 px-4 sm:px-0
-    intent: outer spacing wrapper for the single-row inline filter chip bar above index tables
+    classes: mt-4 mx-4 rounded-md bg-kind-bg p-3 sm:mx-0 sm:p-4
+    intent: kind-tinted container wrapping the inline filter chip bar above index tables
     surfaces: [server]
   inCard:
     classes: mx-4 mt-2 mb-3 rounded-md bg-kind-bg p-3 sm:mx-2 sm:mt-0 sm:mb-2 sm:p-4
@@ -1884,12 +1885,8 @@ filterBar:
     hooks: [icon-xs]
     css: [src/style/icons.css]
   actions:
-    classes: flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-base-bg px-3 py-1.5
-    intent: compact tinted summary and action tray shown directly below active filter chips
-    surfaces: [server]
-  inCardActions:
     classes: flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-white/80 px-3 py-1.5
-    intent: light neutral summary and action tray contrasting cleanly inside a kind-tinted card filter bar
+    intent: light neutral summary and action tray contrasting cleanly inside a kind-tinted filter bar
     surfaces: [server]
   status:
     classes: text-xs font-medium text-base-medium

@@ -216,7 +216,10 @@
        data-default="FilterBar"
        data-visible="true"
        data-persistent="true"
-       {% if in_card %}data-kind="{{ card_kind or resolved_kind }}"{% endif %}
+       {% if in_card %}
+         data-isolated="true"
+         data-kind="{{ card_kind or resolved_kind }}"
+       {% endif %}
        class="{{ styles.filterBar.inCard if in_card else styles.filterBar.container }}">
     <div data-widget="FilterBar"
          data-persistent="true"
@@ -261,7 +264,7 @@
       </div>
       <div data-role="bar-actions"
            data-visible="false"
-           class="{{ styles.filterBar.inCardActions if in_card else styles.filterBar.actions }}">
+           class="{{ styles.filterBar.actions }}">
         <span data-role="match-status" class="{{ styles.filterBar.status }}"></span>
         {% if entity.allowed(Action.EDIT) %}
           <button type="button"

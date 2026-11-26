@@ -568,7 +568,7 @@ const STYLES = {
     }
   },
   "filterBar": {
-    "container": "mt-4 px-4 sm:px-0",
+    "container": "mt-4 mx-4 rounded-md bg-kind-bg p-3 sm:mx-0 sm:p-4",
     "inCard": "mx-4 mt-2 mb-3 rounded-md bg-kind-bg p-3 sm:mx-2 sm:mt-0 sm:mb-2 sm:p-4",
     "row": "flex flex-col gap-2",
     "chipsGroup": "flex min-w-0 flex-row flex-wrap items-center gap-2",
@@ -577,8 +577,7 @@ const STYLES = {
     "addButton": "inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-base-medium/70 bg-white px-2.5 py-1 text-sm font-medium text-base-medium transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
     "icon": "icon-sm text-base-medium",
     "chevron": "icon-xs text-base-medium",
-    "actions": "flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-base-bg px-3 py-1.5",
-    "inCardActions": "flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-white/80 px-3 py-1.5",
+    "actions": "flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-white/80 px-3 py-1.5",
     "status": "text-xs font-medium text-base-medium",
     "saveButton": "inline-flex cursor-pointer items-center gap-1 rounded-md border border-kind-light bg-white px-2.5 py-1 text-xs font-semibold text-kind-dark transition-colors hover:bg-kind-bg disabled:pointer-events-none disabled:opacity-50",
     "clearButton": "cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-base-medium transition-colors hover:bg-white hover:text-base-dark disabled:pointer-events-none disabled:opacity-50",

@@ -294,13 +294,18 @@ class Project extends Entity {
 			}
 		}
 
-		const [{ filterBar }, response] = await Promise.all([
-			this._ensureTasksTab({ loadRows: false }),
+		const [{ filterBar, indexTable }, response] = await Promise.all([
+			this._ensureTasksTab({ loadRows: false }).then((ready) => {
+				ready.indexTable?.showLoading("Loading tasks…");
+				return ready;
+			}),
 			request.get<StatusBarResponse>(route),
 		]);
 		if (this._destroyed || !filterBar) return;
 		if (response?.ok && Array.isArray(response.conditions)) {
 			await filterBar.applyConditions(response.conditions);
+		} else {
+			indexTable?.setEmptyRowVisibility();
 		}
 	}
 
