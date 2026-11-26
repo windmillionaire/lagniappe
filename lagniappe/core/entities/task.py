@@ -505,22 +505,32 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             self.project = None
             self.model = None
 
-    def update(self, data: TaskData) -> None:
+    def update(self, data: TaskData, *, partial: bool = False) -> None:
         if self.completed:
             raise ValidationError("Reopen the task before editing its completion.")
         previous_form_key = self.properties.form.key
-        self.page = data.get("page", self.page)
-        self.form = data.get("form")
-        self.description = data.get("description")
-        self.name = data.get("name")
-        self.due_date = data.get("due_date")
+        if not partial or "page" in data:
+            self.page = data.get("page", self.page)
+        if not partial or "form" in data:
+            self.form = data.get("form")
+        if not partial or "description" in data:
+            self.description = data.get("description")
+        if not partial or "name" in data:
+            self.name = data.get("name")
+        if not partial or "due_date" in data:
+            self.due_date = data.get("due_date")
 
-        tracking = data.get("model") or data.get("project")
-        self._update_tracking(tracking)
+        if not partial or "model" in data or "project" in data:
+            tracking = data.get("model") or data.get("project")
+            self._update_tracking(tracking)
         form_changed = previous_form_key != self.properties.form.key
 
         previous_assignee_key = self.properties.assigned_to.key
-        assigned_to = data.get("assigned_to")
+        assigned_to = (
+            data.get("assigned_to")
+            if (not partial or "assigned_to" in data)
+            else self.assigned_to
+        )
         actor = current_context_user()
         next_assignee_key = getattr(assigned_to, "key", None)
         if previous_assignee_key != next_assignee_key:

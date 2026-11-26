@@ -38,7 +38,7 @@ from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.utility.network import expect_successful_response
 from testing.utility.local_time import local_date_iso, local_date_plus_days_iso
-from ..elements import DateSelect, SpinnerButtons
+from ..elements import SpinnerButtons
 from .core import SiteResource
 
 
@@ -87,6 +87,11 @@ class Task(SiteResource):
     COMPLETE_TASK_CHECKBOX = "input[data-role='complete-toggle']"
     NAV_TOGGLES = "[data-role='nav-toggles']"
     PAGE_TASK_LIST = "[data-widget='PageTaskList']"
+
+    CHIP_TRAY = "[data-role='task-chips']"
+    CHIP_TRAY_TOGGLE = "[data-role='chip-tray-toggle']"
+    CHIP_DRAWER = "[data-role='chip-drawer']"
+    FORM_CHIP = "[data-role='form-chip']"
 
     SETTINGS_FORM_TOGGLE = "button[lp-control='task']"
     SETTINGS_FORM = "[data-widget='TaskSettings']"
@@ -273,6 +278,104 @@ class Task(SiteResource):
         expect(settings_form).to_be_visible()
         return settings_form
 
+    def expand_chips(self):
+        self._wait_for_page_task_list()
+        tray = self.element.locator(self.CHIP_TRAY)
+        expect(tray).to_be_visible()
+        if tray.get_attribute("data-tray-open") != "true":
+            self.element.locator(self.CHIP_TRAY_TOGGLE).click()
+            expect(tray).to_have_attribute("data-tray-open", "true")
+        return tray
+
+    def open_chip(self, field):
+        self._wait_for_page_task_list()
+        drawer = self.element.locator(self.CHIP_DRAWER)
+        if (
+            drawer.is_visible()
+            and drawer.get_attribute("data-chip-field") == field
+        ):
+            return drawer
+
+        chip = self.element.locator(f"[data-chip='{field}']").first
+        if not chip.is_visible():
+            self.expand_chips()
+        expect(chip).to_be_visible()
+        chip.click()
+        expect(drawer).to_be_visible()
+        expect(drawer).to_have_attribute("data-chip-field", field)
+        return drawer
+
+    def open_change_form(self):
+        self._wait_for_page_task_list()
+        self.element.get_by_role("button", name="Task actions").click()
+        menu = self.user.page.get_by_role("menu", name="Task actions")
+        expect(menu).to_be_visible()
+        menu.get_by_role("menuitem", name="Change Form").click()
+        drawer = self.element.locator(self.CHIP_DRAWER)
+        expect(drawer).to_be_visible()
+        expect(drawer).to_have_attribute("data-chip-field", "form")
+        return drawer
+
+    def rename(self, new_name):
+        self._wait_for_page_task_list()
+        self.element.get_by_role("button", name="Task actions").click()
+        menu = self.user.page.get_by_role("menu", name="Task actions")
+        expect(menu).to_be_visible()
+        menu.get_by_role("menuitem", name="Rename").click()
+        rename_input = self.element.locator("[data-role='rename-form'] input[name='name']")
+        expect(rename_input).to_be_visible()
+        rename_input.fill(new_name)
+        with expect_successful_response(
+            self.user.page,
+            method="PUT",
+            path=f"/tasks/{self.key}/update",
+            entity_key=self.key,
+        ):
+            rename_input.press("Enter")
+        expect(self.element.locator("[data-role='title']")).to_contain_text(new_name)
+
+    def set_description(self, text):
+        drawer = self.open_chip("description")
+        textarea = drawer.locator("textarea[name='description']")
+        expect(textarea).to_be_visible()
+        textarea.fill(text)
+        with expect_successful_response(
+            self.user.page,
+            method="PUT",
+            path=f"/tasks/{self.key}/update",
+            entity_key=self.key,
+        ):
+            drawer.locator("[data-role='save-description']").click()
+        expect(drawer).not_to_be_visible()
+
+    def select_chip_option(self, field, resource, *, query=None, change_form=False):
+        drawer = (
+            self.open_change_form()
+            if (field == "form" and change_form)
+            else self.open_chip(field)
+        )
+        combobox = drawer.locator("input[role='combobox']")
+        expect(combobox).to_be_visible()
+        option_id = (
+            resource.entity.page.urlsafe_key
+            if field == "assigned_to" and hasattr(resource, "entity") and hasattr(resource.entity, "page")
+            else resource.key
+        )
+        search_text = query if query is not None else resource.definition.name
+        combobox.fill(search_text)
+        panel = self.user.page.locator("[role='listbox'][data-visible='true']")
+        expect(panel).to_be_visible()
+        option = panel.locator(f"[role='option'][data-id='{option_id}']")
+        expect(option).to_be_visible()
+        with expect_successful_response(
+            self.user.page,
+            method="PUT",
+            path=f"/tasks/{self.key}/update",
+            entity_key=self.key,
+        ):
+            option.click()
+        expect(drawer).not_to_be_visible()
+
     @property
     def task_form(self):
         self._wait_for_page_task_list()
@@ -281,22 +384,27 @@ class Task(SiteResource):
             return task_form
 
         self._close_task()
-        self._open_task()
-
-        if task_form.is_visible():
-            return task_form
-
-        task_toggle = self.element.locator(self.TASK_FORM_TOGGLE)
-        if task_toggle.is_visible():
-            task_toggle.click()
+        form_chip = self.element.locator(self.FORM_CHIP)
+        if form_chip.count() > 0 and form_chip.first.is_visible():
+            form_chip.first.click()
+        else:
+            self._open_task()
 
         expect(task_form).to_be_visible()
         expect(task_form).to_have_attribute("rendered", "")
         return task_form
 
     def set_due_date(self, due_date_definition):
-        due_date_form = DateSelect(self.settings_form).form()
-        due_date_definition.set(due_date_form)
+        drawer = self.open_chip("schedule")
+        due_date_definition.set(drawer)
+        with expect_successful_response(
+            self.user.page,
+            method="PUT",
+            path=f"/tasks/{self.key}/update",
+            entity_key=self.key,
+        ):
+            drawer.locator("[data-role='save-schedule']").click()
+        expect(drawer).not_to_be_visible()
 
     def complete(self):
         page = self.definition.origin.get(self.user)

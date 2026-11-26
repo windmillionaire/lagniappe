@@ -331,7 +331,18 @@ test("test_task_completion_replaces_closed_row_in_one_transition", async () => {
 		"../../src/script/widgets/pageTaskList.ts",
 		{
 			"../../src/script/elements/base/baseList.ts": { BaseList: class {} },
+			"../../src/script/shared/index.ts": { request: {} },
 			"../../src/script/shared/transitions.ts": { withTransition },
+			"../../src/script/widgets/taskChips.ts": {
+				setTaskTrayOpen() {},
+				TaskChipController: class {
+					closeChip() {}
+					closeAll() {}
+					hasOpenEditor() {
+						return false;
+					}
+				},
+			},
 		},
 	);
 

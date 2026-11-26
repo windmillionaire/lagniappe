@@ -45,6 +45,7 @@ from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.project_definitions import ProjectDefinition
 from testing.definitions.page_definitions import PageDefinition
 from testing.definitions.model_task_definitions import ModelTaskDefinition
+from testing.definitions.task_definitions import TaskDefinition
 from testing.elements import (
     Badges,
     Buttons,
@@ -52,10 +53,6 @@ from testing.elements import (
     Filters,
     Modal,
     ProjectFilterConditions,
-    FormElements,
-    FormSelect,
-    ProjectSelect,
-    SpinnerButtons,
     Tabs,
 )
 from testing.resources import Form, ModelTask, Page, Project, Task
@@ -295,23 +292,18 @@ def test_project_filter_results_respect_task_permissions(get_user, mode, permiss
     page_resource = Page(user=owner, definition=PageDefinition(name=page.name, category=None))
     page_resource.entity = page
     owner.go(page_resource)
-    create_form = page_resource.create_task_form
     task_name = f"{token} Restricted"
-    create_form.locator(FormElements.NAME).fill(task_name)
-    project_select = ProjectSelect(create_form)
+    task_elt, task_key = page_resource.quick_add_task(task_name)
+    created_task = Task(user=owner, definition=TaskDefinition(name=task_name, origin=None))
+    created_task.key = task_key
+    created_task.element = task_elt
     if model:
-        project_select.panel(fill=project.definition.name)
-        project_select.select_by_key(model)
-        assert FormSelect(create_form).contains(form)
+        created_task.select_chip_option("project", model, query=project.definition.name)
+        Badges.FORM.visible(created_task.element, form)
     else:
-        project_select.select(project)
+        created_task.select_chip_option("project", project)
         if permission_source == "task_form":
-            FormSelect(create_form).select(form)
-    with expect_successful_response(owner.page, method="POST", path=f"/tasks/{page_resource.key}/create",
-                                    request_payload_contains=task_name):
-        SpinnerButtons.CREATE.click(create_form)
-    expect(create_form).not_to_be_visible()
-    task_key = page_resource.active_task_list.new_item(task_name).get_attribute("data-key")
+            created_task.select_chip_option("form", form)
     restricted_task = Entities.fetch_one(task_key, request=Fetch.root())
     assert restricted_task.properties.project.key == project.entity.key
     assert restricted_task.properties.model.key == (model.entity.key if model else None)

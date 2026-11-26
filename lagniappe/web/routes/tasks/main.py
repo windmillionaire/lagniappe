@@ -237,29 +237,11 @@ def _task_create_due_date_data(request):
     return _task_scheduling_due_date_data(request)
 
 
-def task_data(
-    request: Request, page: models.Page, task: models.Task | None = None
-) -> TaskData:
-    """Resolve form data into a dict suitable for Task.create() or Task.update()."""
-    assets = attachments.submitted_assets(request)
-    asset_file_keys = attachments.file_keys(assets)
-    if "page" in request.form:
-        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
-
-    form_key = request.form.get("form")
-    assignee_key = request.form.get("assigned_to")
-    project_key = request.form.get("project")
-    model_key = request.form.get("model")
-    public_tracking = _public_task_tracking(task, project_key, model_key)
-    resolver = SubmittedReferenceResolver(
-        authenticated_user(),
-        form_key,
-        assignee_key,
-        project_key,
-        model_key,
-        *asset_file_keys,
-    )
-
+def _resolve_form_reference(
+    resolver: SubmittedReferenceResolver,
+    form_key: str | None,
+    task: models.Task | None,
+):
     current_form = task.form if task else None
     form = resolver.one(
         form_key,
@@ -272,7 +254,16 @@ def task_data(
         Action.VIEW, user=current_user
     ):
         form = current_form
+    return form
 
+
+def _resolve_tracking_references(
+    resolver: SubmittedReferenceResolver,
+    project_key: str | None,
+    model_key: str | None,
+    task: models.Task | None,
+):
+    public_tracking = _public_task_tracking(task, project_key, model_key)
     current_tracking = (task.model or task.project) if task else None
 
     def tracking_reference_valid(selected):
@@ -314,14 +305,25 @@ def task_data(
         not model.project or model.project.key != project.key
     ):
         raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
-    if not model_key and not project_key and task is not None and current_tracking and not current_tracking.allowed(
-        Action.VIEW, user=current_user
+    if (
+        not model_key
+        and not project_key
+        and task is not None
+        and current_tracking
+        and not current_tracking.allowed(Action.VIEW, user=current_user)
     ):
         model = task.model
         project = task.project
     if public_tracking is not None:
         model, project = public_tracking
+    return model, project
 
+
+def _resolve_assignee_reference(
+    resolver: SubmittedReferenceResolver,
+    assignee_key: str | None,
+    task: models.Task | None,
+):
     current_assignee = task.assigned_to if task else None
 
     def assignee_authorized(selected):
@@ -350,6 +352,34 @@ def task_data(
         )
     ):
         assigned_to = current_assignee
+    return assigned_to
+
+
+def task_data(
+    request: Request, page: models.Page, task: models.Task | None = None
+) -> TaskData:
+    """Resolve form data into a dict suitable for Task.create() or Task.update()."""
+    assets = attachments.submitted_assets(request)
+    asset_file_keys = attachments.file_keys(assets)
+    if "page" in request.form:
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+
+    form_key = request.form.get("form")
+    assignee_key = request.form.get("assigned_to")
+    project_key = request.form.get("project")
+    model_key = request.form.get("model")
+    resolver = SubmittedReferenceResolver(
+        authenticated_user(),
+        form_key,
+        assignee_key,
+        project_key,
+        model_key,
+        *asset_file_keys,
+    )
+
+    form = _resolve_form_reference(resolver, form_key, task)
+    model, project = _resolve_tracking_references(resolver, project_key, model_key, task)
+    assigned_to = _resolve_assignee_reference(resolver, assignee_key, task)
 
     task_data: TaskData = {
         **_task_base_data(request),
@@ -368,6 +398,71 @@ def task_data(
         )
 
     return task_data
+
+
+def partial_task_data(
+    request: Request, page: models.Page, task: models.Task, chip_field: str | None
+) -> TaskData:
+    """Resolve a single inline task chip update without clearing untouched fields."""
+    if "page" in request.form:
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+
+    if chip_field == "name":
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            raise exceptions.ValidationError("Task name is required.")
+        return {"name": name}
+
+    if chip_field == "description":
+        return {"description": request.form.get("description") or ""}
+
+    if chip_field == "schedule":
+        return {"due_date": _task_create_due_date_data(request)}
+
+    if chip_field == "form":
+        form_key = request.form.get("form")
+        resolver = SubmittedReferenceResolver(authenticated_user(), form_key)
+        return {"form": _resolve_form_reference(resolver, form_key, task)}
+
+    if chip_field == "project":
+        project_key = request.form.get("project")
+        model_key = request.form.get("model")
+        include_form = "form" in request.form
+        form_key = request.form.get("form") if include_form else None
+        resolver = SubmittedReferenceResolver(
+            authenticated_user(),
+            project_key,
+            model_key,
+            form_key,
+        )
+        model, project = _resolve_tracking_references(
+            resolver, project_key, model_key, task
+        )
+        result: TaskData = {"model": model, "project": project}
+        if include_form:
+            result["form"] = _resolve_form_reference(resolver, form_key, task)
+        return result
+
+    if chip_field == "assigned_to":
+        assignee_key = request.form.get("assigned_to")
+        resolver = SubmittedReferenceResolver(authenticated_user(), assignee_key)
+        return {
+            "assigned_to": _resolve_assignee_reference(resolver, assignee_key, task)
+        }
+
+    if chip_field == "files":
+        assets = attachments.submitted_assets(request)
+        if assets is None:
+            raise exceptions.ValidationError("Attachments payload is required.")
+        asset_file_keys = attachments.file_keys(assets)
+        resolver = SubmittedReferenceResolver(authenticated_user(), *asset_file_keys)
+        return {
+            "asset_files": attachments.resolve_files(
+                resolver, asset_file_keys, assets=assets, page=page, task=task
+            )
+        }
+
+    raise exceptions.ValidationError("Invalid task field.")
 
 
 def _should_submit_task_form(active, role, task):
@@ -414,12 +509,26 @@ def update(
         )
 
     update_data = None
-    if "TaskSettings" in active:
+    partial_update = False
+    update_schedule = False
+    if "TaskChip" in active:
+        try:
+            page = task.page
+            if page is None:
+                return responses.error("The task page is no longer available.")
+            chip_field = request.form.get("chip_field")
+            update_data = partial_task_data(request, page, task, chip_field)
+            partial_update = True
+            update_schedule = chip_field == "schedule"
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
+    elif "TaskSettings" in active:
         try:
             page = task.page
             if page is None:
                 return responses.error("The task page is no longer available.")
             update_data = task_data(request, page, task)
+            update_schedule = True
         except exceptions.ValidationError as error:
             return responses.error(str(error))
 
@@ -438,19 +547,20 @@ def update(
 
     if update_data is not None:
         try:
-            task.update(update_data)
+            task.update(update_data, partial=partial_update)
         except exceptions.ValidationError as e:
             return responses.error(str(e))
 
-        if _ai_schedule_requested(request.form):
-            require_ai_access(AI.CREATE)
+        if update_schedule:
+            if _ai_schedule_requested(request.form):
+                require_ai_access(AI.CREATE)
 
-        schedule = task.properties.schedule.update(request.form)
-        if isinstance(schedule, ScheduleType) and schedule.generate:
-            schedule.create()
+            schedule = task.properties.schedule.update(request.form)
+            if isinstance(schedule, ScheduleType) and schedule.generate:
+                schedule.create()
 
-        if isinstance(schedule, ScheduleType) and schedule.error:
-            return responses.error(schedule.error)
+            if isinstance(schedule, ScheduleType) and schedule.error:
+                return responses.error(schedule.error)
 
     if role == "complete-toggle":
         try:

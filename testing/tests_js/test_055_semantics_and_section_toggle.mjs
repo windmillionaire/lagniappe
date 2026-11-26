@@ -183,3 +183,111 @@ test("test_search_results_facets_sync_aria_pressed_on_toggle_and_reset", async (
 	);
 	assert.equal(resetBtn.getAttribute("aria-label"), "Clear filters");
 });
+
+test("test_task_chips_tray_toggle_and_apply_update_preserves_open_form", async (t) => {
+	createBrowser(t);
+	const { setTaskTrayOpen, applyTaskChipUpdate } = await esmock.strict(
+		"../../src/script/widgets/taskChips.ts",
+		{
+			"../../src/script/elements/combobox/facets.ts": {
+				FacetsBox: class {},
+				isFacetOption: () => false,
+			},
+			"../../src/script/elements/dueDate.ts": { DueDate: class {} },
+			"../../src/script/elements/formatting.ts": { formatting: {} },
+			"../../src/script/elements/taskUpload.ts": { TaskUpload: class {} },
+			"../../src/script/shared/index.ts": { request: {} },
+			"../../src/script/shared/transitions.ts": {
+				withTransition: (cb) => cb(),
+			},
+		},
+	);
+
+	document.body.innerHTML = `
+		<li id="task-1" data-open="TaskForm" data-name="Before">
+			<div lp-nav data-nav="task-1">
+				<span data-role="title">Before</span>
+				<button data-role="save-toggle" data-saved="false" data-visible="true"></button>
+				<div data-role="task-chips" data-tray-open="false">
+					<button data-role="chip-tray-toggle" aria-expanded="false">
+						<span class="icon" data-icon="plus"></span>
+					</button>
+				</div>
+			</div>
+			<form data-widget="TaskForm"><input name="notes" value="unsaved draft"></form>
+		</li>
+	`;
+
+	const row = document.getElementById("task-1");
+	setTaskTrayOpen(row, true);
+	const chips = row.querySelector("[data-role='task-chips']");
+	const toggle = row.querySelector("[data-role='chip-tray-toggle']");
+	assert.equal(chips.dataset.trayOpen, "true");
+	assert.equal(toggle.getAttribute("aria-expanded"), "true");
+	assert.equal(toggle.querySelector(".icon").dataset.icon, "minus");
+
+	const formNode = row.querySelector("[data-widget='TaskForm']");
+	const inputNode = formNode.querySelector("input[name='notes']");
+	let reconciledWith = null;
+	const task = {
+		name: "task-1",
+		elt: row,
+		widgets: { TaskForm: { name: "TaskForm", unsavedState: true } },
+		active: { name: "TaskForm" },
+		activeWidget: { name: "TaskForm" },
+		nav: {
+			reconcile(widget, name) {
+				reconciledWith = [widget, name];
+			},
+		},
+		_replaceNav(update) {
+			const nextNav = update.querySelector("[lp-nav]");
+			row.querySelector("[lp-nav]").replaceWith(nextNav);
+		},
+	};
+
+	const responseHtml = new DOMParser().parseFromString(
+		`<li id="task-1" data-name="After">
+			<div lp-nav data-nav="task-1">
+				<span data-role="title">After</span>
+				<button data-role="save-toggle" data-saved="true" data-visible="false"></button>
+				<div data-role="task-chips" data-tray-open="false">
+					<button data-role="chip-tray-toggle" aria-expanded="false">
+						<span class="icon" data-icon="plus"></span>
+					</button>
+				</div>
+			</div>
+			<form data-widget="TaskForm"><input name="notes" value="server value"></form>
+		</li>`,
+		"text/html",
+	);
+
+	await applyTaskChipUpdate(
+		task,
+		{ ok: true, html: responseHtml },
+		{
+			chipField: "name",
+		},
+	);
+
+	assert.equal(row.querySelector("[data-role='title']").textContent, "After");
+	assert.equal(
+		row.querySelector("[data-role='task-chips']").dataset.trayOpen,
+		"true",
+	);
+	assert.equal(
+		row.querySelector("[data-role='chip-tray-toggle'] .icon").dataset.icon,
+		"minus",
+	);
+	assert.equal(
+		row.querySelector("[data-widget='TaskForm']"),
+		formNode,
+		"Non-form chip update must keep the open TaskForm DOM intact",
+	);
+	assert.equal(inputNode.value, "unsaved draft");
+	assert.equal(
+		row.querySelector("[data-role='save-toggle']").dataset.visible,
+		"true",
+	);
+	assert.deepEqual(reconciledWith, ["TaskForm", "task-1"]);
+});

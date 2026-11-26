@@ -90,7 +90,6 @@ def test_edited_form_markers_cover_update_forms_with_focused_routes():
         "projects/info.html": ["url_for('projects.info', key=project.urlsafe_key)"],
         "pages/tasks.html": [
             "url_for('tasks.get', key=t.urlsafe_key)",
-            "url_for('tasks.settings', key=t.urlsafe_key)",
         ],
         "pages/document.html": [
             "url_for('pages.document_settings', key=page.urlsafe_key)"

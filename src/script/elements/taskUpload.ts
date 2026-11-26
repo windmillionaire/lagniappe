@@ -239,11 +239,17 @@ export class TaskUpload extends BaseUpload {
 			return;
 		}
 
+		this.assets = taskAssets(response.assets);
 		withTransition(() => {
-			this.assets = taskAssets(response.assets);
 			this.renderAssets();
 			this.reset();
 		});
+		this.target.dispatchEvent(
+			new CustomEvent("task-assets-changed", {
+				bubbles: true,
+				detail: { assets: this.assets, action: "upload" },
+			}),
+		);
 	}
 
 	_removeBadge(file?: TaskAsset) {
@@ -301,13 +307,19 @@ export class TaskUpload extends BaseUpload {
 			return;
 		}
 
+		this.assets = taskAssets(response.assets);
 		withTransition(() => {
-			this.assets = taskAssets(response.assets);
 			this.renderAssets();
 			this._removeBadge(
 				isTaskAsset(response.deleted) ? response.deleted : file,
 			);
 		});
+		this.target.dispatchEvent(
+			new CustomEvent("task-assets-changed", {
+				bubbles: true,
+				detail: { assets: this.assets, action: "delete" },
+			}),
+		);
 	}
 
 	get open() {

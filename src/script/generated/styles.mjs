@@ -471,6 +471,30 @@ const STYLES = {
     "buttons": "flex flex-col gap-3",
     "title": "min-w-0 flex-1 leading-relaxed",
     "complete": "order-first mt-0.5 grid size-5 shrink-0 place-items-center self-start",
+    "description": "task-description text-sm whitespace-pre-wrap [overflow-wrap:anywhere] italic px-3 py-2 ring ring-inset font-semibold min-w-0 w-fit max-w-full rounded-md text-base-default ring-task-default/20 bg-base-bg",
+    "quickAdd": {
+      "form": "flex flex-row items-center gap-2 border-b border-base-light/50 bg-task-bg/40 px-4 py-3 sm:px-6",
+      "icon": "text-task-default inline-flex shrink-0 items-center justify-center",
+      "input": "min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base text-base-dark placeholder:text-base-medium focus:border-task-light focus:bg-white focus:outline-none focus:ring-2 focus:ring-task-default/15",
+      "submit": "shrink-0 rounded-md bg-task-default px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-task-dark disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-task-default"
+    },
+    "chip": {
+      "editable": "lp-badge task-chip-editable ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-white py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
+      "form": "lp-badge task-chip-form ring-form-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-form-bg/70 py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-form-default ring ring-inset transition-colors hover:bg-form-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-form-default",
+      "add": "task-chip-add inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-kind-light bg-base-bg/60 py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default opacity-75 transition-all hover:border-solid hover:bg-kind-bg hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
+      "trayToggle": "task-chip-tray-toggle inline-flex h-7 min-w-7 cursor-pointer items-center justify-center rounded-md border border-dashed border-base-light/80 bg-transparent px-1.5 text-sm font-semibold text-base-medium transition-colors hover:border-solid hover:border-base-light hover:bg-base-bg hover:text-base-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-default",
+      "drawer": "mx-4 mb-4 flex flex-col gap-3 rounded-lg border border-base-light/60 bg-base-bg/60 p-3 sm:mx-6 sm:p-4",
+      "drawerHeader": "flex flex-row items-center justify-between gap-2",
+      "drawerTitle": "text-xs font-bold uppercase tracking-wide text-base-medium",
+      "drawerActions": "flex flex-row items-center gap-1.5",
+      "actionBtn": "inline-flex cursor-pointer items-center gap-1 rounded-md border border-base-light/70 bg-white px-2.5 py-1 text-xs font-semibold text-base-default transition-colors hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-default",
+      "actionPrimary": "inline-flex cursor-pointer items-center gap-1 rounded-md bg-task-default px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-task-dark disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-task-default",
+      "actionDanger": "inline-flex cursor-pointer items-center gap-1 rounded-md border border-delete-light bg-white px-2.5 py-1 text-xs font-semibold text-delete-default transition-colors hover:bg-delete-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default"
+    },
+    "rename": {
+      "form": "flex min-w-0 flex-1 flex-row items-center gap-1.5",
+      "input": "min-w-0 flex-1 rounded-md border border-task-default bg-white px-2 py-0.5 text-base font-medium text-base-dark focus:outline-none focus:ring-2 focus:ring-task-default/20"
+    },
     "home": {
       "complete": "float-left mt-0.5 mr-2 grid size-5 place-items-center",
       "group": "text-sm font-semibold italic px-3 py-2 due-date",

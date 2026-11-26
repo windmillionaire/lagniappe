@@ -89,13 +89,8 @@ def test_worker_page_and_task(get_user, case, results):
     expect(user.locate(Page.PAGE_DESCRIPTION)).to_have_text(description)
 
     task_name = f"Task for {identity}"
-    create = page.create_task_form
-    create.locator("input[name='name']").fill(task_name)
-    with expect_successful_response(user.page, method="POST", path=f"/tasks/{page.key}/create"):
-        create.get_by_role("button", name="Create Task", exact=True).click()
-    item = page.task_list.locator("[data-key]").filter(has_text=task_name)
-    expect(item).to_have_count(1)
-    task_key = item.get_attribute("data-key")
+    item, task_key = page.quick_add_task(task_name)
+    expect(item).to_be_visible()
     user.reload(page)
     expect(page.task_list).to_contain_text(task_name)
     fixtures = {"user": user.entity.urlsafe_key, "page": page.key, "task": task_key,

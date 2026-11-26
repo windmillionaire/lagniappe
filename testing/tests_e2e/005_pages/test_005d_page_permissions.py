@@ -40,7 +40,7 @@ def test_page_viewer_reads_page_without_page_editing_affordances(get_admin, get_
     expect(viewer.locate(Tabs.DOCUMENT_TAB)).not_to_be_attached()
     expect(tabs.tasks).to_be_visible()
 
-    expect(viewer.locate(Page.CREATE_TASK_TOGGLE)).not_to_be_attached()
+    expect(viewer.locate(Page.QUICK_ADD_FORM)).not_to_be_attached()
     expect(viewer.locate(Page.SITE_SETTINGS_TOGGLE)).not_to_be_attached()
     expect(viewer.locate(Page.PAGE_PERMISSIONS_TOGGLE)).not_to_be_attached()
 

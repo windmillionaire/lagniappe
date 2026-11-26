@@ -296,9 +296,8 @@ def page_task(task: models.Task, **extra: object) -> tuple[Response, int]:
     )
 
 
-def task_settings(task: models.Task) -> tuple[str, int]:
-    template = get_template_attribute("pages/tasks.html", "settings_form")
-    return entity_response((template(task, task.page), 200), task)
+def task_settings(task: models.Task) -> tuple[Response, int]:
+    return page_task(task)
 
 
 def task_combine_form(

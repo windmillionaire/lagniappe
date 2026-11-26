@@ -173,6 +173,7 @@ const FEATURE_CHUNK_MODULES = {
 		"widgets/taskForm.mjs",
 		"widgets/taskHistory.mjs",
 		"widgets/taskSettings.mjs",
+		"widgets/taskChips.mjs",
 		"widgets/pageTaskList.mjs",
 	],
 	"home-tools": [
