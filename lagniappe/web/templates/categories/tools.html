@@ -63,7 +63,7 @@
   </form>
 {% endmacro %}
 
-{% macro create_page(category) %}
+{% macro create_page(category, form_class=None) %}
   {% set form_preload = category.properties.form.column_value if category.form else none %}
   {% set related_forms = category.properties.forms.column_value %}
   <form data-widget="CreatePage"
@@ -78,7 +78,7 @@
         data-help="create_page"
         data-nav="true"
         data-controls="true"
-        class="{{ styles.form.tools }}">
+        class="{{ form_class or styles.form.tools }}">
     {% if Resource.FORMS.allowed(Action.VIEW) %}
       <div data-role="form-select"
            data-kind="form"

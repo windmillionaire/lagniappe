@@ -900,10 +900,6 @@ index:
       classes: mx-auto w-full flex flex-row gap-4
       intent: container presentation within index tools
       surfaces: [server]
-    single:
-      classes: mx-auto w-full rounded-md bg-kind-bg p-4
-      intent: single-column drawer panel for direct index creation forms without side navigation
-      surfaces: [server]
     main:
       classes: flex-1 rounded-md bg-kind-bg p-4
       intent: main presentation within index tools

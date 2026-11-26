@@ -71,19 +71,14 @@
        data-default="CreatePage"
        data-visible="false"
        class="group/tools mt-4">
-    <div class="{{ styles.index.tools.single }}">
-      <div lp-nav
-           class="{{ styles.form.header.container }} group/form mb-6"
-           data-nav="tools">
+    <div class="{{ styles.card.primary }}">
+      <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="tools">
         <div data-role="header" class="{{ styles.layout.nav.header }}">
-          <h2 class="{{ styles.form.header.title }}" data-role="title"></h2>
-          <div class="{{ styles.form.header.controls }}" data-role="controls">
-            {{ controls.help() }}
-            {{ controls.close() }}
-          </div>
+          <span class="text-default-dark" data-role="title"></span>
+          {{ controls.page_controls() }}
         </div>
       </div>
-      {{ tools.create_page(category) }}
+      {{ tools.create_page(category, form_class=styles.form.default) }}
     </div>
   </div>
 {% endmacro %}
@@ -122,10 +117,10 @@
                {% if form_preload %}data-preload='{{ form_preload|tojson }}'{% endif %}
                hidden></div>
         {% endif %}
-        {% if can_edit %}{{ tools_section(category) }}{% endif %}
       {% endif %}
       {{ mobile_toggles((index or filtered).table.columns) }}
     </div>
+    {% if not filtered and can_edit %}{{ tools_section(category) }}{% endif %}
     {% if filtered %}
       {{ filtered_conditions(filtered) }}
     {% else %}
