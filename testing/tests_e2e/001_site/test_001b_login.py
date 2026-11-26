@@ -1509,7 +1509,7 @@ def test_logout_clears_session_and_returns_login(get_admin, get_user):
     expect(user.page.get_by_role("heading", name="You are logged in")).to_have_class(
         re.compile(r".*\btext-2xl\b.*")
     )
-    logout = user.page.get_by_role("button", name="Logout")
+    logout = user.page.get_by_role("button", name="Sign out")
     expect(logout).to_be_visible()
 
     with user.page.expect_navigation():
@@ -1544,7 +1544,7 @@ def test_logout_flags_user_cache_invalidation(get_admin, get_user):
     owner = get_admin()
     user = get_user(Users.logout_ajax, creator=owner)
     user.go(SitePages.LOGIN_PAGE)
-    logout = user.page.get_by_role("button", name="Logout")
+    logout = user.page.get_by_role("button", name="Sign out")
     expect(logout).to_be_visible()
 
     with (

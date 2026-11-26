@@ -6,7 +6,6 @@ from config import SETTINGS
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Forms, SitePages, Users
-from testing.elements import Tools
 from testing.resources.form import Builder
 from testing.resources.site import FormIndex
 from testing.utility.network import manual_mutation_headers
@@ -43,8 +42,6 @@ def test_form_index_shows_create_for_user_with_forms_create(get_user):
     user.go(SitePages.FORM_INDEX)
 
     expect(user.locate("#tools[lp-component]")).to_be_attached()
-    tools = Tools(user)
-    tools.open()
     expect(user.locate(FormIndex.CREATE_FORM_BUTTON)).to_be_visible()
 
 

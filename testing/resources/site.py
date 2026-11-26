@@ -24,7 +24,7 @@ Usage:
 
 from playwright.sync_api import expect
 
-from testing.elements import List, SpinnerButtons, Tools
+from testing.elements import List, SpinnerButtons
 from testing.utility.network import expect_successful_response
 
 from .core import SiteResource
@@ -188,10 +188,10 @@ class FormIndex(SiteResource):
         wait_for_index_table_loaded(self, self.TABLE_BODY)
 
     def create_form_form(self):
-        tools = Tools(self.user)
-        tools.open()
-        tools.locate(self.CREATE_FORM_BUTTON).click()
-        create_form = tools.locate(self.CREATE_FORM_WIDGET)
+        button = self.user.locate(self.CREATE_FORM_BUTTON)
+        expect(button).to_be_visible()
+        button.click()
+        create_form = self.user.locate(self.CREATE_FORM_WIDGET)
         expect(create_form).to_be_visible()
         return create_form
 
@@ -216,7 +216,7 @@ class UserIndex(SiteResource):
     TABLE_BODY = "#table tbody"
 
     PUBLIC_USERS_TOGGLE = "[data-role='public-users-toggle']"
-    PUBLIC_USERS_TOGGLE_DESKTOP = "[data-role='public-users-toggle'].desktop"
+    PUBLIC_USERS_TOGGLE_DESKTOP = "[data-role='public-users-toggle']"
     USER_GROUPS_BUTTON = "button[lp-show='user-groups:nav']"
     USER_GROUPS_COMPONENT = "#user-groups"
     NEW_USER_GROUP_BUTTON = "button[lp-show='user-groups:CreateUserGroup']"
@@ -233,20 +233,20 @@ class UserIndex(SiteResource):
 
     @property
     def create_user_form(self):
-        tools = Tools(self.user)
-        tools.open()
-        tools.locate(self.CREATE_USER_BUTTON).click()
-        create_user = tools.locate(self.CREATE_USER_WIDGET)
+        button = self.user.locate(self.CREATE_USER_BUTTON)
+        expect(button).to_be_visible()
+        button.click()
+        create_user = self.user.locate(self.CREATE_USER_WIDGET)
         expect(create_user).to_be_visible()
         expect(create_user).to_have_attribute("initialized", "")
         return create_user
 
     @property
     def user_groups(self):
-        tools = Tools(self.user)
-        tools.open()
-        tools.locate(self.USER_GROUPS_BUTTON).click()
-        user_groups = tools.locate(self.USER_GROUPS_COMPONENT)
+        button = self.user.locate(self.USER_GROUPS_BUTTON)
+        expect(button).to_be_visible()
+        button.click()
+        user_groups = self.user.locate(self.USER_GROUPS_COMPONENT)
         expect(user_groups).to_be_visible()
         return user_groups
 

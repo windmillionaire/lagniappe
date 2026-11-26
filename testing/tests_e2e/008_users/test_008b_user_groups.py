@@ -8,7 +8,7 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import General, Levels, Site
 from testing.definitions import Groups, Permissions, SitePages, Users
 from testing.definitions.group_definitions import GroupDefinition
-from testing.elements import Buttons, Modal, PermissionsForm, SpinnerButtons, Tools
+from testing.elements import Buttons, Modal, PermissionsForm, SpinnerButtons
 from testing.resources import Group
 from testing.utility.polling import expect_poll_result
 
@@ -65,9 +65,7 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
     group = Groups.general_users_view_only.get(owner)
     user_index = owner.go(SitePages.USER_INDEX)
 
-    tools = Tools(owner)
-    tools.open()
-    create_user = tools.locate(user_index.CREATE_USER_WIDGET)
+    create_user = user_index.create_user_form
     expect(create_user).to_be_visible()
 
     row = owner.locate(f"#table tbody tr[data-key='{member.entity.page.urlsafe_key}']")

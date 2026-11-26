@@ -42,19 +42,8 @@ def _assert_single_user_settings_field_set(settings_panel):
     expect(settings_panel.locator(FormElements.EMAIL)).to_have_count(1)
 
 
-def _assert_sign_out_button_in_user_header(settings_panel):
-    user_header = settings_panel.locator("[data-role='user-card'] > header")
-    user_actions = user_header.locator("[data-role='user-actions']")
-    sign_out_button = user_actions.locator("button[data-action='logout']")
-    expect(sign_out_button).to_be_visible()
-    expect(sign_out_button).to_have_attribute(
-        "data-route", re.compile(r"/users/logout$")
-    )
-    expect(sign_out_button).to_contain_text("Sign out")
-    user_fields_actions = settings_panel.locator(
-        "[data-role='user-fields'] [data-role='user-actions']"
-    )
-    expect(user_fields_actions).to_have_count(0)
+def _assert_no_sign_out_button_in_user_settings(settings_panel):
+    expect(settings_panel.locator("button[data-action='logout']")).to_have_count(0)
 
 
 def _tabs_controls(user):
@@ -193,7 +182,7 @@ def test_user_settings_panel_opens_from_my_page(get_admin, get_user, browser_fai
         Entities.fetch_one(user.entity.page.key, request=Fetch.root()).db.get("restricted_to") or []
     ) == stored_restrictions
 
-    _assert_sign_out_button_in_user_header(settings_panel)
+    _assert_no_sign_out_button_in_user_settings(settings_panel)
 
     controls = _tabs_controls(user)
     expect(controls.locator(Buttons.LP_CLOSE)).to_be_visible()
@@ -261,7 +250,7 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expected_owner_fields.extend(["api-key-settings", "owner-inbound"])
     assert user_settings_field_order(settings_panel) == expected_owner_fields
 
-    _assert_sign_out_button_in_user_header(settings_panel)
+    _assert_no_sign_out_button_in_user_settings(settings_panel)
     controls = _tabs_controls(owner)
     expect(controls.locator("button[lp-help='user_settings']")).to_be_visible()
     expect(controls.locator(Buttons.LP_CLOSE)).to_be_visible()

@@ -9,7 +9,6 @@ from lagniappe.core.definitions import Fetch, Levels, Site
 from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Groups, SitePages, Users
 from testing.elements import (
-    Dropdown,
     MobileTableControls,
     Modal,
     PermissionsForm,
@@ -390,10 +389,9 @@ def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user
     owner.page.reload()
     user_index.initialize_view()
 
-    dropdown_button = owner.locate("[data-role='tools-dropdown']")
-    expect(dropdown_button).to_be_visible()
-    expect(dropdown_button).to_have_attribute("data-combobox-id", re.compile(".+"))
-    Dropdown(dropdown_button).select_by_name("New User")
+    create_button = owner.locate(user_index.CREATE_USER_BUTTON)
+    expect(create_button).to_be_visible()
+    create_button.click()
     expect(owner.locate(user_index.CREATE_USER_WIDGET)).to_be_visible()
 
     controls = MobileTableControls(owner)

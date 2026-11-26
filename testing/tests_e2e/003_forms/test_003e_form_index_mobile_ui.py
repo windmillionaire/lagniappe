@@ -1,10 +1,9 @@
-import re
 
 import pytest
 from playwright.sync_api import expect
 
 from testing.definitions import Forms, SitePages
-from testing.elements import Dropdown, MobileTableControls
+from testing.elements import MobileTableControls
 from testing.resources.site import FormIndex
 
 pytestmark = pytest.mark.e2e
@@ -23,11 +22,9 @@ def test_form_index_mobile_tools_and_column_controls_are_exclusive(get_admin, ge
     expect(controls.row("name")).to_be_visible()
     expect(controls.row("form_type")).to_be_visible()
 
-    dropdown_button = user.locate("[data-role='tools-dropdown']")
-    expect(dropdown_button).to_be_visible()
-    expect(dropdown_button).to_have_attribute("data-combobox-id", re.compile(".+"))
-
-    Dropdown(dropdown_button).select_by_name("New Form")
+    create_button = user.locate(FormIndex.CREATE_FORM_BUTTON)
+    expect(create_button).to_be_visible()
+    create_button.click()
 
     expect(controls.panel).to_be_hidden()
     create_form = user.locate(FormIndex.CREATE_FORM_WIDGET)

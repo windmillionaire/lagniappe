@@ -425,8 +425,8 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_admin,
     expect(notifications).to_be_visible(timeout=15000)
     notifications.click()
 
-    panel = user.page.locator("[role='listbox'][data-visible='true']")
-    option = panel.locator("[role='option']").filter(has_text=body)
+    panel = user.page.locator("[role='dialog'][data-visible='true']")
+    option = panel.locator("[role='group']").filter(has_text=body)
     expect(option).to_be_visible()
     panel_box = panel.bounding_box()
     option_box = option.bounding_box()
@@ -438,7 +438,7 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_admin,
     expect(target).to_have_attribute("data-kind", "page")
     expect(target).to_contain_text(page.name)
 
-    report_option = panel.locator("[role='option']").filter(has_text=report_body)
+    report_option = panel.locator("[role='group']").filter(has_text=report_body)
     expect(report_option).to_be_visible()
     report_target = report_option.locator("[data-role='target']")
     expect(report_target).to_have_attribute(
@@ -510,13 +510,13 @@ def test_notification_menu_deletes_and_clears(
                     route.continue_()
     else:
         notifications.click()
-    panel = user.page.locator("[role='listbox'][data-visible='true']")
+    panel = user.page.locator("[role='dialog'][data-visible='true']")
     expect(panel).to_be_visible()
 
     clear_all = panel.locator("[data-action='clear-notifications']")
     expect(clear_all).to_be_visible()
 
-    first_option = panel.locator("[role='option']").filter(has_text=first_body)
+    first_option = panel.locator("[role='group']").filter(has_text=first_body)
     expect(first_option).to_be_visible()
     with user.page.expect_response(f"**/l/activity/{first.urlsafe_key}"):
         first_option.locator("[data-action='delete-notification']").click()
@@ -537,7 +537,7 @@ def test_notification_menu_deletes_and_clears(
         clear_all.click()
 
     expect(panel).to_be_visible()
-    expect(panel.locator("[role='option']")).to_have_count(0)
+    expect(panel.locator("[role='group']")).to_have_count(0)
     expect(panel.locator("[data-role='empty']")).to_have_text(
         "No unread notifications"
     )

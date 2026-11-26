@@ -276,10 +276,10 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     expect(notification_count).not_to_have_text("...", timeout=15000)
     starting_count = int(notification_count.text_content())
     notifications.click()
-    initial_menu = recipient.page.locator("[role='listbox'][data-visible='true']")
+    initial_menu = recipient.page.locator("[role='dialog'][data-visible='true']")
     message_user = initial_menu.locator("[data-action='message-user']")
     expect(message_user).to_be_visible()
-    expect(initial_menu.locator("[role='option']")).to_have_count(1)
+    expect(initial_menu.locator("[role='group']")).to_have_count(1)
     expect(message_user).not_to_have_class(re.compile(r"(?:^|\s)border-b(?:\s|$)"))
     message_user.click()
     composer = recipient.locate("[data-role='message-composer']")
@@ -303,8 +303,8 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
         "aria-label", f"Notifications: {starting_count + 1}", timeout=15000
     )
     notifications.click()
-    menu = recipient.page.locator("[role='listbox'][data-visible='true']")
-    aggregate = menu.locator("[role='option']").filter(
+    menu = recipient.page.locator("[role='dialog'][data-visible='true']")
+    aggregate = menu.locator("[role='group']").filter(
         has_text="1 new message"
     )
     expect(aggregate).to_be_visible()
@@ -502,9 +502,9 @@ def test_inbound_message_allows_reply_without_compose_permission(get_admin, get_
     home.wait_for_interaction_readiness()
     notifications = recipient.locate("[data-role='notifications']")
     notifications.click()
-    menu = recipient.page.locator("[role='listbox'][data-visible='true']")
+    menu = recipient.page.locator("[role='dialog'][data-visible='true']")
     expect(menu.locator("[data-action='message-user']")).to_have_count(0)
-    aggregate = menu.locator("[role='option']").filter(has_text="1 new message")
+    aggregate = menu.locator("[role='group']").filter(has_text="1 new message")
     expect(aggregate).to_be_visible()
     with recipient.page.expect_navigation():
         aggregate.get_by_role("link", name="1 new message", exact=True).click()

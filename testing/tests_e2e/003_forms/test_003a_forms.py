@@ -16,8 +16,9 @@ from testing.definitions import (
     SitePages,
     TaskFormFields,
 )
-from testing.elements import Buttons, FormElements, Modal, SpinnerButtons, Table, Tools
+from testing.elements import Buttons, FormElements, Modal, SpinnerButtons, Table
 from testing.resources.form import Builder
+from testing.resources.site import FormIndex
 from testing.definitions.form_definitions import FormDefinition
 from testing.resources import Form
 from testing.utility.reconnect import expect_reconnect_refresh
@@ -49,9 +50,12 @@ def test_forms_index_page(get_admin, get_user, browser_failures):
     finally:
         Entities.delete(external_form)
 
-    tools = Tools(user)
-    tools.open()
-    tools.close()
+    create_button = user.locate(FormIndex.CREATE_FORM_BUTTON)
+    expect(create_button).to_be_visible()
+    create_button.click()
+    expect(user.locate(FormIndex.CREATE_FORM_WIDGET)).to_be_visible()
+    user.locate("#tools [lp-close]").click()
+    expect(user.locate("#tools")).to_be_hidden()
 
 
 # @template delete/form.html::instance_link
