@@ -10,7 +10,7 @@ from flask import abort, request, g, make_response
 
 from flask_login import current_user
 from lagniappe.core.definitions import Action, Fetch, Resource
-from lagniappe.core.properties.home import ToolsList
+from lagniappe.core.properties.home import CategoryList, ToolsList
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.properties.notification_aggregate import counts as aggregate_counts
@@ -22,6 +22,7 @@ from lagniappe.core.tools.polling.projections import (
     render_operation_statuses,
 )
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
+from lagniappe.web.ai_display import home_ai_context_keys
 from lagniappe.web.auth import authenticated_user, home_permission, logged_in
 from lagniappe.web import responses
 
@@ -35,7 +36,10 @@ def _home_poll_channels(kind: str | None) -> tuple[str, ...]:
 
 
 @home.route("/")
-@home_permission(anonymous_endpoint="home.public_directory", poll_channels=_home_poll_channels)
+@home_permission(
+    anonymous_endpoint="home.public_directory", poll_channels=_home_poll_channels,
+    context_keys=home_ai_context_keys,
+)
 def home_page(*, poll_revisions: dict[str, str]) -> ResponseReturnValue:
     home = Entities.HOME(user=authenticated_user())
     return responses.home_page(home, poll_revisions)
@@ -48,6 +52,8 @@ def get(kind: str, *, poll_revisions: dict[str, str]) -> ResponseReturnValue:
         abort(403)
     home = Entities.HOME(user=authenticated_user())
     section = home.section(kind, cursor=request.args.get("cursor"))
+    if isinstance(section, CategoryList) and g.get("experiments_variant") == "home-categories:control":
+        section.fetch_request = Fetch.direct()
     if isinstance(section, ToolsList):
         render_operation_statuses(section.list, authenticated_user())
 

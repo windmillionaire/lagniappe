@@ -1,5 +1,6 @@
 """Runtime resolution for application AI settings."""
 
+from collections.abc import Mapping
 import logging
 from typing import Literal, TypedDict
 
@@ -29,6 +30,12 @@ RUNTIME_AI_SETTING_KEYS: tuple[ModelSetting, ...] = (
 )
 
 
+def auto_execute_setting(record: Mapping[str, object] | None, config: object) -> bool:
+    if record is not None and "AI_AUTO_EXECUTE" in record:
+        return bool(record["AI_AUTO_EXECUTE"])
+    return bool(getattr(config, "AI_AUTO_EXECUTE", False))
+
+
 def runtime_ai_settings(config: object = CONFIG) -> RuntimeAISettings:
     """Return live site AI settings over deployment-configured fallbacks."""
     settings: RuntimeAISettings = {
@@ -48,7 +55,7 @@ def runtime_ai_settings(config: object = CONFIG) -> RuntimeAISettings:
             "AI_LOCATION",
             constants.DEFAULT_AI_LOCATION,
         ),
-        "AI_AUTO_EXECUTE": bool(getattr(config, "AI_AUTO_EXECUTE", False)),
+        "AI_AUTO_EXECUTE": auto_execute_setting(None, config),
     }
     try:
         persisted = site_database.ai()
@@ -63,6 +70,5 @@ def runtime_ai_settings(config: object = CONFIG) -> RuntimeAISettings:
         for key in RUNTIME_AI_SETTING_KEYS:
             if persisted.get(key):
                 settings[key] = persisted[key]
-        if "AI_AUTO_EXECUTE" in persisted:
-            settings["AI_AUTO_EXECUTE"] = bool(persisted.get("AI_AUTO_EXECUTE"))
+        settings["AI_AUTO_EXECUTE"] = auto_execute_setting(persisted, config)
     return settings

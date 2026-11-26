@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
 
-from flask import request
+from flask import g, request
 from flask_login import current_user
 
 from lagniappe.core.definitions import Action, Fetch, Resource
@@ -31,10 +31,16 @@ def get_notes(
     rows = database_get.page_notes(page)
     if not rows:
         page.remember_empty_notes()
-    loaded = Entities.fetch(
-        *rows,
-        request=Fetch.direct(),
-    )
+        return responses.page_notes([], page)
+    if g.get("experiments_variant") != "page-notes:control":
+        viewer = authenticated_user()
+        known = {entity.key: entity for entity in (page, viewer) if entity.key is not None}
+        notes_to_load = [Entities.NOTE(row) for row in rows]
+        for note in notes_to_load:
+            note.attach(known, resolved_keys=known)
+    else:
+        notes_to_load = rows
+    loaded = Entities.fetch(*notes_to_load, request=Fetch.direct())
     notes = [
         note
         for note in loaded

@@ -170,7 +170,7 @@ def test_home_category_list_restrictions_and_cursor(monkeypatch):
         )
     ]
     assert fetch_requests == [
-        (("category-1", "category-2"), home_properties.Fetch.direct())
+        (("category-1", "category-2"), home_properties.Fetch.root())
     ]
     assert loaded_categories == categories
     assert section.cursor == "category-next"

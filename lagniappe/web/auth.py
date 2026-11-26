@@ -409,6 +409,7 @@ def home_permission(
     *,
     anonymous_endpoint: str | None = None,
     poll_channels: Callable[[str | None], tuple[str, ...]] | None = None,
+    context_keys: Callable[[], Sequence[Key]] | None = None,
 ) -> _PermissionDecorator:
     """Authenticate Home reads and share their revision keys with the session lookup."""
 
@@ -435,7 +436,10 @@ def home_permission(
                 database_utility.site_fingerprint_keys(paths)
                 if paths and session.get(LOGIN_USER_KEY) else {}
             )
-            user, _entity = _load_request_context(context_keys=tuple(set(keys.values())))
+            lookup_keys = set(keys.values())
+            if keys and context_keys and request.method == "GET":
+                lookup_keys.update(context_keys())
+            user, _entity = _load_request_context(context_keys=tuple(lookup_keys))
             if not user.is_authenticated:
                 if anonymous_endpoint:
                     return redirect(url_for(anonymous_endpoint))

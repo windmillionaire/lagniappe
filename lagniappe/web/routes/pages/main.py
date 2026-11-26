@@ -40,6 +40,7 @@ from lagniappe.web.auth import (
     permission,
     require_ai_access,
 )
+from lagniappe.web.ai_display import fingerprint_auto_execute_enabled
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web import deferred_autofill
@@ -70,16 +71,12 @@ def _page_view_fingerprint(page, user):
     """Empty-notes discovery changes initial HTML, not the Page's content revision."""
     base = f"{deferred_autofill.form_fingerprint(page, user)}:{int(page.has_notes)}"
     if getattr(page, "user", None):
-        from lagniappe.core.tools.ai.auto_execute import site_auto_execute_enabled
-
-        return f"{base}:{int(site_auto_execute_enabled())}"
+        return f"{base}:{int(fingerprint_auto_execute_enabled())}"
     return base
 
 
 def _user_settings_fingerprint(page, user):
-    from lagniappe.core.tools.ai.auto_execute import site_auto_execute_enabled
-
-    return f"{page.fingerprint}:{int(site_auto_execute_enabled())}"
+    return f"{page.fingerprint}:{int(fingerprint_auto_execute_enabled())}"
 
 
 @pages.route("<key>", methods=["GET"])

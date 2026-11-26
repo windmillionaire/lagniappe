@@ -156,19 +156,8 @@ def initialize(app: Flask) -> None:
         }
     )
     app.jinja_env.filters.pop("safe", None)
-    from flask import g, has_request_context
-    from lagniappe.core.tools.ai.auto_execute import site_auto_execute_enabled
+    from lagniappe.web.ai_display import auto_execute_site_enabled
     from lagniappe.web.deferred_autofill import form_state
-
-    def auto_execute_site_enabled() -> bool:
-        if has_request_context():
-            cached = getattr(g, "_auto_execute_site_enabled", None)
-            if cached is not None:
-                return bool(cached)
-            value = site_auto_execute_enabled()
-            g._auto_execute_site_enabled = value
-            return value
-        return site_auto_execute_enabled()
 
     app.jinja_env.globals.update(
         {

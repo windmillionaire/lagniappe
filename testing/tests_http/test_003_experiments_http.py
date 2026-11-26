@@ -474,34 +474,38 @@ def test_experiments_comparison_metadata_survives_304(monkeypatch):
         assert "invalid-private-value" not in json.dumps(records[-1])
 
 
-@pytest.mark.parametrize("enabled,mode,endpoint,variant,tag", [
-    (True, "summary", "projects.status", "listed", "project-stage:listed"),
-    (True, "summary", "projects.status", "direct", "project-stage:direct"),
-    (True, "summary", "projects.status", "reload", None),
-    (True, "summary", "other", "direct", None),
-    (False, "summary", "projects.status", "direct", None),
-    (True, "off", "projects.status", "direct", None),
+@pytest.mark.parametrize("enabled,mode,endpoint,kind,variant,tag", [
+    (True, "summary", "home.home_page", "all", "control", "home-ai:control"),
+    (True, "summary", "pages.view", "all", "optimized", "page-ai:optimized"),
+    (True, "summary", "pages.user_settings", "all", "control", "page-ai:control"),
+    (True, "summary", "internal.get", "categories", "control", "home-categories:control"),
+    (True, "summary", "internal.get", "pages", "control", None),
+    (True, "summary", "pages.get_notes", "all", "optimized", "page-notes:optimized"),
+    (True, "summary", "projects.status", "all", "control", None),
+    (True, "summary", "home.home_page", "all", "unknown", None),
+    (False, "summary", "home.home_page", "all", "control", None),
+    (True, "off", "home.home_page", "all", "control", None),
 ])
-def test_stage_trial_traces_only_selected_requests(monkeypatch, enabled, mode, endpoint, variant, tag):
-    flask_app = Flask("stage-trial")
+def test_read_comparisons_trace_only_selected_routes(monkeypatch, enabled, mode, endpoint, kind, variant, tag):
+    flask_app = Flask("read-comparison")
     records = []
     monkeypatch.setattr(measurements, "emit", records.append)
     initialize_measurements(flask_app, SimpleNamespace(
         EXPERIMENTS_ENABLED=enabled, EXPERIMENTS_DIAGNOSTICS=mode, EXPERIMENTS_SOURCE_ID="fixture",
     ))
 
-    @flask_app.get("/stage", endpoint=endpoint)
-    def stage():
-        with measurements.span("stage", "build_filter"), measurements.span("datastore", "lookup"):
+    @flask_app.get("/get/<kind>", endpoint=endpoint)
+    def route(kind):
+        with measurements.span("datastore", "lookup"):
             return "ok"
 
-    response = flask_app.test_client().get("/stage", headers={"X-Lagniappe-Experiments-Project-Stage": variant})
+    response = flask_app.test_client().get(f"/get/{kind}", headers={"X-Lagniappe-Experiments-Reads": variant})
     assert response.headers.get("X-Lagniappe-Experiment") == tag
     if not enabled or mode == "off":
         assert not records
     elif tag:
         assert records[0]["experiment"] == tag
         assert isinstance(records[0]["process"], int)
-        assert [event["operation"] for event in records[0]["trace"]] == ["datastore.lookup", "stage.build_filter"]
+        assert [event["operation"] for event in records[0]["trace"]] == ["datastore.lookup"]
     else:
         assert "experiment" not in records[0] and "trace" not in records[0]

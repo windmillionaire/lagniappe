@@ -515,3 +515,74 @@ def test_stage_list_selection_preserves_project_membership_and_view_permission(m
     foreign_key = Key("models", "stage", parent=other_project_key).to_legacy_urlsafe().decode()
     assert tasks._project_model(project, foreign_key, from_stage_list=True) is None
     assert tasks._project_model(project, "invalid", from_stage_list=True) is None
+
+
+@pytest.mark.parametrize("stored,expected", [({}, True), ({"AI_AUTO_EXECUTE": False}, False)])
+def test_home_ai_display_uses_settings_from_the_session_lookup(monkeypatch, stored, expected):
+    from flask import g
+    from google.cloud.datastore import Key
+    from lagniappe.web import ai_display
+
+    key = Key("site", "ai", project="offline")
+    monkeypatch.setattr(CONFIG, "AI_ENABLED", True)
+    monkeypatch.setattr(CONFIG, "AI_AUTO_EXECUTE", True, raising=False)
+    monkeypatch.setattr(ai_display.site, "key", lambda _: key)
+    with app.test_request_context("/"):
+        assert ai_display.home_ai_context_keys() == (key,)
+        g.request_context_records = {key: stored} if stored else {}
+        assert ai_display.auto_execute_site_enabled() is expected
+
+    with app.test_request_context("/", headers={"If-None-Match": '"cached"'}):
+        assert ai_display.home_ai_context_keys() == ()
+
+
+def test_personal_page_fingerprint_and_template_share_one_setting_per_request(monkeypatch):
+    from lagniappe.web import ai_display
+    from lagniappe.web.routes.pages.main import _user_settings_fingerprint
+
+    values = iter([False, True])
+    monkeypatch.setattr(ai_display, "site_auto_execute_enabled", lambda: next(values))
+    template_setting = app.jinja_env.globals["auto_execute_site_enabled"]
+    for enabled in (False, True):
+        with app.test_request_context("/"):
+            assert _user_settings_fingerprint(SimpleNamespace(fingerprint="page"), None) == f"page:{int(enabled)}"
+            assert template_setting() is enabled
+
+
+def test_page_notes_load_only_other_authors_and_preserve_visibility(monkeypatch):
+    from flask import g
+    from google.cloud.datastore import Entity, Key
+    from lagniappe.web.routes.pages import notes
+
+    def row(kind, name, **fields):
+        record = Entity(key=Key(kind, name, project="offline"))
+        record.update(type=kind, name=name, hash=name, **fields)
+        return record
+
+    page = Entities.PAGE(row("page", "page"))
+    viewer = Entities.USER(row("user", "viewer", email="viewer@example.invalid"))
+    other = row("user", "other", email="other@example.invalid")
+    data = [
+        row("note", name, parent=page.key, user=user, visibility=visibility, scope="page")
+        for name, user, visibility in (
+            ("mine", viewer.key, "private"),
+            ("hidden", other.key, "private"),
+            ("shared", other.key, "everyone"),
+        )
+    ]
+    monkeypatch.setattr(notes.database_get, "page_notes", lambda _page: data)
+    monkeypatch.setattr(notes.responses, "page_notes", lambda items, _page: [(n.name, n.user.name) for n in items])
+    viewer.permissions = {page.hash: "VIEW"}
+    page.db["requires"] = [page.hash]
+    reads = []
+
+    def read(keys):
+        if keys:
+            reads.append(set(keys))
+        return [other] if other.key in keys else []
+
+    monkeypatch.setattr(notes.database_get, "entities", read)
+    with app.test_request_context():
+        g._login_user = viewer
+        assert notes.get_notes.__wrapped__(page.urlsafe_key, entity=page) == [("mine", "viewer"), ("shared", "other")]
+    assert reads == [{other.key}]
