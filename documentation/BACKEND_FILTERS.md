@@ -31,7 +31,7 @@ Filter Entity (core/entities/filter.py)
 FilterCache (core/tools/filters/cache.py)
   │
   ├── Builds entity filter indices (entity.to_filter_index)
-  ├── Stores as Redis JSON keyed by entity hash + user access
+  ├── Stores as Redis JSON keyed by parent hash and format scope
   └── Queries with FilterExpression → JSONPath
          │
          ▼
@@ -167,16 +167,31 @@ Caches entity filter indices in Redis JSON for fast querying.
 
 ### Cache Key
 
-The shared cache key is the parent hash plus the format scope `all-v2`.
-Permission checks happen after matched roots are loaded. The scope version
-ensures caches built before punctuation-preserving values are not reused.
+Projects and Categories use the parent hash and the `all-v4` format scope.
+The first read rebuilds projections from older scopes. Each query checks the
+viewer's permissions after loading the matching entities.
 
 ### Building the Cache
 
-`cache()` either creates or refreshes the cache:
+Categories fetch active Pages in batches of 100. A Page can belong through its
+model Category, its additional Categories, or both. Projects fetch all their
+Tasks, including completed Tasks, and their filterable relations. Both use
+`entity.to_filter_index()` to build the RedisJSON document. A Page's own task
+list uses `database_get.page_tasks()` and applies the viewer's permissions.
 
-- **Create**: Paginates through all child entities (pages for categories, tasks for projects), calls `entity.to_filter_index(user)` on each, and stores the result as a Redis JSON document.
-- **Refresh**: Checks which entities have been modified since the last cache build and updates only those entries.
+One worker holds a renewable Redis lease per parent. Concurrent readers share
+its published index. After a committed edit, writers record the member hash
+and its current parent hashes before looking up published indexes. Page and
+Task changes have independent bounded histories. A builder reloads if its
+parent or a member changed, or if its history no longer covers the scan.
+Each Category retry starts at the first page with an empty result. A Redis
+transaction verifies ownership and publishes the complete index with its expiry.
+
+A clean index needs one RedisJSON read to check for refresh markers. An
+incremental refresh watches the document and reloads marked members. It removes
+deleted members, Tasks that moved to another Project, and Pages that became
+inactive or left this Category. A racing edit or expiry causes a retry.
+If a builder stops, its lease expires and a waiting reader can take over.
 
 ### Querying
 

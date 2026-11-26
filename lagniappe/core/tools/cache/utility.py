@@ -11,6 +11,7 @@ from redis import ResponseError
 
 from .core import cache, filter_cache
 from .keys import Keys, Search
+from .filter_publication import MEMBER_HISTORIES, record_changes
 
 MISSING_INDEX_MESSAGES = (
     "unknown index name",
@@ -58,8 +59,9 @@ def _drop_index_if_exists(index):
 
 def delete(entities: Collection[Entity | None]) -> None:
     """Remove entities from both the hash cache and parent JSON indexes."""
-    hash_map = {e.hash: e for e in entities if e and e.hash}
-    existing_parents = filter_cache.get_existing_parents(hash_map.keys())
+    members = {e.hash: e for e in entities if e and e.hash and e.kind in MEMBER_HISTORIES}
+    record_changes(members.values())
+    existing_parents = filter_cache.get_existing_parents(members.keys()) if members else {}
 
     entity_keys = set()
     for entity in (entity for entity in entities if entity):

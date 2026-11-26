@@ -210,6 +210,8 @@ cache = Cache()
 class CacheJSON:
     """Redis JSON cache client for filter and relationship data."""
 
+    ttl = timedelta(days=1)
+
     def __init__(self) -> None:
         self._redis: Redis | None = None
         self.INDEX = Keys.JSON_INDEX.value
@@ -282,7 +284,7 @@ class CacheJSON:
         except ResponseError as e:
             capture(e, context={"method": "create", "key": key, "mapping": mapping})
             raise e
-        self.redis.expire(key, timedelta(days=1))
+        self.redis.expire(key, self.ttl)
 
     def query(self, key: str, json_path: str) -> JsonType:
         """Return a JSON value at a specific path within a key."""
@@ -301,7 +303,7 @@ class CacheJSON:
             except ResponseError as e:
                 capture(e, context={"method": "set", "key": key, "mapping": mapping})
                 raise e
-            self.redis.expire(key, timedelta(days=1))
+            self.redis.expire(key, self.ttl)
 
     def refresh_needed(self, cache_key: str) -> list[str]:
         """Get member IDs within a specific JSON object that have refresh stubs"""
