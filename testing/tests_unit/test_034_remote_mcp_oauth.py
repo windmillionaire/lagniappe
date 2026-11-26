@@ -721,14 +721,14 @@ def test_access_reads_current_grant_and_user_in_one_lookup(monkeypatch):
     database.key.side_effect = lambda kind, name: Key(kind, name, project="offline")
     monkeypatch.setattr(store.DATA, "_datastore_client", database)
 
-    actor = Entity(database.key("users", "actor"))
+    actor = Entity(store.create_named_key("users", "actor"))
     actor.update({"type": "user", "active": True})
     grant_name = auth._grant_name(auth.Entities.USER(actor), CLIENT_ID)
-    grant = Entity(database.key("mcp_oauth", grant_name))
+    grant = Entity(store.create_named_key("mcp_oauth", grant_name))
     grant.update(config, client_id=CLIENT_ID, family="family", user=actor.key,
                  expires_at=NOW + timedelta(minutes=5))
     token = auth._secret("a")
-    access = Entity(database.key("mcp_oauth", auth._name(token, "a")))
+    access = Entity(store.create_named_key("mcp_oauth", auth._name(token, "a")))
     access.update(grant, grant=grant_name, generation=1, issued_at=NOW)
     rows = {row.key: row for row in (access, actor, grant)}
     database.get.side_effect = lambda key, **kwargs: rows.get(key)

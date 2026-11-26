@@ -517,9 +517,8 @@ def test_uncomplete_from_loaded_task_history_closes_task(get_admin, get_user):
 
     expect(task.element).to_have_attribute("data-completed", "false")
     expect(task.element).to_have_attribute("data-open", "false")
-    settings = task.element.locator(Task.SETTINGS_FORM)
-    expect(settings).not_to_have_attribute("rendered", "")
-    expect(settings).to_be_hidden()
+    expect(task.element.locator(Task.CHIP_TRAY)).not_to_have_attribute("data-tray-open", "true")
+    expect(task.element.locator("[data-role='chip-drawer']:visible")).to_have_count(0)
     expect(task.element.locator(Task.TASK_HISTORY)).to_be_hidden()
 
     refreshed_history = _open_history(task)

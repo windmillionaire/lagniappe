@@ -179,6 +179,8 @@ class HomePage(SitePage):
         return self.user.locate(self.USER_PAGE_BUTTON)
 
     def _open_loaded_list(self, list_selector, toggle_selector, wait_for_toggle=True):
+        # Home restores the user's open sections during startup prefetch.
+        self.wait_for_interaction_readiness()
         list_helper = List(self.user.locate(list_selector))
 
         if list_helper.list.get_attribute("data-visible") != "true":
@@ -192,6 +194,10 @@ class HomePage(SitePage):
         assert list_helper.is_loaded
         expect(list_helper.list).to_be_visible()
         return list_helper
+
+    @property
+    def report_list(self):
+        return self._open_loaded_list(self.TOOL_REPORT_LIST, self.TOOL_REPORT_LIST_TOGGLE).list
 
     @property
     def task_list(self):

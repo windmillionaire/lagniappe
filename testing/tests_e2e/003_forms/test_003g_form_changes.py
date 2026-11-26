@@ -1263,7 +1263,8 @@ def test_failed_preflight_recovers_after_reload(get_admin, get_user):
     expect(status).to_contain_text("needs attention", timeout=30000)
     expect(user.locate("#notification [data-role='form-change-status']")).to_be_visible()
     expect(user.locate(builder.SAVE_BUTTON)).to_be_disabled()
-    expect(user.locate("[lp-view] > section")).to_have_count(3)
+    for column in ("components-column", "main-column", "settings-column"):
+        expect(user.locate(f"[lp-view] #{column}")).to_be_visible()
     expect(user.page.get_by_role("button", name="Cancel update", exact=True)).to_have_count(0)
     assert (
         Entities.fetch_one(task.key, request=Fetch.root()).properties.submission.value[

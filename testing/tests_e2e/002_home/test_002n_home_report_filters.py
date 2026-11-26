@@ -48,10 +48,7 @@ def _report(user, tool="create", status="ready", **data):
 
 def _open_reports(user):
     home = user.go(SitePages.HOME)
-    user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
-    panel = user.locate(home.TOOL_REPORT_LIST)
-    expect(panel).to_have_attribute("loaded", "")
-    return panel
+    return home.report_list
 
 
 def _filter(panel, value):

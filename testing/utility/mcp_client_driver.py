@@ -243,7 +243,7 @@ async def _revoke_browser_key(specification: dict[str, Any]) -> dict[str, Any]:
 async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]:
     result: dict[str, Any] = {}
     async with _connection() as client:
-        result["tools"] = [_dump(tool.as_mcp_tool()) for tool in client.tools.values()]
+        result["tools"] = [_dump(tool.as_mcp_tool()) for tool in client.listed_tools()]
 
         actor_call = await _call(client, "get_actor", {})
         actor = _structured(actor_call)
@@ -588,7 +588,7 @@ async def _foreign_plan(specification: dict[str, Any]) -> tuple[dict[str, Any], 
     try:
         async with _connection() as client:
             result = {
-                "tools": [_dump(tool.as_mcp_tool()) for tool in client.tools.values()],
+                "tools": [_dump(tool.as_mcp_tool()) for tool in client.listed_tools()],
                 "foreign_plan": await _call(
                     client,
                     "get_plan",

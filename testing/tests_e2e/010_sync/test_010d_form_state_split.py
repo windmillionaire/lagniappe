@@ -222,8 +222,10 @@ def test_task_collection_refresh_preserves_active_form_for_revision_review(
         owner.page,
         subscription_id=f"edit:{task.key}",
         timeout=25000,
+    ), expect_successful_response(
+        collaborator.page, method="PUT", path=f"/tasks/{task.key}/update", entity_key=task.key,
     ):
-        collaborator_task.save()
+        collaborator_form.get_by_role("button", name="Update", exact=True).click()
 
     task_form = task.element.locator(task.TASK_FORM)
     marker = task_form.locator("[lp-edited-marker]")

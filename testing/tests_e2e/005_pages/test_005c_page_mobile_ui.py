@@ -2,7 +2,7 @@ import pytest
 from playwright.sync_api import expect
 
 from testing.definitions import Pages
-from testing.elements import FormElements, MobileNav, Tabs
+from testing.elements import MobileNav, Tabs
 from testing.resources import Page
 from testing.utility.network import scoped_browser_route
 
@@ -96,9 +96,9 @@ def test_page_mobile_create_task_opens_from_tasks_section(get_admin, get_user):
 
     page.mobile_nav.select_section("tasks:active")
 
-    create_form = user.locate(Page.CREATE_TASK_FORM)
-    expect(create_form).to_be_visible()
-    expect(create_form.locator(FormElements.NAME)).to_be_visible()
+    quick_add = user.locate(Page.QUICK_ADD_FORM)
+    expect(quick_add.get_by_role("textbox", name="Add a task")).to_be_visible()
+    expect(quick_add.get_by_role("button", name="Add", exact=True)).to_be_visible()
 
 
 def test_page_mobile_selection_persists_after_reload(get_admin, get_user):

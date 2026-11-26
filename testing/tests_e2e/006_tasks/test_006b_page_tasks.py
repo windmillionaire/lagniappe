@@ -557,8 +557,8 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_admi
     page = Pages.test_create_page_task.get(user)
     user.go(task)
 
-    expect(task.element.locator(task.CHIP_TRAY_TOGGLE)).to_be_visible()
     task_form = _open_page_task_form(page, task)
+    expect(task.element.locator(task.CHIP_TRAY_TOGGLE)).to_be_visible()
     expect(task_form).to_be_visible()
 
     with expect_successful_response(

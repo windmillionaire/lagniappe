@@ -415,9 +415,7 @@ def create_app(
         adapter: HostedAdapter = ctx.request.state.mcp_adapter
         await adapter.initialize()
         tools = []
-        for definition in adapter.tools.values():
-            if definition.name == "get_entity" and "get_entities" in adapter.tools:
-                continue  # Still callable by clients with the earlier tool list.
+        for definition in adapter.listed_tools():
             tool = definition.as_mcp_tool(ctx.protocol_version)
             values = tool.model_dump(by_alias=True, exclude_none=True)
             values["_meta"] = {**values.get("_meta", {}), "securitySchemes": _SCHEMES}

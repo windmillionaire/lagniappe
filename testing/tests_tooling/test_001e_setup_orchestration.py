@@ -139,6 +139,8 @@ def _install_harness(
 
         return invoke
 
+    monkeypatch.setattr("runner.frontend_bundle.sync", step("sync_frontend_bundle"))
+
     def set_application_defaults():
         events.append("set_application_defaults")
         assert settings.APP == {}
@@ -277,6 +279,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
         "ensure_pip_is_available",
         "check_gcloud_cli",
         "ensure_setup_dependencies",
+        "sync_frontend_bundle",
         "set_application_defaults",
         "enable_gcloud_apis",
         "setup_app_engine",

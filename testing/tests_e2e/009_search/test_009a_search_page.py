@@ -263,7 +263,8 @@ def test_facet_selection_visual_state(get_admin, get_user):
 
     project_facet = user.locate(f"{SEARCH_FACET}[data-kind='project']")
     category_facet = user.locate(f"{SEARCH_FACET}[data-kind='category']")
-    project_facet.click()
+    # Keyboard selection keeps the pointer clear of the changing facet layout.
+    project_facet.press("Enter")
 
     expect(user.locate(SEARCH_FACETS)).to_have_attribute("data-has-selection", "true")
     expect(project_facet).to_have_attribute("data-selected", "true")

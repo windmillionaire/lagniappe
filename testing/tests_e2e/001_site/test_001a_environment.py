@@ -37,6 +37,7 @@ from types import SimpleNamespace
 from urllib.parse import urlencode, urlsplit
 from uuid import uuid4
 
+from bs4 import BeautifulSoup
 import pytest
 import requests
 from playwright.sync_api import expect
@@ -283,7 +284,7 @@ def test_authenticated_home_response_headers_include_etag(get_admin, browser_fai
     assert headers["x-content-type-options"] == "nosniff"
     assert headers["referrer-policy"] == "strict-origin-when-cross-origin"
     assert "content-security-policy-report-only" not in headers
-    assert '<div lp-view data-kind="home"' in direct.text
+    assert BeautifulSoup(direct.text, "html.parser").select_one("[lp-view][data-kind='home']")
     csp = headers["content-security-policy"]
     assert "script-src 'self' https://accounts.google.com/gsi/client" in csp
     assert (
@@ -355,7 +356,7 @@ def test_authenticated_home_response_headers_include_etag(get_admin, browser_fai
     assert uncached.status_code == 200
     assert_same_etag(uncached.headers.get("etag"), headers["etag"])
     assert uncached.headers["content-type"].startswith("text/html")
-    assert '<div lp-view data-kind="home"' in uncached.text
+    assert BeautifulSoup(uncached.text, "html.parser").select_one("[lp-view][data-kind='home']")
 
 
 def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):

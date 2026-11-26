@@ -207,7 +207,11 @@
 
 /* @style builder.save */
 .builder-save-button {
+	display: inline-grid;
+	grid-template-columns: auto auto;
+	padding-inline: 0.625rem;
 	& > .builder-save-icon {
+		grid-area: 1 / 1;
 		display: inline-grid;
 		place-items: center;
 		& > .icon {
@@ -216,26 +220,25 @@
 		}
 	}
 	& > .builder-save-label {
-		display: none;
+		grid-area: 1 / 2;
+		visibility: hidden;
 		line-height: 1;
 		transform: translateY(1px);
 	}
 	&[data-saved="true"]:not([aria-busy="true"]) {
 		color: var(--color-project-default);
 		cursor: default;
-		padding-inline: 0.375rem;
 		& > .builder-save-icon > [data-icon="builder.saved"] {
 			visibility: visible;
 		}
 		& > .builder-save-label[data-state="saved"] {
-			display: inline;
+			visibility: visible;
 		}
 	}
 	&[data-saved="false"]:not([aria-busy="true"]) {
 		background-color: var(--color-form-default);
 		color: white;
 		cursor: pointer;
-		padding-inline: 0.625rem;
 		box-shadow: var(--shadow-xs);
 		&:hover,
 		&:focus-visible {
@@ -250,19 +253,18 @@
 			visibility: visible;
 		}
 		& > .builder-save-label[data-state="unsaved"] {
-			display: inline;
+			visibility: visible;
 		}
 	}
 	&[aria-busy="true"] {
 		background-color: var(--color-base-bg);
 		color: var(--color-base-medium);
 		cursor: wait;
-		padding-inline: 0.625rem;
 		& > .builder-save-icon > [data-icon="spinner"] {
 			visibility: visible;
 		}
 		& > .builder-save-label[data-state="saving"] {
-			display: inline;
+			visibility: visible;
 		}
 	}
 }

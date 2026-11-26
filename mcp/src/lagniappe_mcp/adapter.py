@@ -240,6 +240,13 @@ class LagniappeAdapter:
         self.actor: JsonObject | None = None
         self.tools: dict[str, ToolDefinition] = {}
 
+    def listed_tools(self) -> list[ToolDefinition]:
+        """List tools advertised to new clients while keeping legacy calls available."""
+        return [
+            tool for tool in self.tools.values()
+            if tool.name != "get_entity" or "get_entities" not in self.tools
+        ]
+
     async def initialize(self) -> None:
         discovery, actor, catalog = await self.rest.startup()
         validate_value(ACTOR_SCHEMA, actor, phase="actor")

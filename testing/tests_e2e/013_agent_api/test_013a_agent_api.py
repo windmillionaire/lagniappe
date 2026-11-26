@@ -1110,6 +1110,8 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         not in (guidance.json["result"]["guidelines"])
     )
 
+    registered_executor = ai_functions.execute_registered_tool
+
     def execute(name, arguments, user, *, external=False):
         seen.update(name=name, arguments=arguments, user=user, external=external)
         return {"items": [{"hash": "pagehash1234"}]}, []
@@ -1171,9 +1173,13 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         key = "downloadable-file-key"
         entity_kind = "file"
         properties = SimpleNamespace(
-            file=SimpleNamespace(value=FileAsset({"path": "private/person.vcf"})),
+            file=SimpleNamespace(value=FileAsset({"path": "private/person.vcf"}), uri_to_ai=None),
+            text=SimpleNamespace(asset=None),
             get=lambda _name: None,
         )
+
+        def to_ai(self, user):
+            return {"filename": "person.vcf"}
 
         def allowed(self, action, user=None):
             return user is actor
@@ -1182,25 +1188,12 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     monkeypatch.setattr(
         Entities,
         "fetch_one",
-        lambda identifier, request: (
-            report if identifier == "report-key" else DownloadableFile()
-        ),
+        lambda identifier, request: {"report-key": report, DownloadableFile.key: DownloadableFile()}.get(identifier),
     )
-    monkeypatch.setattr(
-        ai_functions,
-        "execute_registered_tool",
-        lambda name, arguments, user, **_context: (
-            {
-                "filename": "person.vcf",
-                "original_file": {
-                    "supported": False,
-                    "attached": False,
-                    "reason": "Provider does not support this MIME type.",
-                },
-            },
-            [],
-        ),
-    )
+    monkeypatch.setattr(ai_functions, "execute_registered_tool", registered_executor)
+    monkeypatch.setattr(cache_store, "get_details_by_hash", lambda hashes: {
+        "filehash1234": {"id": DownloadableFile.key}
+    } if "filehash1234" in hashes else {})
     signed = []
     monkeypatch.setattr(
         storage_assets,

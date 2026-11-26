@@ -236,7 +236,6 @@ def test_complete_task_from_home_page(get_admin, get_user):
         - user.get_user_page(): Navigate to user's personal page
         - user_page.uncomplete_task(): Undo completion
         - task.set_due_date(): Update task due date
-        - task.save(): Persist changes to database
     """
     user = get_admin()
     task = Tasks.test_complete_task_from_home_page.get(user)
@@ -255,7 +254,6 @@ def test_complete_task_from_home_page(get_admin, get_user):
     task.element = user_page.active_task_list.get_item(task)
 
     task.set_due_date(DueDates.personal_task_due_today)
-    task.save()
 
     home = user.go(SitePages.HOME)
     task_item = home.task_list.get_item(task)
@@ -409,7 +407,6 @@ def test_postpone_task_due_date_to_no_due_date(get_admin, get_user):
     task.element = user_page.active_task_list.get_item(task)
 
     task.set_due_date(DueDates.personal_task_due_today)
-    task.save()
 
     home = user.go(SitePages.HOME)
     task_item = home.task_list.get_item(task)
