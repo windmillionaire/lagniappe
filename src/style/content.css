@@ -54,6 +54,13 @@
 }
 
 /* @style dropdown.option.action */
+@media (max-width: 639px) {
+	.dropdown-option-action[data-desktop-only="true"] {
+		display: none;
+	}
+}
+
+/* @style dropdown.option.action */
 [role="menu"] > .dropdown-option-action {
 	gap: 0.5rem;
 	& > span:not(.icon):not(:has(> .icon)) {

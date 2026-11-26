@@ -24,6 +24,17 @@
               {% if can_view_forms %}
                 {{ menus.category_action("Change default form" if category.form else "Set default form", "form", "default-form", "form", "default-form-action-label") }}
               {% endif %}
+              <button type="button"
+                      data-menu-item
+                      data-kind="category"
+                      data-desktop-only="true"
+                      lp-control="menu"
+                      lp-show="table:TableEditor"
+                      data-toggle="true"
+                      class="{{ styles.dropdown.option.action }}">
+                {{ render_icon("tableEdit", (styles.dropdown.icon ~ " text-kind-default")) }}
+                <span data-role="table-edit-label">Edit table inline</span>
+              </button>
             {% endif %}
             {{ menus.star(is_starred(category)) }}
             {% if category.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
@@ -38,25 +49,17 @@
               data-toggle="true"
               aria-label="Table controls"
               title="Table controls">{{ render_icon("column") }}</button>
-      {% if not filtered %}
-        {% if can_edit %}
-          <button type="button"
-                  class="{{ styles.nav.desktopButton }}"
-                  lp-show="table:TableEditor"
-                  data-toggle="true"
-                  aria-label="Edit table"
-                  title="Edit table">{{ render_icon("tableEdit") }}</button>
-          <button type="button"
-                  class="{{ styles.index.header.primaryAction }}"
-                  lp-show="tools:CreatePage"
-                  data-toggle="true"
-                  data-kind="page"
-                  aria-label="New Page"
-                  title="New Page">
-            {{ render_icon("add", styles.index.header.primaryActionIcon) }}
-            <span class="hidden sm:inline">New Page</span>
-          </button>
-        {% endif %}
+      {% if not filtered and can_edit %}
+        <button type="button"
+                class="{{ styles.index.header.primaryAction }}"
+                lp-show="tools:CreatePage"
+                data-toggle="true"
+                data-kind="page"
+                aria-label="New Page"
+                title="New Page">
+          {{ render_icon("add", styles.index.header.primaryActionIcon) }}
+          <span class="hidden sm:inline">New Page</span>
+        </button>
       {% endif %}
     </div>
   </nav>
@@ -117,8 +120,7 @@
                data-editable="{{ can_edit|yesno }}"
                data-kind="form"
                {% if form_preload %}data-preload='{{ form_preload|tojson }}'{% endif %}
-               {% if can_edit %}title="Click to change default form"{% endif %}
-               class="{{ styles.category.defaultForm.display }}">{%- if form_preload -%}{{ render_icon("form", styles.category.defaultForm.icon) }}<span class="text-base-medium">Default form:</span><span data-role="default-form-name" class="font-medium text-kind-default">{{- form_preload.name -}}</span>{%- endif -%}</div>
+               hidden></div>
         {% endif %}
         {% if can_edit %}{{ tools_section(category) }}{% endif %}
       {% endif %}

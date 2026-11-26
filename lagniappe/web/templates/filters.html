@@ -27,7 +27,7 @@
 {% endmacro %}
 
 {% macro filtered_conditions(filter) %}
-  <div class="flex flex-row items-center flex-wrap gap-2 mt-3"
+  <div class="flex flex-row items-center flex-wrap gap-2 mt-4 px-4 sm:px-0"
        data-role="filtered-conditions">
     {% for condition in filter.conditions %}{{ filter_badge(condition.details) }}{% endfor %}
   </div>
@@ -228,11 +228,13 @@
         <div class="relative inline-flex" data-role="saved-anchor">
           <button type="button"
                   data-role="saved-trigger"
+                  aria-label="Saved filters"
+                  title="Saved filters"
                   aria-haspopup="menu"
                   aria-expanded="false"
                   class="{{ styles.filterBar.savedButton }}">
             {{ render_icon("bookmark", styles.filterBar.icon) }}
-            <span>Saved filters</span>
+            <span>Filters</span>
             {{ render_icon("down", styles.filterBar.chevron) }}
           </button>
           <div data-role="saved-popover"

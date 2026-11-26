@@ -263,7 +263,7 @@ const STYLES = {
   "index": {
     "header": {
       "iconContext": "index-header-icon-context",
-      "primaryAction": "inline-flex cursor-pointer items-center gap-1 rounded-md bg-kind-default px-2.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
+      "primaryAction": "index-primary-action inline-flex h-8 cursor-pointer items-center gap-1 rounded-md bg-kind-default px-2.5 text-sm font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
       "primaryActionIcon": "icon-sm"
     },
     "mobile": {
@@ -450,7 +450,7 @@ const STYLES = {
     "embedded": "w-full table-auto border-collapse divide-y sm:text-sm min-w-max bg-white",
     "body": "sm:divide-y w-full sm:divide-base-light/50",
     "thead": {
-      "default": "sticky top-16 z-40 bg-white",
+      "default": "sticky top-16 z-30 bg-white",
       "embedded": "bg-white",
       "th": "group/header max-w-48 gap-2 truncate py-2.5 px-3 text-left font-medium data-[active=false]:border-b-2",
       "actionCell": "sticky right-0 z-20 w-px min-w-px max-w-px p-0 align-top overflow-visible",
@@ -563,23 +563,22 @@ const STYLES = {
   },
   "category": {
     "defaultForm": {
-      "display": "mt-2 inline-flex w-fit max-w-full items-center gap-1.5 rounded-md bg-kind-bg px-3 py-1.5 text-sm empty:hidden",
-      "icon": "icon-sm text-kind-default",
-      "editor": "mt-2 flex w-full max-w-md flex-col gap-2"
+      "editor": "mt-4 flex w-full max-w-md flex-col gap-2",
+      "label": "text-xs font-semibold text-base-medium"
     }
   },
   "filterBar": {
-    "container": "mt-3 mb-2",
-    "row": "flex flex-row flex-wrap items-center justify-between gap-2",
-    "chipsGroup": "flex min-w-0 flex-1 flex-row flex-wrap items-center gap-2",
+    "container": "mt-4 px-4 sm:px-0",
+    "row": "flex flex-col gap-2",
+    "chipsGroup": "flex min-w-0 flex-row flex-wrap items-center gap-2",
     "chips": "contents",
     "savedButton": "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/80 bg-white px-2.5 py-1 text-sm font-medium text-base-dark transition-colors hover:border-base-medium hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
     "addButton": "inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-base-medium/70 bg-white px-2.5 py-1 text-sm font-medium text-base-medium transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
     "icon": "icon-sm text-base-medium",
     "chevron": "icon-xs text-base-medium",
-    "actions": "flex shrink-0 flex-row items-center gap-2",
+    "actions": "flex flex-row flex-wrap items-center gap-2",
     "status": "text-xs font-medium text-base-medium",
-    "saveButton": "inline-flex cursor-pointer items-center rounded-md border border-kind-default/40 bg-kind-bg px-2.5 py-1 text-xs font-semibold text-kind-dark transition-colors hover:bg-kind-light disabled:pointer-events-none disabled:opacity-50",
+    "saveButton": "inline-flex cursor-pointer items-center rounded-md border border-kind-light bg-kind-bg px-2.5 py-1 text-xs font-semibold text-kind-dark transition-colors hover:bg-kind-light disabled:pointer-events-none disabled:opacity-50",
     "clearButton": "cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-base-medium transition-colors hover:bg-base-bg hover:text-base-dark disabled:pointer-events-none disabled:opacity-50",
     "savedPopover": "absolute left-0 top-full z-40 mt-1.5 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-md bg-white p-1.5 shadow-lg outline outline-base-light/60",
     "addPopover": "absolute left-0 top-full z-40 mt-1.5 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-md bg-white p-3 shadow-lg outline outline-base-light/60",

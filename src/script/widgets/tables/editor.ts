@@ -787,10 +787,10 @@ export class TableEditor {
 	}
 
 	_syncEditStatus(editing: boolean) {
-		const buttons = this.view.elt.querySelectorAll<HTMLButtonElement>(
-			'button[lp-show="table:TableEditor"]',
+		const headerButtons = this.view.elt.querySelectorAll<HTMLButtonElement>(
+			'button[lp-show="table:TableEditor"]:not([data-menu-item]):not([data-role="table-edit-close"])',
 		);
-		for (const button of buttons) {
+		for (const button of headerButtons) {
 			button.dataset.editing = editing ? "true" : "false";
 			button.setAttribute("aria-pressed", editing ? "true" : "false");
 			const label = editing ? "Done editing table" : "Edit table";
@@ -815,25 +815,63 @@ export class TableEditor {
 			}
 		}
 
-		for (const pill of this.view.elt.querySelectorAll(
-			"[data-role='table-edit-status']",
+		const menuButtons = this.view.elt.querySelectorAll<HTMLButtonElement>(
+			'button[lp-show="table:TableEditor"][data-menu-item]',
+		);
+		for (const button of menuButtons) {
+			button.dataset.editing = editing ? "true" : "false";
+			button.setAttribute("aria-pressed", editing ? "true" : "false");
+			const labelEl = button.querySelector<HTMLElement>(
+				"[data-role='table-edit-label']",
+			);
+			if (labelEl) {
+				labelEl.textContent = editing
+					? "Done editing table"
+					: "Edit table inline";
+			}
+		}
+
+		for (const node of this.view.elt.querySelectorAll(
+			"[data-role='table-edit-status'], [data-role='table-edit-close']",
 		)) {
-			pill.remove();
+			node.remove();
 		}
 
 		if (!editing) return;
-		const primaryButton = buttons[0];
-		const actions = primaryButton?.closest<HTMLElement>(
-			"[data-role='actions']",
-		);
-		if (!primaryButton || !actions) return;
+		const primaryButton = headerButtons[0];
+		const actions =
+			primaryButton?.closest<HTMLElement>("[data-role='actions']") ||
+			this.view.elt.querySelector<HTMLElement>(
+				"[data-nav='view'] [data-role='actions']",
+			);
+		if (!actions) return;
 
 		const pill = document.createElement("span");
 		pill.dataset.role = "table-edit-status";
 		pill.setAttribute("role", "status");
 		pill.className = STYLES.table.editStatus;
 		pill.textContent = "Editable";
-		actions.insertBefore(pill, primaryButton);
+
+		if (primaryButton) {
+			actions.insertBefore(pill, primaryButton);
+			return;
+		}
+
+		const closeBtn = document.createElement("button");
+		closeBtn.type = "button";
+		closeBtn.dataset.role = "table-edit-close";
+		closeBtn.dataset.toggle = "true";
+		closeBtn.dataset.editing = "true";
+		closeBtn.setAttribute("lp-show", "table:TableEditor");
+		closeBtn.setAttribute("aria-label", "Done editing table");
+		closeBtn.title = "Done editing table";
+		const icon = document.createElement("span");
+		setIcon(icon, "x", "icon-xs text-delete-default");
+		const text = document.createElement("span");
+		text.textContent = "Close";
+		closeBtn.append(icon, text);
+
+		actions.prepend(pill, closeBtn);
 	}
 
 	postreconcile() {

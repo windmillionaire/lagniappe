@@ -875,9 +875,11 @@ index:
       hooks: [index-header-icon-context]
       css: [src/style/icons.css]
     primaryAction:
-      classes: inline-flex cursor-pointer items-center gap-1 rounded-md bg-kind-default px-2.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
+      classes: index-primary-action inline-flex h-8 cursor-pointer items-center gap-1 rounded-md bg-kind-default px-2.5 text-sm font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
       intent: direct primary creation action button in an entity index header
       surfaces: [server]
+      hooks: [index-primary-action]
+      css: [src/style/navigation.css]
     primaryActionIcon:
       classes: icon-sm
       intent: compact leading icon inside a primary index header action button
@@ -1483,7 +1485,7 @@ table:
     surfaces: [server]
   thead:
     default:
-      classes: sticky top-16 z-40 bg-white
+      classes: sticky top-16 z-30 bg-white
       intent: default presentation within table thead
       surfaces: [server]
     embedded:
@@ -1833,33 +1835,26 @@ page:
 
 category:
   defaultForm:
-    display:
-      classes: mt-2 inline-flex w-fit max-w-full items-center gap-1.5 rounded-md bg-kind-bg px-3 py-1.5 text-sm empty:hidden
-      intent: compact read-mode default form badge in the category header that opens an inline form selector when editable
-      surfaces: [server]
-      css: [src/style/navigation.css]
-    icon:
-      classes: icon-sm text-kind-default
-      intent: form icon inside the category header default form badge
-      surfaces: [server]
-      hooks: [icon-sm]
-      css: [src/style/icons.css]
     editor:
-      classes: mt-2 flex w-full max-w-md flex-col gap-2
+      classes: mt-4 flex w-full max-w-md flex-col gap-2
       intent: compact borderless inline editor wrapper for changing a category default form
+      surfaces: [frontend]
+    label:
+      classes: text-xs font-semibold text-base-medium
+      intent: compact label shown above the inline default form selector
       surfaces: [frontend]
 
 filterBar:
   container:
-    classes: mt-3 mb-2
+    classes: mt-4 px-4 sm:px-0
     intent: outer spacing wrapper for the single-row inline filter chip bar above index tables
     surfaces: [server]
   row:
-    classes: flex flex-row flex-wrap items-center justify-between gap-2
-    intent: horizontal layout aligning saved filters, active chips, add button, and right-side actions
+    classes: flex flex-col gap-2
+    intent: vertical stack placing active filter chips above the match-count and action bar
     surfaces: [server]
   chipsGroup:
-    classes: flex min-w-0 flex-1 flex-row flex-wrap items-center gap-2
+    classes: flex min-w-0 flex-row flex-wrap items-center gap-2
     intent: wrapping group of saved-filter trigger, active filter chips, and add-filter trigger
     surfaces: [server]
   chips:
@@ -1887,15 +1882,15 @@ filterBar:
     hooks: [icon-xs]
     css: [src/style/icons.css]
   actions:
-    classes: flex shrink-0 flex-row items-center gap-2
-    intent: right-aligned status, save-filter, and clear controls shown while filters are active
+    classes: flex flex-row flex-wrap items-center gap-2
+    intent: secondary status, save-filter, and clear row shown directly below active filter chips
     surfaces: [server]
   status:
     classes: text-xs font-medium text-base-medium
     intent: subtle live status or match count indicator in the filter bar
     surfaces: [server]
   saveButton:
-    classes: inline-flex cursor-pointer items-center rounded-md border border-kind-default/40 bg-kind-bg px-2.5 py-1 text-xs font-semibold text-kind-dark transition-colors hover:bg-kind-light disabled:pointer-events-none disabled:opacity-50
+    classes: inline-flex cursor-pointer items-center rounded-md border border-kind-light bg-kind-bg px-2.5 py-1 text-xs font-semibold text-kind-dark transition-colors hover:bg-kind-light disabled:pointer-events-none disabled:opacity-50
     intent: compact button saving the active filter bar conditions
     surfaces: [server]
   clearButton:

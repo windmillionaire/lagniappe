@@ -305,6 +305,11 @@ export function startCategoryDefaultFormEdit(view: EntityIndex) {
 	form.dataset.kind = "form";
 	form.className = STYLES.category.defaultForm.editor;
 
+	const label = document.createElement("span");
+	label.className = STYLES.category.defaultForm.label;
+	label.textContent = "Default form";
+	form.appendChild(label);
+
 	const selectWrap = document.createElement("div");
 	selectWrap.className = "grid grid-cols-1";
 	selectWrap.dataset.type = "select";
@@ -372,7 +377,6 @@ export function startCategoryDefaultFormEdit(view: EntityIndex) {
 	const close = () => {
 		combobox.destroy();
 		form.remove();
-		displayEl.hidden = false;
 	};
 
 	const save = async (nextFormId: string) => {

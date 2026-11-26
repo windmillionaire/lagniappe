@@ -313,7 +313,7 @@ button.tab-icon .icon {
 	--icon-size: var(--icon-xs-glyph-size);
 }
 
-/* @style category.defaultForm.icon filterBar.icon index.header.primaryActionIcon nav.menu.chevron */
+/* @style filterBar.icon index.header.primaryActionIcon nav.menu.chevron */
 .icon.icon-sm {
 	--icon-box-size: var(--icon-sm-box-size);
 	--icon-size: var(--icon-sm-glyph-size);

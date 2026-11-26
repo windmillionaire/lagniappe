@@ -199,22 +199,6 @@ export default class EntityIndex extends Core {
 			return true;
 		}
 
-		const editableDefaultForm = target.closest<HTMLElement>(
-			"[data-role='default-form'][data-editable='true']",
-		);
-		if (
-			editableDefaultForm &&
-			this.elt.contains(editableDefaultForm) &&
-			!target.closest("a, button, input, textarea, form")
-		) {
-			e.preventDefault();
-			e.stopPropagation();
-			void import("../../widgets/categoryHeader.ts").then((mod) => {
-				if (!this._destroyed) mod.startCategoryDefaultFormEdit(this);
-			});
-			return true;
-		}
-
 		return false;
 	}
 
