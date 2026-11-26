@@ -203,8 +203,7 @@ def test_create_page_task_with_project(get_admin, get_user):
     _quick_add_page_task(page, task)
     task.select_chip_option("project", project)
 
-    project_chip = Badges.PROJECT.visible(task.element, project)
-    project_chip.click()
+    Badges.PROJECT.visible(task.element, project)
     drawer = task.element.locator(task.CHIP_DRAWER)
     expect(drawer).to_be_visible()
     expect(drawer.locator("a[data-role='open-link']")).to_have_attribute(

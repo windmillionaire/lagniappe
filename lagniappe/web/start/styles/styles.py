@@ -302,7 +302,7 @@ STYLES = {
 			"mobile": "group/nav flex flex-row items-center justify-between gap-4 border-y border-base-light/50 bg-base-bg pr-4 py-1 text-lg",
 			"flipper": "inline-grid place-items-center focus:outline-none text-kind-default sm:hidden text-lg",
 			"group": "flex flex-row items-center",
-			"header": "gap-2 flex min-w-0 flex-1 flex-row items-center justify-start",
+			"header": "min-h-8 gap-2 flex min-w-0 flex-1 flex-row items-center justify-start",
 			"title": "layout-nav-title gap-2 flex w-full flex-row items-center justify-between pl-4 py-3 sm:px-6 sm:py-5 text-lg font-semibold",
 			"toggles": "flex flex-row items-center gap-3 pl-2 slide-left",
 			"adminToggles": "flex flex-row items-center gap-3 pl-2 slide-left",
@@ -485,7 +485,7 @@ STYLES = {
 		"chip": {
 			"editable": "lp-badge task-chip-editable ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-white py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
 			"form": "lp-badge task-chip-form ring-form-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-form-bg/70 py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-form-default ring ring-inset transition-colors hover:bg-form-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-form-default",
-			"add": "task-chip-add inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-kind-light bg-base-bg/60 py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default opacity-75 transition-all hover:border-solid hover:bg-kind-bg hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
+			"add": "task-chip-add inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-kind-light bg-base-bg/60 py-[3px] pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default opacity-75 transition-all hover:border-solid hover:bg-kind-bg hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
 			"drawer": "mx-4 mb-4 pt-3.5 border-t border-base-light/50 flex flex-col gap-3 sm:mx-6"
 		},
 		"rename": {

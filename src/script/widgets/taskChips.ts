@@ -440,6 +440,8 @@ export class TaskChipController {
 				void this._saveChip(taskRow, drawer, data, {
 					chipField: field,
 					formChanged: field === "form",
+					keepDrawerOpen: true,
+					remountCombobox: true,
 				});
 			});
 			row.appendChild(clearBtn);
@@ -483,6 +485,8 @@ export class TaskChipController {
 				chipField: field,
 				openForm,
 				formChanged,
+				keepDrawerOpen: !openForm,
+				remountCombobox: !openForm,
 			});
 		};
 
@@ -695,6 +699,7 @@ export class TaskChipController {
 			openForm?: boolean;
 			formChanged?: boolean;
 			keepDrawerOpen?: boolean;
+			remountCombobox?: boolean;
 		},
 	) {
 		const route = taskRow.dataset.route;
@@ -732,9 +737,47 @@ export class TaskChipController {
 		});
 
 		if (options.keepDrawerOpen) {
-			buttons.forEach((btn) => {
-				btn.disabled = false;
-			});
+			if (
+				options.remountCombobox &&
+				(options.chipField === "project" ||
+					options.chipField === "form" ||
+					options.chipField === "assigned_to")
+			) {
+				const liveChips = taskRow.querySelector<HTMLElement>(
+					"[data-role='task-chips']",
+				);
+				const session = this.sessions.get(taskRow);
+				if (liveChips && session) {
+					session.destroy();
+					const onKeydown = (e: KeyboardEvent) => {
+						if (e.key !== "Escape") return;
+						if (drawer.querySelector("[role='listbox'][data-visible='true']"))
+							return;
+						e.preventDefault();
+						e.stopPropagation();
+						this.closeChip(taskRow);
+					};
+					drawer.addEventListener("keydown", onKeydown);
+					const cleanupInner = this._mountComboboxDrawer(
+						taskRow,
+						liveChips,
+						drawer,
+						options.chipField,
+					);
+					this.sessions.set(taskRow, {
+						field: options.chipField,
+						drawer,
+						destroy: () => {
+							drawer.removeEventListener("keydown", onKeydown);
+							cleanupInner();
+						},
+					});
+				}
+			} else {
+				buttons.forEach((btn) => {
+					btn.disabled = false;
+				});
+			}
 			setChipHeaderControls(taskRow, true);
 			this._markEditingChips(taskRow, options.chipField);
 		} else {

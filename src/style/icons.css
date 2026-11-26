@@ -257,6 +257,12 @@ button.tab-icon .icon {
 	--icon-default-size: var(--icon-base-glyph-size);
 }
 
+/* @style task.controlGroup */
+.task-control-group .icon[data-icon="plus"],
+.task-control-group .icon[data-icon="minus"] {
+	--icon-size: var(--icon-xs-glyph-size);
+}
+
 /* @style layout.nav.title */
 .layout-nav-title .icon {
 	--icon-box-size: var(--icon-lg-box-size);

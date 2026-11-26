@@ -987,7 +987,7 @@ layout:
           target: home.pagination.container
           reason: navigation grouping and pagination layout are separate semantic roles
     header:
-      classes: gap-2 flex min-w-0 flex-1 flex-row items-center justify-start
+      classes: min-h-8 gap-2 flex min-w-0 flex-1 flex-row items-center justify-start
       intent: header presentation within layout nav
       surfaces: [server]
       css: [src/style/navigation.css]
@@ -1590,7 +1590,7 @@ task:
       hooks: [task-chip-form]
       css: [src/style/content.css]
     add:
-      classes: task-chip-add inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-kind-light bg-base-bg/60 py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default opacity-75 transition-all hover:border-solid hover:bg-kind-bg hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
+      classes: task-chip-add inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-kind-light bg-base-bg/60 py-[3px] pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default opacity-75 transition-all hover:border-solid hover:bg-kind-bg hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
       intent: faded add-metadata chip shown when the task chip tray is expanded
       surfaces: [server]
       hooks: [task-chip-add]

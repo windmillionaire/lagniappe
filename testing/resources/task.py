@@ -379,7 +379,10 @@ class Task(SiteResource):
             entity_key=self.key,
         ):
             option.click()
-        expect(drawer).not_to_be_visible()
+        if field == "form":
+            expect(drawer).not_to_be_visible()
+        else:
+            expect(drawer).to_be_visible()
 
     @property
     def task_form(self):
