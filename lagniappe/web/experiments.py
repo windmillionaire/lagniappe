@@ -30,14 +30,6 @@ def task_list_context_keys() -> Sequence[Key]:
     return task_lists.snapshot_keys()
 
 
-_READ_TRIAL_ROUTES = {
-    "home.home_page": "home-ai",
-    "pages.view": "page-ai",
-    "pages.user_settings": "page-ai",
-    "pages.get_notes": "page-notes",
-}
-
-
 def initialize_measurements(app: Flask, config: Config) -> None:
     """Register first so the timing response hook runs after all other hooks."""
     if not config.EXPERIMENTS_ENABLED or config.EXPERIMENTS_DIAGNOSTICS == "off":
@@ -45,16 +37,7 @@ def initialize_measurements(app: Flask, config: Config) -> None:
 
     @app.before_request
     def begin() -> None:
-        mode = config.EXPERIMENTS_DIAGNOSTICS
-        if request.method == "GET":
-            trial = _READ_TRIAL_ROUTES.get(request.endpoint or "")
-            if request.endpoint == "internal.get" and (request.view_args or {}).get("kind") == "categories":
-                trial = "home-categories"
-            variant = request.headers.get("X-Lagniappe-Experiments-Reads")
-            if trial and variant in ("control", "optimized"):
-                g.experiments_variant = f"{trial}:{variant}"
-                mode = "trace"
-        g.experiments_measurement = measurements.Measurement(mode)
+        g.experiments_measurement = measurements.Measurement(config.EXPERIMENTS_DIAGNOSTICS)
         g.experiments_token = measurements.CURRENT.set(g.experiments_measurement)
 
     @app.after_request

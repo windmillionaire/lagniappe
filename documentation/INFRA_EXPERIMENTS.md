@@ -98,25 +98,6 @@ content lengths, source/version/instance, and operation aggregates.
 App Engine's static-file responses bypass Flask and have no app summary;
 capture their timing and sizes in the browser.
 
-With experiments diagnostics enabled, send `X-Lagniappe-Experiments-Reads`
-with `control` or `optimized` on these GETs. Ordinary requests use the optimized
-path. Each tagged response returns the route-specific arm in
-`X-Lagniappe-Experiment` and records the trace, process and instance.
-
-| Tag prefix | Request | Compare |
-| --- | --- | --- |
-| `home-ai` | Signed-in Home shell | On an unconditional render, fetch AI settings with Home revisions. Use an AI Create viewer. |
-| `page-ai` | Own personal Page or its user settings fragment | Reuse the fingerprint's AI setting when rendering controls. |
-| `home-categories` | Home Categories section | Render Category rows directly from the query. Include a Category with a Form. |
-| `page-notes` | Page notes section | Reuse the authorized Page and current author. Include a populated self-authored list. |
-
-Run balanced pairs separately per route, using the same viewer, data and deployed
-source. Match request IDs to logs. Check the rendered controls or ordered rows,
-ETags, Datastore call counts, server time and client time. Report warm same-worker
-pairs separately. Conditional Home requests skip the settings prefetch. Other
-signed-in Home requests can include one extra settings key in the existing
-lookup before the viewer’s AI access is known. Check both cases.
-
 A service worker can return a cached response with an older request ID. Check
 the matching log timestamp against the browser request before attributing that
 server work to the current attempt. Page-level network captures may omit the

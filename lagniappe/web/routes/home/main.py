@@ -10,7 +10,7 @@ from flask import abort, request, g, make_response
 
 from flask_login import current_user
 from lagniappe.core.definitions import Action, Fetch, Resource
-from lagniappe.core.properties.home import CategoryList, ToolsList
+from lagniappe.core.properties.home import ToolsList
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.properties.notification_aggregate import counts as aggregate_counts
@@ -52,8 +52,6 @@ def get(kind: str, *, poll_revisions: dict[str, str]) -> ResponseReturnValue:
         abort(403)
     home = Entities.HOME(user=authenticated_user())
     section = home.section(kind, cursor=request.args.get("cursor"))
-    if isinstance(section, CategoryList) and g.get("experiments_variant") == "home-categories:control":
-        section.fetch_request = Fetch.direct()
     if isinstance(section, ToolsList):
         render_operation_statuses(section.list, authenticated_user())
 

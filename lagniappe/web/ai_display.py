@@ -10,7 +10,7 @@ from lagniappe.core.tools.database import site
 
 
 def home_ai_context_keys() -> tuple[Key, ...]:
-    if not CONFIG.AI_ENABLED or request.if_none_match or g.get("experiments_variant") == "home-ai:control":
+    if not CONFIG.AI_ENABLED or request.if_none_match:
         return ()
     g.home_ai_key = site.key("ai")
     return (g.home_ai_key,)
@@ -27,9 +27,3 @@ def auto_execute_site_enabled() -> bool:
         else:
             g._auto_execute_site_enabled = site_auto_execute_enabled()
     return g._auto_execute_site_enabled
-
-
-def fingerprint_auto_execute_enabled() -> bool:
-    if g.get("experiments_variant") == "page-ai:control":
-        return site_auto_execute_enabled()
-    return auto_execute_site_enabled()

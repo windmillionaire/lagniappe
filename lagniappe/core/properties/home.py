@@ -81,7 +81,6 @@ class ProjectList(HomeProperty):
         return self._list
 
 class CategoryList(HomeProperty):
-    fetch_request = Fetch.root()
     _id = "categories"
     _label = "Categories"
     entity_kind = "category"
@@ -97,7 +96,7 @@ class CategoryList(HomeProperty):
             start_cursor=self.cursor,
             hashes=hashes,
         )
-        self._list = Entities.fetch(*db.results, request=self.fetch_request)
+        self._list = Entities.fetch(*db.results, request=Fetch.root())
         self.cursor = db.next_cursor
 
         return self._list
