@@ -235,6 +235,15 @@
 	overflow-wrap: normal;
 }
 
+/* @style filterBar.chip */
+.lp-badge.lp-filter-chip {
+	padding-right: 0;
+	& > button {
+		flex-shrink: 0;
+		overflow: visible;
+	}
+}
+
 /* @style task.chip.add */
 li[data-open="false"]
 	[data-role="task-chips"]:not([data-tray-open="true"])

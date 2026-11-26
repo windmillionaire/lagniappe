@@ -724,6 +724,7 @@ export class FilterBar {
 		}
 
 		const id = `chip-${++chipSeq}`;
+		badgeEl.classList.add(STYLES.filterBar.chip);
 		const removeBtn = document.createElement("button");
 		removeBtn.type = "button";
 		removeBtn.className = STYLES.filterBar.chipRemove;
@@ -850,7 +851,10 @@ export class FilterBar {
 				if (response.filter && this._savedFilters !== null) {
 					this._savedFilters = [response.filter, ...this._savedFilters];
 				}
-				this.saveButton.textContent = "Saved ✓";
+				this.saveButton.replaceChildren(
+					createIcon("check", "icon-xs"),
+					document.createTextNode("Saved"),
+				);
 				if (this._saveFeedbackTimer) clearTimeout(this._saveFeedbackTimer);
 				this._saveFeedbackTimer = setTimeout(() => {
 					this._saveFeedbackTimer = null;

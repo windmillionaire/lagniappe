@@ -41,10 +41,11 @@
 
 {% macro timestamp_equals(details) %}
   {%- set field = details.field if details.field else details -%}
+  {%- set value = details.value if details.value is not none else field.column_value -%}
   {%- if field.input_type == "time" -%}
-    <span class="text-kind-default">{{ field.column_value|format_time }}</span>
+    <span class="text-kind-default">{{ value|format_time }}</span>
   {%- else -%}
-    <span class="text-kind-default">{{ field.column_value|format_date }}</span>
+    <span class="text-kind-default">{{ value|format_date }}</span>
   {%- endif -%}
 {% endmacro %}
 

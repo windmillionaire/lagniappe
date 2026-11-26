@@ -14,8 +14,9 @@ from flask import request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Comparator, Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.core.mixins.date import DateMixin
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.filters import (
     FilterCache,
@@ -340,14 +341,42 @@ def _options_values(condition, field, comparator):
 
 
 def _filter_options_response(updates, condition, values, comparator):
-    if comparator == "BETWEEN" and len(values) < 2:
+    if comparator == "BETWEEN" and (len(values) < 2 or any(not v for v in values)):
         return responses.error(f"{updates['field']} must have both a from and to value")
     elif not values:
         return responses.error(f"No value provided for {updates['field']}")
 
     try:
-        condition.set_value(values, default_comparator=comparator)
-        condition = _validated_display_condition(condition._contract_parent, condition)
+        if isinstance(condition.field, DateMixin):
+            # Compile raw ISO date strings so contract.py expands whole-day
+            # bounds in the acting user's timezone (e.g. EQUALS -> full local
+            # day BETWEEN, LESS_EQUAL -> end of local day).
+            try:
+                comparator_value = Comparator[comparator or "EQUALS"].value
+            except KeyError as error:
+                raise FilterContractError(f"Unknown comparator: {comparator}") from error
+            compiled = compile_filter_contract(
+                condition._contract_parent,
+                {
+                    "version": 1,
+                    "conditions": [
+                        {
+                            "source_id": condition.entity.hash,
+                            "field": updates["field"],
+                            "comparator": comparator_value,
+                            "values": values,
+                        }
+                    ],
+                },
+                current_user,
+            )
+            entity_map = {entity.hash: entity for entity in compiled.related}
+            condition = Entities.CONDITION.create(compiled.definitions[-1], entity_map)
+            if not condition:
+                raise FilterContractError("Filter condition is unavailable.")
+        else:
+            condition.set_value(values, default_comparator=comparator)
+            condition = _validated_display_condition(condition._contract_parent, condition)
     except FilterContractError as error:
         return _contract_error_response(error)
     except Exception as e:

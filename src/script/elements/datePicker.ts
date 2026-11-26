@@ -245,15 +245,18 @@ export class DatePicker {
 		document.addEventListener("keydown", this._onDocKeydown, true);
 		document.addEventListener("lp:close-date-picker", this._onExternalClose);
 
-		this.cleanupPosition = autoUpdate(this.trigger, popover, () => {
+		const anchor =
+			this.input.closest<HTMLElement>("[data-role='date-input-wrap']") ||
+			this.input;
+		this.cleanupPosition = autoUpdate(anchor, popover, () => {
 			if (!this.input.isConnected || !this.trigger.isConnected) {
 				this.close();
 				return;
 			}
-			void computePosition(this.trigger, popover, {
+			void computePosition(anchor, popover, {
 				placement: "bottom-end",
 				strategy: "fixed",
-				middleware: [offset(6), flip(), shift({ padding: 8 })],
+				middleware: [offset(8), flip(), shift({ padding: 8 })],
 			}).then(({ x, y }) => {
 				if (!this.popover) return;
 				this.popover.style.left = `${x}px`;

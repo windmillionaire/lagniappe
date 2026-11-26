@@ -365,3 +365,65 @@ def test_filter_table_derives_parent_fields_and_related_forms(get_schema):
     assert "due_date" in project_table.fields
     assert "input-numab12" in project_table.fields
     assert project_table.fields["input-numab12"].selected is False
+
+
+@pytest.mark.unit
+def test_timestamp_date_only_contract_expands_user_timezone_day_and_displays_is_on():
+    from zoneinfo import ZoneInfo
+
+    from lagniappe.core.tools.filters.contract import compile_filter_contract
+
+    viewer = UtilityTestUser(owner=True)
+    viewer.db["timezone"] = "America/Los_Angeles"
+    category = TestEntities.get(
+        "CATEGORY",
+        {"name": "Dates Category", "hash": "dates_cat"},
+    )
+    # 2026-11-25 20:00 PST is 2026-11-26 04:00 UTC (crosses UTC midnight!).
+    late_nov_25 = datetime(2026, 11, 26, 4, 0, tzinfo=UTC).timestamp()
+
+    compiled_eq = compile_filter_contract(
+        category,
+        {
+            "version": 1,
+            "conditions": [
+                {
+                    "source_id": category.hash,
+                    "field": "modified",
+                    "comparator": Comparator["EQUALS"].value,
+                    "values": ["2026-11-25"],
+                }
+            ],
+        },
+        viewer,
+    )
+    eq_def = compiled_eq.definitions[0]
+    assert eq_def.comparator == Comparator.BETWEEN
+    assert eq_def.value[0] <= late_nov_25 <= eq_def.value[1]
+
+    display = Condition.create(eq_def, {category.hash: category})
+    assert display is not None
+    display.field.user = viewer
+    details = display.details
+    assert details["text"] == "is on"
+    assert details["status"] == "EQUALS"
+    assert details["value"].astimezone(ZoneInfo("America/Los_Angeles")).date().isoformat() == "2026-11-25"
+
+    compiled_le = compile_filter_contract(
+        category,
+        {
+            "version": 1,
+            "conditions": [
+                {
+                    "source_id": category.hash,
+                    "field": "modified",
+                    "comparator": Comparator["LESS_EQUAL"].value,
+                    "values": ["2026-11-25"],
+                }
+            ],
+        },
+        viewer,
+    )
+    le_def = compiled_le.definitions[0]
+    assert le_def.comparator == Comparator.LESS_EQUAL
+    assert late_nov_25 <= le_def.value

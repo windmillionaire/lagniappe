@@ -1878,19 +1878,19 @@ filterBar:
     hooks: [icon-xs]
     css: [src/style/icons.css]
   actions:
-    classes: flex flex-row flex-wrap items-center gap-2
-    intent: secondary status, save-filter, and clear row shown directly below active filter chips
+    classes: flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-base-bg px-3 py-1.5
+    intent: compact tinted summary and action tray shown directly below active filter chips
     surfaces: [server]
   status:
     classes: text-xs font-medium text-base-medium
     intent: subtle live status or match count indicator in the filter bar
     surfaces: [server]
   saveButton:
-    classes: inline-flex cursor-pointer items-center rounded-md border border-kind-light bg-kind-bg px-2.5 py-1 text-xs font-semibold text-kind-dark transition-colors hover:bg-kind-light disabled:pointer-events-none disabled:opacity-50
+    classes: inline-flex cursor-pointer items-center gap-1 rounded-md border border-kind-light bg-white px-2.5 py-1 text-xs font-semibold text-kind-dark transition-colors hover:bg-kind-bg disabled:pointer-events-none disabled:opacity-50
     intent: compact button saving the active filter bar conditions
     surfaces: [server]
   clearButton:
-    classes: cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-base-medium transition-colors hover:bg-base-bg hover:text-base-dark disabled:pointer-events-none disabled:opacity-50
+    classes: cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-base-medium transition-colors hover:bg-white hover:text-base-dark disabled:pointer-events-none disabled:opacity-50
     intent: compact button clearing all active filter bar chips
     surfaces: [server]
   savedPopover:
@@ -1898,12 +1898,18 @@ filterBar:
     intent: anchored popover listing saved filters for one-click application or deletion
     surfaces: [server]
   addPopover:
-    classes: absolute left-0 top-full z-40 mt-1.5 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-md bg-white p-3 shadow-lg outline outline-base-light/60
+    classes: absolute left-0 top-full z-40 mt-1.5 flex w-88 max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-md bg-white p-3 shadow-lg outline outline-base-light/60
     intent: anchored two-step popover for picking a filter field and configuring its condition
     surfaces: [server]
+  chip:
+    classes: lp-filter-chip
+    intent: modifier making an active filter badge flush on the right for its divided remove button
+    surfaces: [frontend]
+    hooks: [lp-filter-chip]
+    css: [src/style/content.css]
   chipRemove:
-    classes: ml-0.5 inline-flex cursor-pointer items-center justify-center rounded-sm p-0.5 text-base-medium transition-colors hover:bg-base-light/40 hover:text-base-dark
-    intent: inline remove button appended inside an active filter condition badge
+    classes: ml-1.5 -my-1 inline-flex self-stretch cursor-pointer items-center justify-center border-l border-kind-light px-2 text-base-medium transition-colors hover:bg-delete-bg hover:text-delete-default focus-visible:bg-delete-bg focus-visible:text-delete-default focus-visible:outline-none
+    intent: divided right-hand remove segment inside an active filter condition chip
     surfaces: [frontend]
   searchInput:
     classes: form-input w-full rounded-md px-2.5 py-1.5 text-sm
@@ -1928,13 +1934,15 @@ filterBar:
     intent: compact back-navigation header in step two of the add-filter popover
     surfaces: [frontend]
   backButton:
-    classes: inline-flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium text-base-medium transition-colors hover:bg-base-bg hover:text-base-dark
+    classes: -ml-1.5 inline-flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium text-base-medium transition-colors hover:bg-base-bg hover:text-base-dark
     intent: back button returning from condition configuration to field selection
     surfaces: [frontend]
   stepBody:
-    classes: flex flex-col gap-3
+    classes: filter-popover-form flex flex-col gap-3
     intent: wrapper for server-rendered field condition controls inside the add-filter popover
     surfaces: [frontend]
+    hooks: [filter-popover-form]
+    css: [src/style/forms.css]
   error:
     classes: rounded-md bg-error-bg px-2.5 py-1.5 text-xs font-medium text-error-dark
     intent: compact inline validation error inside the filter bar popover

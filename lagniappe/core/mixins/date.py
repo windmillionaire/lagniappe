@@ -1,12 +1,12 @@
 """Date mixin for datetime property handling with timezone conversion."""
 
-from datetime import datetime, UTC
+from datetime import datetime, time, UTC
 import re
 from typing import TYPE_CHECKING, cast, overload
 
 from .field_host import FieldHost
 
-from ..definitions import FieldType, FilterOptions, Ordering
+from ..definitions import Comparator, FieldType, FilterOptions, Ordering
 from ..tools import dates
 
 if TYPE_CHECKING:
@@ -131,14 +131,26 @@ class DateMixin(_DateHost):
 
     def filter_details(self, condition: Condition) -> dict[str, object]:
         details = super().filter_details(condition)
+        tz = dates.user_timezone(self.user)
         if isinstance(condition.value, list):
-            details["value"] = [
-                datetime.fromtimestamp(v, dates.user_timezone(self.user))
-                for v in condition.value
-            ]
+            dt_values = [datetime.fromtimestamp(v, tz) for v in condition.value]
+            if (
+                condition.comparator == Comparator.BETWEEN
+                and len(dt_values) == 2
+                and dt_values[0].date() == dt_values[1].date()
+                and dt_values[0].time() == time.min
+                and dt_values[1].hour == 23
+                and dt_values[1].minute == 59
+                and dt_values[1].second == 59
+            ):
+                details["text"] = FilterOptions.DATE.value.EQUALS.value
+                details["status"] = Comparator.EQUALS.name
+                details["value"] = dt_values[0]
+            else:
+                details["value"] = dt_values
         else:
             details["value"] = datetime.fromtimestamp(
-                cast(float, condition.value), dates.user_timezone(self.user)
+                cast(float, condition.value), tz
             )
         return details
 
