@@ -53,10 +53,10 @@
     {% if not page.tasks %}{{ task_empty(page) }}{% endif %}
   </ul>
   <div data-role="completed-header"
-       class="flex flex-row items-center gap-2 border-y border-base-light/50 px-4 py-3 -mt-px bg-base-bg"
+       class="flex flex-row items-center justify-between gap-2 border-y border-base-light/50 px-4 py-3 -mt-px bg-base-bg"
        data-visible="false">
-    {{ controls.expand() }}
     <span class="text-base-dark font-semibold">Completed Tasks</span>
+    {{ controls.expand() }}
   </div>
   <ul data-role="completed-tasks"
       class="divide-y divide-base-light/50"

@@ -45,10 +45,10 @@
           <div class="space-y-4">
             {% for group in groups if group.pages %}
               <details class="group overflow-hidden rounded-md bg-white outline outline-base-light/50">
-                <summary class="flex cursor-pointer list-none items-center gap-3 px-4 py-3 font-semibold text-base-dark hover:bg-page-bg focus-visible:outline-2 focus-visible:outline-page-default">
+                <summary class="{{ styles.disclosure.summary }} px-4 py-3 font-semibold text-base-dark hover:bg-page-bg focus-visible:outline-2 focus-visible:outline-page-default">
                   <span class="flex-1">{{ group.name }}</span>
                   <span class="text-sm font-normal text-base-medium">{{ group.pages|length }} {{ 'page' if group.pages|length == 1 else 'pages' }}</span>
-                  <span aria-hidden="true" class="text-xl leading-none text-page-default transition-transform group-open:rotate-45">+</span>
+                  {{ render_icon("down", styles.disclosure.chevron) }}
                 </summary>
                 <ul class="divide-y divide-base-light/50 border-t border-base-light/50">
                   {% for page in group.pages %}

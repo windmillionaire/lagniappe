@@ -13,14 +13,17 @@
     {% endcall %}
     <details data-role="ai-assisted-install"
              data-kind="page"
-             class="mt-4 rounded-lg border border-base-light/50 bg-white shadow-sm">
-      <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
-        <span class="ml-1 text-lg font-semibold">Install with a local AI assistant (no terminal required)</span>
-        <span class="ml-5 block text-sm font-normal leading-relaxed text-base-medium">
-          Use Claude, Codex, Antigravity, or another local coding assistant with
-          <code>./setup.sh --agent</code> and the localhost browser Secret Vault
-          so passwords and API keys never enter chat history.
+             class="group mt-4 rounded-lg border border-base-light/50 bg-white shadow-sm">
+      <summary class="{{ styles.disclosure.summary }} px-5 py-4 text-base-dark">
+        <span class="min-w-0">
+          <span class="text-lg font-semibold">Install with a local AI assistant (no terminal required)</span>
+          <span class="mt-0.5 block text-sm font-normal leading-relaxed text-base-medium">
+            Use Claude, Codex, Antigravity, or another local coding assistant with
+            <code>./setup.sh --agent</code> and the localhost browser Secret Vault
+            so passwords and API keys never enter chat history.
+          </span>
         </span>
+        {{ render_icon("down", styles.disclosure.chevron) }}
       </summary>
       <div class="border-t border-base-light/40 px-5 py-5 space-y-3 text-sm text-base-medium">
         <p>
@@ -258,12 +261,15 @@
     {% endcall %}
     <details data-role="delegated-owner-checklist"
              data-kind="page"
-             class="rounded-lg border border-base-light/50 bg-white shadow-sm">
-      <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
-        <span class="ml-1 text-lg font-semibold">Business / permanent Owner</span>
-        <span class="ml-5 block text-sm font-normal leading-relaxed text-base-medium">
-          Create and fund the project, create the installer account, grant temporary access, and close the handoff.
+             class="group rounded-lg border border-base-light/50 bg-white shadow-sm">
+      <summary class="{{ styles.disclosure.summary }} px-5 py-4 text-base-dark">
+        <span class="min-w-0">
+          <span class="text-lg font-semibold">Business / permanent Owner</span>
+          <span class="mt-0.5 block text-sm font-normal leading-relaxed text-base-medium">
+            Create and fund the project, create the installer account, grant temporary access, and close the handoff.
+          </span>
         </span>
+        {{ render_icon("down", styles.disclosure.chevron) }}
       </summary>
       <div class="border-t border-base-light/40 px-5 py-5">
         <p class="mb-5 text-base-medium">
@@ -583,12 +589,15 @@
     </details>
     <details data-role="delegated-installer-checklist"
              data-kind="page"
-             class="rounded-lg border border-base-light/50 bg-white shadow-sm">
-      <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
-        <span class="ml-1 text-lg font-semibold">Installer</span>
-        <span class="ml-5 block text-sm font-normal leading-relaxed text-base-medium">
-          Activate the temporary account, run setup, verify the deployment, and return access.
+             class="group rounded-lg border border-base-light/50 bg-white shadow-sm">
+      <summary class="{{ styles.disclosure.summary }} px-5 py-4 text-base-dark">
+        <span class="min-w-0">
+          <span class="text-lg font-semibold">Installer</span>
+          <span class="mt-0.5 block text-sm font-normal leading-relaxed text-base-medium">
+            Activate the temporary account, run setup, verify the deployment, and return access.
+          </span>
         </span>
+        {{ render_icon("down", styles.disclosure.chevron) }}
       </summary>
       <div class="border-t border-base-light/40 px-5 py-5">
         <ol class="text-base-medium space-y-4 list-decimal ml-5">

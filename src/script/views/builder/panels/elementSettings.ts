@@ -80,7 +80,7 @@ const _condition = (condition: FieldCondition, index: number) => {
 		? "checked"
 		: (condition.label ?? null);
 
-	const remove = _toggle("x", "remove", "delete");
+	const remove = _toggle("trash.inactive", "remove", "delete");
 
 	elt.append(wrapper, remove);
 	return elt;
@@ -105,7 +105,7 @@ const _option = (option: FieldOption, index: number, length: number) => {
 		);
 		toggles.appendChild(_toggle("up", "moveUp", "form", index === 0));
 	}
-	toggles.appendChild(_toggle("x", "remove", "delete"));
+	toggles.appendChild(_toggle("trash.inactive", "remove", "delete"));
 
 	wrapper.append(name, toggles);
 
@@ -137,7 +137,7 @@ const _column = (column: FormFieldSchema, index: number, length: number) => {
 		);
 		toggles.appendChild(_toggle("up", "moveUp", "form", index === 0));
 	}
-	toggles.appendChild(_toggle("x", "remove", "delete"));
+	toggles.appendChild(_toggle("trash.inactive", "remove", "delete"));
 
 	wrapper.append(name, toggles);
 	return wrapper;

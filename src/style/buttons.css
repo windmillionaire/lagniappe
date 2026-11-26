@@ -133,9 +133,11 @@
 	}
 }
 
-/* @style filterBar.savedDelete toggle.container */
+/* @style filterBar.savedDelete toggle.container builder.settings.toggle.container */
 .action-icon-button[lp-control="delete"],
-.action-icon-button[data-role="saved-delete"] {
+.action-icon-button[data-role="saved-delete"],
+.action-icon-button[data-role="delete"],
+.action-icon-button[data-role="remove"][data-kind="delete"] {
 	color: var(--color-base-medium);
 	opacity: 0.65;
 	&:focus-visible {
@@ -331,5 +333,5 @@ button[data-role="expand"] > .icon {
 
 /* @style toggle.container toggle.plain */
 button[data-role="expand"][data-open="true"] > .icon {
-	transform: rotate(90deg);
+	transform: rotate(180deg);
 }

@@ -8,6 +8,22 @@ button.tab-icon {
 }
 
 /* @style entity.tabIcon */
+@media (max-width: 639.98px) {
+	[data-nav="mobile"] button.tab-icon {
+		min-width: 2.25rem;
+		min-height: 2.25rem;
+		border-radius: var(--radius-md);
+	}
+
+	[data-nav="mobile"]
+		[data-flipped="true"]
+		button.tab-icon[data-selected="true"] {
+		background-color: white;
+		box-shadow: var(--shadow-xs);
+	}
+}
+
+/* @style entity.tabIcon */
 @media (min-width: 640px) {
 	button.tab-icon::after {
 		content: "";

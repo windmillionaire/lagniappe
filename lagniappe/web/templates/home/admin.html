@@ -154,12 +154,13 @@
           its exact referenced files.
         </p>
         {% if data_protection.native_backups %}
-          <details class="mt-4 rounded-lg bg-base-bg">
-            <summary class="cursor-pointer px-4 py-3 text-base-dark marker:text-kind-default">
-              <span class="ml-1 font-medium">
+          <details class="group mt-4 rounded-lg bg-base-bg">
+            <summary class="{{ styles.disclosure.summary }} px-4 py-3 text-base-dark">
+              <span class="font-medium">
                 Show {{ data_protection.native_backups|length }} automatic
                 backup{{ "s" if data_protection.native_backups|length != 1 else "" }}
               </span>
+              {{ render_icon("down", styles.disclosure.chevron) }}
             </summary>
             <ul class="space-y-4 border-t border-base-light/40 p-4">
               {% for backup in data_protection.native_backups %}

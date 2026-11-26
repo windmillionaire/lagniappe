@@ -201,7 +201,7 @@ ICONS = {
 		"fill": 1
 	},
 	"expand": {
-		"glyph": "arrow_right",
+		"glyph": "keyboard_arrow_down",
 		"fill": 1
 	},
 	"file": {
@@ -213,7 +213,7 @@ ICONS = {
 		"fill": 1
 	},
 	"files": {
-		"glyph": "work",
+		"glyph": "folder",
 		"fill": 1
 	},
 	"filter": {

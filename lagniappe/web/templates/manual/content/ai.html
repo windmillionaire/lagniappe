@@ -115,8 +115,11 @@
     {% endif %}
   {% endcall %}
   {% call card() %}
-    <details data-role="external-ai-help">
-      <summary class="cursor-pointer text-page-default font-semibold">Use an external AI agent: MCP or skill</summary>
+    <details class="group" data-role="external-ai-help">
+      <summary class="{{ styles.disclosure.summary }} text-page-default font-semibold">
+        <span>Use an external AI agent: MCP or skill</span>
+        {{ render_icon("down", styles.disclosure.chevron) }}
+      </summary>
       <div class="space-y-3 mt-3 text-base-medium">
         <p>An installation can disable AI entirely, or allow built-in AI while
           disabling external agents. External access covers both MCP and the API/skill.</p>

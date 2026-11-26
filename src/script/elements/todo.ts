@@ -234,7 +234,7 @@ export class TodoElement extends BaseElement {
 			actions.appendChild(
 				this._button({
 					role: "todo-remove",
-					icon: "remove",
+					icon: "trash.inactive",
 					label: `Remove ${item.text}`,
 					kind: "delete",
 				}),
@@ -267,7 +267,7 @@ export class TodoElement extends BaseElement {
 		actions.append(
 			this._button({
 				role: "todo-dismiss-draft",
-				icon: "remove",
+				icon: "close",
 				label: "Dismiss new todo",
 				kind: "delete",
 			}),

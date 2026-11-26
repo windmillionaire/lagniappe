@@ -154,6 +154,7 @@ builder:
         classes: "action-icon-button size-5 transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
         intent: centered builder settings action using the shared icon-button interaction outline
         surfaces: [server, frontend]
+        css: [src/style/buttons.css]
       icon:
         classes: icon-xs text-kind-default
         intent: icon presentation within builder settings toggle
@@ -241,6 +242,16 @@ datePicker:
     surfaces: [frontend]
     hooks: [lp-dp-popover]
     css: [src/style/forms.css]
+
+disclosure:
+  summary:
+    classes: "flex w-full cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden"
+    intent: shared summary row for native details accordions with right-aligned rotating chevron
+    surfaces: [server]
+  chevron:
+    classes: shrink-0 text-base-medium transition-transform duration-150 motion-reduce:transition-none group-open:rotate-180
+    intent: right-aligned Material disclosure chevron that rotates when its parent details element opens
+    surfaces: [server]
 
 dropdown:
   menu:

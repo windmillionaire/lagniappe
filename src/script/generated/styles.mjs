@@ -73,6 +73,10 @@ const STYLES = {
     "trigger": "lp-date-trigger",
     "popover": "lp-dp-popover"
   },
+  "disclosure": {
+    "summary": "flex w-full cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden",
+    "chevron": "shrink-0 text-base-medium transition-transform duration-150 motion-reduce:transition-none group-open:rotate-180"
+  },
   "dropdown": {
     "menu": "absolute z-101 flex min-w-37.5 flex-col gap-1 rounded-md bg-white p-1 shadow-lg outline outline-base-light/50",
     "icon": "dropdown-option-icon",
