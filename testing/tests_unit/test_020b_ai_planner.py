@@ -9,9 +9,11 @@ import pytest
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import AI
 from lagniappe.core.tools.ai import planner
+from lagniappe.core.tools.ai.core import GenAI
 from lagniappe.core.tools.ai.function_definitions.get_guidelines import (
     execute_get_guidelines,
 )
+from lagniappe.core.tools.files.constants import MAX_ARTIFACT_BYTES
 from testing.utility.ai_report_fakes import _prompt_context_json, _test_file, _test_user
 from testing.utility.test_entities import TestEntities
 
@@ -205,6 +207,52 @@ def test_generate_report_validates_answers_actions_and_file_usage(monkeypatch):
         planner.generate_report(prompt)
 
 
+@pytest.mark.parametrize("fenced", (False, True))
+def test_vertex_plan_preserves_large_artifact_code_and_bounds_the_proposal(monkeypatch, fenced):
+    user = _test_user("artifact-owner")
+    monkeypatch.setattr(type(user), "access", lambda self, access: access == AI.CREATE)
+    prompt = planner.report_prompt(_report(user, instructions="Create an interactive timeline."), user)
+    assert "create_artifact" in prompt.allowed_actions
+    guidance = execute_get_guidelines(
+        {"task": "report_actions", "actions": ["create_artifact"]}, user,
+    )
+    fields = guidance["action_schema"]["anyOf"][0]["properties"]["data"]["properties"]
+    assert "512 KiB" in fields["artifact_html"]["description"]
+
+    script = '<script>const values = [4, 7]; console.log(values[0], "```text keep this```");</script>'
+    html = script + "<!--" + "x" * (MAX_ARTIFACT_BYTES - len(script) - 7) + "-->"
+    artifact = {
+        "id": "timeline",
+        "type": "create_artifact",
+        "data": {"name": "Timeline", "page_action": "history", "artifact_html": html},
+    }
+    raw = {
+        "summary": "Add a timeline [1]",
+        "confidence": 1,
+        "issues": [],
+        "file_usage": [],
+        "actions": [
+            {"id": "history", "type": "create_page", "data": {"name": "Food history"}},
+            artifact,
+        ],
+    }
+
+    def generate(_prompt, *, validator, validation_retries):
+        output = json.dumps(raw)
+        if fenced:
+            output = "```json\n" + output + "\n```"
+        return validator(GenAI.cleanup(output, "JSON"))
+
+    monkeypatch.setattr(planner.ai_model, "generate_content", generate)
+    result = planner.generate_report(prompt)
+    assert result["proposal"]["summary"] == "Add a timeline "
+    assert result["proposal"]["actions"][1]["data"]["artifact_html"] == html
+
+    raw["actions"].append({**artifact, "id": "timeline-copy"})
+    with pytest.raises(exceptions.AIException, match="serialized artifact proposal exceeds 750 KiB"):
+        planner.generate_report(prompt)
+
+
 def test_report_availability_rejects_old_and_malformed_records():
     user = _test_user("availability-owner")
     report = _report(user)
@@ -257,12 +305,12 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
         (
             {"page-one": "EDIT"},
             {"can_update_pages", "can_update_tasks"},
-            {"append_page_document", "replace_page_document", "attach_file", "move_file", "move_task"},
+            {"append_page_document", "replace_page_document", "attach_file", "create_artifact", "move_file", "move_task"},
         ),
         (
             {"cat-one": "EDIT"},
             {"can_create_pages", "can_update_pages", "can_update_tasks"},
-            {"create_page", "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task"},
+            {"create_page", "append_page_document", "replace_page_document", "attach_file", "create_artifact", "move_file", "move_task"},
         ),
         (
             {"project-one": "EDIT"},
@@ -278,13 +326,13 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
         (
             {"page-one": "DELETE"},
             {"can_update_pages", "can_update_tasks", "can_delete_pages", "can_delete_tasks", "can_delete_files"},
-            {"append_page_document", "replace_page_document", "attach_file", "move_file", "move_task",
+            {"append_page_document", "replace_page_document", "attach_file", "create_artifact", "move_file", "move_task",
              "suggest_page_deletion", "delete_page", "delete_task", "delete_file"},
         ),
         (
             {"models": "EDIT"},
             {"can_create_pages", "can_create_model_tasks", "can_update_pages", "can_update_tasks"},
-            {"create_page", "create_model_task", "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task"},
+            {"create_page", "create_model_task", "append_page_document", "replace_page_document", "attach_file", "create_artifact", "move_file", "move_task"},
         ),
         (
             {"models": "CREATE"},
@@ -293,7 +341,7 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
              "can_delete_pages", "can_delete_categories", "can_delete_projects",
              "can_delete_tasks", "can_delete_files"},
             {"create_category", "create_project", "create_page", "create_model_task",
-             "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task",
+             "append_page_document", "replace_page_document", "attach_file", "create_artifact", "move_file", "move_task",
              "suggest_page_deletion", "delete_page", "delete_category", "delete_project",
              "delete_model_task", "delete_task", "delete_file"},
         ),

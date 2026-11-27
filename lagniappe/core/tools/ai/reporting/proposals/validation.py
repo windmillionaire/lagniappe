@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from lagniappe.core.tools.cache.details import CachedDetail
 
 
+import json
 import re
 
 from config.form_schema import SchemaValidationError
@@ -19,6 +20,7 @@ from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools import dates
 from lagniappe.core.tools.forms.drafts import validate_draft_schema
 from lagniappe.core.tools.files.artifacts import artifact_content
+from lagniappe.core.tools.files.constants import MAX_ARTIFACT_PROPOSAL_BYTES
 
 from ...debug import ai_debug
 from ...form_content import static_form_markdown
@@ -277,7 +279,20 @@ def validate_proposal(
         except exceptions.ValidationError as error:
             raise exceptions.AIException(f"update_form_schema: {error}") from error
 
+    validate_artifact_proposal_size(checked)
     return checked
+
+
+def validate_artifact_proposal_size(proposal: ReportProposal) -> None:
+    """Leave room in the Datastore entity for the Plan and its execution ledger."""
+    if not any(action["type"] == "create_artifact" for action in proposal["actions"]):
+        return
+    # Report processes are serialized with ASCII escapes before being saved.
+    if len(json.dumps(proposal).encode("utf-8")) > MAX_ARTIFACT_PROPOSAL_BYTES:
+        raise exceptions.AIException(
+            f"The serialized artifact proposal exceeds {MAX_ARTIFACT_PROPOSAL_BYTES // 1024} KiB. "
+            "Reduce the included data or split the work into smaller Plans."
+        )
 
 
 def _validate_existing_reference_kinds(action, action_label, resolved_details):

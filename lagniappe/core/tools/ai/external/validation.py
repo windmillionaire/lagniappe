@@ -21,7 +21,7 @@ from lagniappe.core.tools.files.html import render_markdown, strip_tags
 from ..planner import file_usage_schema, validate_file_usage
 from ..references import HASH_PREFIXED_ID_REGEX, HASH_REFERENCE_REGEX
 from ..reporting.contracts.schema import external_report_proposal_response_schema
-from ..reporting.proposals.validation import validate_proposal
+from ..reporting.proposals.validation import validate_artifact_proposal_size, validate_proposal
 from .contracts import _external_allowed_report_actions, report_file_references
 from .definitions import (
     CONTRACT_VERSION,
@@ -631,6 +631,7 @@ def validate_external_proposal(
     prepare_schema_updates(normalized, user)
     from ..reporting.entity_updates import prepare_entity_updates
     prepare_entity_updates(normalized, user)
+    validate_artifact_proposal_size(normalized)
     if resolved_references is not None:
         resolved_references.update(
             {

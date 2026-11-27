@@ -162,8 +162,9 @@ the Page's **Files** and the execution result includes its File page link.
 For a Plan with other changes, submit an action of type `create_artifact`
 with `data.name`, `data.artifact_html`, and either `data.page` (existing
 Page reference) or `data.page_action` (id of an earlier `create_page`
-action). The HTML may be up to 256 KiB in UTF-8. Bundle the data and any
-third-party JS or CSS inline. The sandboxed File preview runs script and
+action). The HTML may be up to 512 KiB in UTF-8, including data and any
+bundled JS or CSS. The serialized proposal can be up to 750 KiB. The
+sandboxed File preview runs script and
 style elements and blocks external subresources and Fetch/XHR requests. Use
 `addEventListener` for interactions.
 

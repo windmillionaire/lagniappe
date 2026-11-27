@@ -175,9 +175,11 @@ def test_artifact_proposal_creates_one_interactive_file_on_the_page(monkeypatch)
         denied.setattr(type(page), "allowed", lambda self, action, user=None: action is Action.VIEW)
         with pytest.raises(exceptions.AIException, match="requires an editable Page"):
             external_validation.validate_external_proposal(proposal, report, actor, file_usage=[])
-    with pytest.raises(exceptions.AIException, match="at most 256 KiB"):
+    with pytest.raises(exceptions.AIException, match="at most 512 KiB"):
         external_validation.validate_external_proposal(
-            {**proposal, "actions": [{"type": "create_artifact", "data": {**data, "artifact_html": "é" * MAX_ARTIFACT_BYTES}}]},
+            {**proposal, "actions": [{"type": "create_artifact", "data": {
+                **data, "artifact_html": "é" * (MAX_ARTIFACT_BYTES // 2 + 1),
+            }}]},
             report, actor, file_usage=[],
         )
     assert external_api.submission_validation_errors(
