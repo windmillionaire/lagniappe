@@ -280,25 +280,31 @@ def test_star_file(get_admin, get_user):
 def test_star_route_rejects_inaccessible_and_missing_targets(
     get_user, browser_failures
 ):
-    owner = get_user(Users.OWNER)
-    target = Categories.test_create_page.get(owner)
+    get_user(Users.OWNER)
+    # Use a dedicated category so parallel tests creating pages in shared
+    # categories cannot change its fingerprint mid-assertion.
+    target_entity = Entities.CATEGORY.create(
+        {"name": f"Inaccessible Star Target {uuid4().hex}"}
+    )
+    target_entity.save()
+    target_key = target_entity.urlsafe_key
     restricted = get_user(Users.user_one_category)
     restricted.go(SitePages.HOME)
 
-    assert target.entity.allowed(Action.VIEW, user=restricted.entity) is False
+    assert target_entity.allowed(Action.VIEW, user=restricted.entity) is False
     saved_user = Entities.USER.load(restricted.email)
     starred_before = list(saved_user.db.get("starred", []))
-    target_before = Entities.fetch_one(target.key, request=Fetch.direct())
+    target_before = Entities.fetch_one(target_key, request=Fetch.direct())
     target_fingerprint = target_before.fingerprint
     target_modified = target_before.modified
 
-    forbidden_path = f"/l/toggle-star/{target.key}"
+    forbidden_path = f"/l/toggle-star/{target_key}"
     with browser_failures.expect_http_error(
         restricted,
         status=403,
         path=forbidden_path,
     ):
-        forbidden = _patch_star(restricted, target.key)
+        forbidden = _patch_star(restricted, target_key)
     assert forbidden["status"] == 403
 
     missing_path = "/l/toggle-star/not-a-real-star-target"
@@ -312,7 +318,7 @@ def test_star_route_rejects_inaccessible_and_missing_targets(
 
     saved_user = Entities.USER.load(restricted.email)
     assert saved_user.db.get("starred", []) == starred_before
-    target_after = Entities.fetch_one(target.key, request=Fetch.direct())
+    target_after = Entities.fetch_one(target_key, request=Fetch.direct())
     assert target_after.fingerprint == target_fingerprint
     assert target_after.modified == target_modified
 
@@ -332,7 +338,7 @@ def test_star_route_rejects_inaccessible_and_missing_targets(
     expect(starred).to_have_attribute("loaded", "")
     expect(starred).to_be_visible()
     inaccessible = starred.locator(
-        f"li[data-role='unavailable-starred-item'][data-key='{target.key}']"
+        f"li[data-role='unavailable-starred-item'][data-key='{target_key}']"
     )
     expect(inaccessible).to_have_attribute("data-state", "inaccessible")
     expect(inaccessible).to_contain_text("no longer accessible")
