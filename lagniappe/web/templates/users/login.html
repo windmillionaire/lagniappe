@@ -78,7 +78,7 @@
   <button type="button"
           data-role="{{ role }}"
           data-kind="user"
-          class="{{ styles.link.alternate }} text-kind-default hover:text-kind-dark hover:decoration-kind-dark {{ 'w-full' if not inline }}">{{ text }}</button>
+          class="{{ styles.link.alternate }} inline-flex items-center justify-center min-h-9 sm:min-h-0 text-kind-default hover:text-kind-dark hover:decoration-kind-dark {{ 'w-full' if not inline }}">{{ text }}</button>
 {% endmacro %}
 
 {% macro remember_me() %}

@@ -113,9 +113,12 @@ abstract class LoginForms {
 		this.reset();
 		this.sync();
 		this.form.classList.remove("hidden");
+		this.focusInitial();
 	}
 
 	sync() {}
+
+	focusInitial() {}
 
 	hide() {
 		this.form.classList.add("hidden");
@@ -233,15 +236,13 @@ class EmailCheckForm extends LoginForms {
 		);
 		this.setActionButton(requiredControl(this.form, "[data-role='signin']"));
 
-		this.email.focus();
-
 		this.actionButton?.addEventListener("click", this.handleSignIn.bind(this));
 		this.backButton.addEventListener("click", () => {
 			document.dispatchEvent(new CustomEvent("login:show-auth-method"));
 		});
 	}
 
-	sync() {
+	focusInitial() {
 		this.email.focus();
 	}
 
@@ -372,7 +373,10 @@ class FirstTimeSetupForm extends LoginForms {
 		this.email.value = this.data.email || "";
 		this.selectedEmail.textContent = this.data.email || "";
 		this.password.value = "";
-		setTimeout(() => this.password.focus(), 100);
+	}
+
+	focusInitial() {
+		this.password.focus();
 	}
 
 	handleSignIn() {
@@ -456,6 +460,9 @@ class SignInForm extends LoginForms {
 				"We couldn't send the verification email. Sign in again to retry delivery.",
 			);
 		}
+	}
+
+	focusInitial() {
 		this.password.focus();
 	}
 
@@ -512,6 +519,9 @@ class ForgotPasswordForm extends LoginForms {
 
 	sync() {
 		this.email.value = this.data.email || "";
+	}
+
+	focusInitial() {
 		if (!this.data.email) this.email.focus();
 	}
 
