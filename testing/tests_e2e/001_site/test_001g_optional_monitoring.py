@@ -23,10 +23,8 @@ def test_optional_monitoring_does_not_gate_controls(
 ):
     owner = get_user(Users.OWNER)
     user = owner if layout == "page" else get_user(Users.ANONYMOUS)
-    path = (
-        f"/pages/{Pages.test_create_page.get(owner).key}"
-        if layout == "page" else "/users/login"
-    )
+    target_page = Pages.test_create_page.get(owner) if layout == "page" else None
+    path = f"/pages/{target_page.key}" if target_page is not None else "/users/login"
     client = app.test_client()
     for cookie in user.page.context.cookies():
         client.set_cookie(cookie["name"], cookie["value"])
@@ -78,12 +76,14 @@ def test_optional_monitoring_does_not_gate_controls(
                 f"{SETTINGS.test_config['BASE_URL']}{path}",
                 wait_until="domcontentloaded",
             )
-            if layout == "page":
-                expect(user.page.locator("[lp-view]")).to_have_attribute(
-                    "initialized", ""
-                )
+            if target_page is not None:
+                target_page.user = user
+                target_page.initialize_view()
+                target_page.wait_for_interaction_readiness()
                 user.page.get_by_role("button", name="Page actions", exact=True).click()
-                user.page.locator("[data-page-action='rename']:visible").click()
+                menu = user.page.get_by_role("menu", name="Page actions")
+                expect(menu).to_be_visible()
+                menu.locator("[data-page-action='rename']").click()
                 name = user.page.locator("[data-role='rename-form'] input[name='name']")
                 expect(name).to_be_visible()
                 name.fill("Unsaved monitoring probe")
