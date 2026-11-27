@@ -137,3 +137,25 @@ test("test_ready_rejection_does_not_replay_commit", async (t) => {
 	assert.equal(commits, 1);
 	assert.equal(capturedErrors.length, 0);
 });
+
+test("test_skipped_transition_before_update_still_commits_dom", async (t) => {
+	const skipped = new Error("Transition was skipped");
+	const { capturedErrors, withTransition } = await setupTransitions(t, {
+		skipped: (error) => /skipped/i.test(error?.message || ""),
+	});
+	installTransitionApi(t, () => ({
+		finished: Promise.reject(skipped),
+		ready: Promise.reject(skipped),
+		updateCallbackDone: Promise.reject(skipped),
+	}));
+	let commits = 0;
+
+	const result = await withTransition(() => {
+		commits += 1;
+	});
+	await Promise.resolve();
+
+	assert.equal(result, true);
+	assert.equal(commits, 1);
+	assert.equal(capturedErrors.length, 0);
+});

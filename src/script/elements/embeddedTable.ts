@@ -242,6 +242,7 @@ export class ExpandedTableCell {
 
 		this.row = document.createElement("tr");
 		this.row.dataset.embedded = "true";
+		this.row.dataset.column = tableId;
 		this.row.dataset.visible = "false";
 		this.row.className =
 			"rounded-md border border-base-light/50 mx-4 mb-3 overflow-hidden sm:rounded-none sm:border-t sm:border-b sm:border-x-0 sm:mx-0 sm:mb-0";

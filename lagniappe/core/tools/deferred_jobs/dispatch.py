@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 import threading
 
-from flask import Flask, current_app, url_for
+from flask import Flask, current_app, has_request_context, request, url_for
 from werkzeug.local import LocalProxy
 
 from lagniappe import CONFIG
@@ -55,9 +55,15 @@ class DeferredJobDispatch:
             return service.run(job.urlsafe_key)
         if CONFIG.development:
             app = cast("LocalProxy[Flask]", current_app)._get_current_object()
+            base_url = request.host_url if has_request_context() else None
 
             def run_local():
-                with app.app_context():
+                request_context = (
+                    app.test_request_context(base_url=base_url)
+                    if base_url
+                    else app.test_request_context("/")
+                )
+                with request_context:
                     service.run(job.urlsafe_key)
 
             if delay_seconds:

@@ -142,7 +142,7 @@ export default class Manual extends ShellView {
 			const newTarget = response.html.querySelector("body");
 			await withTransition(
 				() => {
-					if (newTarget) target?.replaceChildren(newTarget);
+					if (newTarget) target?.replaceChildren(...newTarget.childNodes);
 					this.elt
 						.querySelectorAll<HTMLButtonElement>("[data-section]")
 						.forEach((button) => {

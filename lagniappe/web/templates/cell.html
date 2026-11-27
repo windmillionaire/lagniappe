@@ -77,7 +77,7 @@
       <span>
         {{- format_name(value, link=column.link, parent=column.parent, icon=value.form_type if value.kind == 'form' else False) -}}
       </span>
-      {% if not parent.table.embedded %}
+      {% if not parent.table.embedded and entity.allowed(Action.DELETE) %}
         <span class="sm:hidden">
           {{ delete(label='Delete ' ~ entity.name,
                     modal_route=url_for('internal.delete', key=entity.urlsafe_key) if entity.entity_kind == 'user' else None) }}

@@ -282,11 +282,19 @@ export default class Home extends Core {
 			toggle.classList.toggle("pointer-events-none", safeCount === 0);
 		}
 		if (safeCount === 0) {
+			const starredComponent = this.components.starred;
+			if (starredComponent?.active?.name === "StarredList") {
+				starredComponent.active = null;
+			}
 			const list = this._sectionElement(
 				"starred",
 			)?.querySelector?.<HTMLElement>("[data-widget='StarredList']");
 			if (list) list.dataset.visible = "false";
-			this.syncHomeSectionState(this.components.starred);
+			const wasOpen = this._openSections.has("starred");
+			this.syncHomeSectionState(starredComponent);
+			if (!this._suppressSectionPersist && wasOpen) {
+				this._persistOpenSections();
+			}
 		}
 	}
 
@@ -422,11 +430,15 @@ export default class Home extends Core {
 			() => {
 				if (commit) commit();
 				if (starredComponent.active === widget) {
-					this._suppressSectionPersist = true;
-					try {
-						starredComponent.render(true);
-					} finally {
-						this._suppressSectionPersist = false;
+					if (!this._canRestoreWidget("starred", widget)) {
+						this._setStarredCount(0);
+					} else {
+						this._suppressSectionPersist = true;
+						try {
+							starredComponent.render(true);
+						} finally {
+							this._suppressSectionPersist = false;
+						}
 					}
 				}
 			},

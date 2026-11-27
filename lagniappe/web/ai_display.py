@@ -3,6 +3,7 @@
 from flask import g, has_request_context, request
 from google.cloud.datastore import Key
 
+from config.remote_mcp import mcp_issuer
 from lagniappe import CONFIG
 from lagniappe.core.tools.ai.auto_execute import site_auto_execute_enabled
 from lagniappe.core.tools.ai.settings import auto_execute_setting
@@ -27,3 +28,19 @@ def auto_execute_site_enabled() -> bool:
         else:
             g._auto_execute_site_enabled = site_auto_execute_enabled()
     return g._auto_execute_site_enabled
+
+
+def oauth_connection_available() -> bool:
+    if (
+        not CONFIG.AI_ENABLED
+        or not CONFIG.EXTERNAL_AI_ENABLED
+        or not CONFIG.MCP_RESOURCE
+        or not CONFIG.MCP_SERVICE_ACCOUNT
+        or not has_request_context()
+    ):
+        return False
+    try:
+        issuer = mcp_issuer(vars(CONFIG))
+    except ValueError:
+        return False
+    return request.host_url.rstrip("/") == issuer

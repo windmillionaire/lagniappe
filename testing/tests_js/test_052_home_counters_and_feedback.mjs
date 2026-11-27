@@ -77,6 +77,7 @@ test("test_home_starred_count_updates_immediately_and_task_feedback_dismisses", 
 	assert.equal(starredToggle.classList.contains("opacity-50"), true);
 	assert.equal(starredToggle.classList.contains("pointer-events-none"), true);
 	assert.equal(starredList.dataset.visible, "false");
+	assert.equal(home.components.starred.active, null);
 	assert.equal(starredToggle.getAttribute("aria-expanded"), "false");
 
 	// Dismissing task feedback hides the banner.

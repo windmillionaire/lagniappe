@@ -706,3 +706,31 @@ test("test_entity_title_menu_anchors_to_the_title_bottom_left", async (t) => {
 	assert.equal(refreshedItems[0].html, firstHtml);
 	assert.equal(dropdown.element.isConnected, true);
 });
+
+/**
+ * @style dropdown.panel
+ */
+test("test_combobox_preserves_item_ids_and_opens_closed_listbox_on_arrow_down", async (t) => {
+	const env = await setupFloating(t);
+	const { initial, parent } = makeComboboxElements();
+	const combobox = new env.Combobox(parent);
+	combobox.init();
+	combobox.items = [{ id: "B2", name: "B2" }];
+	combobox.updatePanel('<div role="option">B2</div>');
+	assert.equal(combobox.items[0].id, "B2");
+	assert.equal(combobox.options[0].id, "B2");
+	combobox.panel.querySelector('[role="option"]').scrollIntoView = () => {};
+	t.mock.method(combobox, "_startAutoUpdate", () => Promise.resolve(true));
+
+	const down = interactionEvent({ key: "ArrowDown" });
+	combobox.elementKeydown(down);
+	await combobox.panelReady;
+	await Promise.resolve();
+	assert.equal(down.defaultPrevented, true);
+	assert.equal(combobox.panelOpen, true);
+	assert.equal(combobox.focusedIndex, 0);
+	assert.equal(
+		initial.getAttribute("aria-activedescendant"),
+		`${combobox.panel.id}-opt-0`,
+	);
+});

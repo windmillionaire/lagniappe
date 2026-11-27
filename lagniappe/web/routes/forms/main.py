@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 import json
 import re
 
-from flask import render_template, request, url_for
+from flask import redirect, render_template, request, url_for
 from flask_login import current_user
 
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
@@ -90,6 +90,13 @@ def _draft_image_sources(form, html_fields):
         )))
         result[field_id] = sources
     return result
+
+
+@forms.route("", methods=["GET"])
+@forms.route("/", methods=["GET"])
+@permission(Resource.FORMS, Action.VIEW)
+def forms_root() -> ResponseReturnValue:
+    return redirect(url_for("forms.form_index"))
 
 
 @forms.route("/index", methods=["GET"])
@@ -170,7 +177,21 @@ def update_direct(key: str, **kwargs: object) -> ResponseReturnValue:
 @forms.route("/create", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
 def create() -> ResponseReturnValue:
-    new_form = Entities.FORM.create(request.form)
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        return responses.error("Name this form before creating it.")
+    form_type = (request.form.get("form-type") or "").strip()
+    if form_type not in {"page", "task"}:
+        return responses.error("Select whether this form is for pages or tasks.")
+    create_data: dict[str, object] = {
+        **request.form.to_dict(),
+        "name": name,
+        "form-type": form_type,
+    }
+    try:
+        new_form = Entities.FORM.create(create_data)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     new_form.save()
 
     return responses.rows(new_form, index.FormIndex())

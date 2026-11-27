@@ -67,9 +67,17 @@
         {% else %}
           <section class="rounded-md border border-dashed border-base-light bg-base-bg px-6 py-12 text-center">
             <h2 class="text-xl font-semibold text-base-dark">No public pages yet</h2>
-            <p class="mx-auto mt-2 max-w-lg text-base-medium">There is nothing in the public directory right now. Sign in to access the rest of the site.</p>
-            <a class="action-button mt-6 inline-flex rounded-md bg-page-default px-3 py-1.5 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default"
-               href="{{ login_url }}">Sign in</a>
+            {% if current_user.is_authenticated %}
+              <p class="mx-auto mt-2 max-w-lg text-base-medium">There is nothing in the public directory right now.</p>
+              <a data-kind="page"
+                 class="action-button mt-6 inline-flex min-h-9 items-center rounded-md bg-page-default px-4 py-1.5 text-sm font-semibold text-white hover:bg-page-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default"
+                 href="{{ url_for('home.home_page') }}">Go to Home</a>
+            {% else %}
+              <p class="mx-auto mt-2 max-w-lg text-base-medium">There is nothing in the public directory right now. Sign in to access the rest of the site.</p>
+              <a data-kind="page"
+                 class="action-button mt-6 inline-flex min-h-9 items-center rounded-md bg-page-default px-4 py-1.5 text-sm font-semibold text-white hover:bg-page-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default"
+                 href="{{ login_url }}">Sign in</a>
+            {% endif %}
           </section>
         {% endif %}
       </div>

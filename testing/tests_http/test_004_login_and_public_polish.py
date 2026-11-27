@@ -486,3 +486,25 @@ def test_readonly_page_and_project_templates_hide_empty_document_tab(
             )
             assert 'lp-show="document:active"' in empty_editable
             assert 'data-widget="CollaborativeDocument"' in empty_editable
+
+
+def test_signed_out_manual_ai_hides_account_details(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client,
+):
+    monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", True)
+    monkeypatch.setattr(CONFIG, "AI_ENABLED", True)
+    monkeypatch.setattr(CONFIG, "EXTERNAL_AI_ENABLED", True)
+    monkeypatch.setattr(
+        CONFIG,
+        "AI_EMAIL_PUBLIC",
+        {"enabled": True, "addresses": {"ai": "secret-inbox@example.com"}},
+    )
+
+    response = http_client.get("/manual/ai")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'data-role="external-ai-generic-details"' in html
+    assert 'data-role="ai-email-account-details"' not in html
+    assert 'data-role="external-ai-account-details"' not in html
+    assert "secret-inbox@example.com" not in html

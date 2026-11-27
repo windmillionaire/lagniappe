@@ -125,7 +125,7 @@ builder:
     surfaces: [server]
   sections:
     side:
-      classes: "basis-1/4 group-data-[expanded=true]/builder:hidden"
+      classes: "basis-1/4 lg:sticky lg:top-20 self-start max-h-[calc(100vh-6rem)] overflow-y-auto group-data-[expanded=true]/builder:hidden"
       intent: side presentation within builder sections
       surfaces: [server]
     main:
@@ -176,7 +176,7 @@ button:
     hooks: [action-button-secondary]
     css: [src/style/buttons.css]
   close:
-    classes: ml-2 shrink-0 text-center text-sm sm:text-base rounded-md px-3 py-1 font-semibold border border-base-light bg-white text-base-dark shadow-xs transition-colors hover:bg-base-bg hover:border-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-medium
+    classes: ml-2 shrink-0 min-h-9 text-center text-sm sm:text-base rounded-md px-3 py-1 font-semibold border border-base-light bg-white text-base-dark shadow-xs transition-colors hover:bg-base-bg hover:border-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-medium
     intent: neutral cancel or close button inside modal headers
     surfaces: [server, frontend]
   group:
@@ -245,7 +245,7 @@ datePicker:
 
 disclosure:
   summary:
-    classes: "flex w-full cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden"
+    classes: "flex min-h-9 w-full cursor-pointer list-none items-center justify-between gap-3 sm:min-h-0 [&::-webkit-details-marker]:hidden"
     intent: shared summary row for native details accordions with right-aligned rotating chevron
     surfaces: [server]
   chevron:
@@ -362,7 +362,7 @@ editor:
       hooks: [editor-save-status]
       css: [src/style/editor.css, src/style/icons.css]
     tool:
-      classes: grid size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm
+      classes: grid size-9 sm:size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm
       intent: tool presentation within editor toolbar
       surfaces: [frontend]
     menu:
@@ -675,14 +675,14 @@ home:
       classes: bg-white rounded-md outline-2 outline-kind-default
       intent: list presentation within home card
       surfaces: [server]
+    title:
+      classes: min-w-0 flex-1 break-words [overflow-wrap:anywhere]
+      intent: shrinkable title slot within home card rows so long names wrap without overflowing mobile cards
+      surfaces: [server]
     actions:
-      classes: flex flex-row items-center gap-1
+      classes: flex shrink-0 flex-row items-center gap-1
       intent: actions presentation within home card
       surfaces: [server]
-      exceptions:
-        - diagnostic: duplicate-style-value
-          target: form.table.cell.title
-          reason: home card actions and table cell titles are separate semantic roles
   column:
     classes: flex flex-col gap-4 sm:gap-6 lg:gap-8
     intent: column presentation within home
@@ -778,7 +778,7 @@ home:
     intent: action link inside the Home task confirmation banner pointing to My Page tasks
     surfaces: [server]
   taskFeedbackDismiss:
-    classes: grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-delete-default transition-colors duration-100 hover:bg-delete-bg hover:outline-2 hover:outline-delete-default focus-visible:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default
+    classes: grid size-9 shrink-0 cursor-pointer place-items-center rounded-md text-delete-default transition-colors duration-100 hover:bg-delete-bg hover:outline-2 hover:outline-delete-default focus-visible:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default sm:size-6
     intent: dismiss control for the Home task confirmation banner
     surfaces: [server]
   view:
@@ -983,7 +983,7 @@ layout:
       intent: mobile presentation within layout nav
       surfaces: [server]
     flipper:
-      classes: inline-grid place-items-center focus:outline-none text-kind-default sm:hidden text-lg
+      classes: inline-grid min-w-9 min-h-9 place-items-center focus:outline-none text-kind-default sm:hidden text-lg
       intent: flipper presentation within layout nav
       surfaces: [server]
     group:
@@ -1191,7 +1191,7 @@ manual:
     intent: command block action row
     surfaces: [server]
   copyButton:
-    classes: rounded-md border border-base-light/50 px-2 py-1 text-xs font-semibold text-white hover:bg-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+    classes: min-h-9 min-w-9 rounded-md border border-base-light/50 px-2 py-1 text-xs font-semibold text-white hover:bg-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:min-h-0 sm:min-w-0
     intent: copy a manual command to the clipboard
     surfaces: [server]
   code:
@@ -1283,13 +1283,13 @@ modal:
 
 nav:
   button:
-    classes: action-icon-button transition-colors duration-100
+    classes: action-icon-button min-w-9 min-h-9 sm:min-w-0 sm:min-h-0 transition-colors duration-100
     intent: button presentation within nav
     surfaces: [server]
     hooks: [action-icon-button]
     css: [src/style/buttons.css, src/style/navigation.css]
   mobileButton:
-    classes: action-icon-button transition-colors duration-100 mobile
+    classes: action-icon-button min-w-9 min-h-9 transition-colors duration-100 mobile
     intent: navigation action shown only in the mobile layout
     surfaces: [server]
     hooks: [action-icon-button, mobile]
@@ -1310,7 +1310,7 @@ nav:
       intent: contents presentation within nav bar
       surfaces: [server]
   link:
-    classes: shrink-0 focus-visible:outline-2 hover:outline-2 focus-visible:outline-offset-2 hover:outline-offset-2 rounded-full focus-visible:outline-white hover:outline-white
+    classes: inline-grid size-9 place-items-center shrink-0 focus-visible:outline-2 hover:outline-2 focus-visible:outline-offset-2 hover:outline-offset-2 rounded-full focus-visible:outline-white hover:outline-white
     intent: link presentation within nav
     surfaces: [server]
   user:
@@ -1325,13 +1325,13 @@ nav:
       hooks: [nav-search-icon]
       css: [src/style/icons.css]
     input:
-      classes: nav-search-input sm:text-sm rounded-md pl-8 pr-7 h-8 w-48 sm:w-64 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+      classes: nav-search-input sm:text-sm rounded-md pl-8 pr-9 sm:pr-7 min-h-9 sm:min-h-0 sm:h-8 w-48 sm:w-64 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
       intent: input presentation within nav search
       surfaces: [server]
       hooks: [nav-search-input]
       css: [src/style/navigation.css]
     clearButton:
-      classes: nav-search-clear absolute right-1 z-10 inline-grid size-6 cursor-pointer place-items-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-page-default
+      classes: nav-search-clear absolute right-0 sm:right-1 z-10 inline-grid size-9 sm:size-6 cursor-pointer place-items-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-page-default
       intent: inline clear button inside the navbar search input
       surfaces: [server]
       hooks: [nav-search-clear]
@@ -1480,6 +1480,12 @@ table:
     classes: min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white
     intent: thin bordered container for embedded history and filter result tables
     surfaces: [server, frontend]
+  scrollWrapper:
+    classes: table-scroll-wrapper w-full
+    intent: local horizontal scroll wrapper for wide index tables without viewport overflow
+    surfaces: [server]
+    hooks: [table-scroll-wrapper]
+    css: [src/style/tables.css]
   default:
     classes: w-full table-auto border-collapse divide-y sm:text-sm mt-4
     intent: default presentation within table
@@ -1910,11 +1916,11 @@ filterBar:
     intent: flow-transparent container placing active condition badges directly inline within the chips group
     surfaces: [server]
   savedButton:
-    classes: inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/80 bg-white px-2.5 py-1 text-sm font-medium text-base-dark transition-colors hover:border-base-medium hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
+    classes: inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/80 bg-white px-2.5 py-1 text-sm font-medium text-base-dark transition-colors hover:border-base-medium hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default max-sm:min-h-9
     intent: compact saved-filters dropdown trigger in the inline filter bar
     surfaces: [server]
   addButton:
-    classes: inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-base-medium/70 bg-white px-2.5 py-1 text-sm font-medium text-base-medium transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
+    classes: inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-base-medium/70 bg-white px-2.5 py-1 text-sm font-medium text-base-medium transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default max-sm:min-h-9
     intent: dashed add-filter chip trigger opening the two-step field and condition popover
     surfaces: [server]
   icon:

@@ -46,10 +46,10 @@ def info(key: str, **kwargs: Unpack[EntityContext[models.File]]) -> ResponseRetu
 @files.route("/<key>/download", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW, no_store=True)
 def download(
-    key: str, **kwargs: Unpack[EntityContext[models.File]]
+    key: str, **kwargs: Unpack[EntityContext[models.File | models.Ingress]]
 ) -> ResponseReturnValue:
     entity = kwargs["entity"]
-    if not isinstance(entity, Entities.FILE):
+    if not isinstance(entity, (Entities.FILE, Entities.INGRESS)):
         return responses.not_found("File not found")
 
     return responses.file_download(entity)

@@ -94,6 +94,18 @@ def _terminal_error(error, *, requires_ai=False):
             MODEL_BUSY_MESSAGE,
             context=dict(getattr(error, "context", None) or {}),
         )
+    if isinstance(error, RuntimeError) and (
+        "SERVER_NAME" in str(error)
+        or "outside an active request" in str(error)
+    ):
+        if requires_ai:
+            return exceptions.AIException(
+                "The AI service ran into an unexpected configuration problem. Try again later.",
+                context=dict(getattr(error, "context", None) or {}),
+            )
+        return RuntimeError(
+            "This operation ran into an unexpected configuration problem. Try again later."
+        )
     return error
 
 

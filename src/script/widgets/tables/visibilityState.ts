@@ -4,6 +4,40 @@
  * TableVisibility widget.
  *
  */
+type EmbeddedToggleButton = HTMLButtonElement & {
+	_embeddedTable?: { destroy: () => void } | null;
+};
+
+export function collapseEmbeddedTables(
+	root: ParentNode | null | undefined,
+	column?: string,
+) {
+	if (!root) return;
+	for (const tr of root.querySelectorAll<HTMLTableRowElement>(
+		"tr[data-embedded='true']",
+	)) {
+		if (tr.closest("table[data-embedded='true']")) continue;
+		if (column && tr.dataset.column !== column) continue;
+		tr.remove();
+	}
+	for (const button of root.querySelectorAll<EmbeddedToggleButton>(
+		"button[data-open='true'], button[aria-expanded='true']",
+	)) {
+		if (
+			column &&
+			button.closest<HTMLElement>("[data-column]")?.dataset.column !== column
+		) {
+			continue;
+		}
+		if (button._embeddedTable) {
+			button._embeddedTable.destroy();
+		} else if (button.closest("[data-column]")) {
+			button.dataset.open = "false";
+			button.setAttribute("aria-expanded", "false");
+		}
+	}
+}
+
 export class TableVisibilityState {
 	declare component: VisibilityComponent;
 	declare view: VisibilityView;
@@ -104,6 +138,7 @@ export class TableVisibilityState {
 		this.hiddenColumns = visible
 			? this.hiddenColumns.filter((value) => value !== index)
 			: [...new Set([...this.hiddenColumns, index])];
+		if (!visible) collapseEmbeddedTables(this.component.elt, column);
 		this.apply();
 		void this.component.widgets.TableEditor?.refreshCheckboxes?.();
 	}

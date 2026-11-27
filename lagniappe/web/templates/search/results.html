@@ -20,7 +20,7 @@
     {% else %}
       <div class="text-delete-default italic py-4">No matches for the query "{{ query }}".</div>
     {% endif %}
-    {{ footer(pagination) }}
+    {% if pagination.total > 0 %}{{ footer(pagination) }}{% endif %}
   </div>
 {% endmacro %}
 

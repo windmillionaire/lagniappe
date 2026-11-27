@@ -136,15 +136,23 @@ export class Condition<Setting extends object = object> {
 		const controls = header.appendChild(document.createElement("div"));
 		controls.className = STYLES.form.header.controls;
 
-		controls.appendChild(
-			primitives.toggle({ icon: "help", data: { kind: "help", role: "help" } }),
-		);
-		controls.appendChild(
-			primitives.toggle({
-				icon: "close",
-				data: { kind: "close", role: "close" },
-			}),
-		);
+		const helpToggle = primitives.toggle({
+			icon: "help",
+			data: { kind: "help", role: "help" },
+		});
+		helpToggle.setAttribute("lp-control", "help");
+		helpToggle.setAttribute("lp-help", "form_settings");
+		helpToggle.setAttribute("aria-label", "Help");
+		helpToggle.title = "Help";
+		controls.appendChild(helpToggle);
+
+		const closeToggle = primitives.toggle({
+			icon: "close",
+			data: { kind: "close", role: "close" },
+		});
+		closeToggle.setAttribute("aria-label", "Close panel");
+		closeToggle.title = "Close panel";
+		controls.appendChild(closeToggle);
 
 		return header;
 	}

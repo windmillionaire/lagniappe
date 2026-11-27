@@ -677,7 +677,7 @@ export default class Messages extends Core {
 			remove.dataset.action = "delete-message";
 			remove.dataset.message = String(message.id);
 			remove.className =
-				"text-delete-default opacity-0 group-hover:opacity-100";
+				"text-delete-default rounded inline-flex min-h-9 items-center px-2 opacity-100 sm:min-h-0 sm:px-0 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default";
 			remove.textContent = "Delete";
 			footer.append(time, remove);
 			article.append(body, footer);

@@ -24,6 +24,7 @@ class GenerateText {
 	declare html: HTMLElement[];
 	declare form: FormController;
 	declare _capturedRange: Range | null;
+	declare _onKeydown: (event: KeyboardEvent) => void;
 
 	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
@@ -43,6 +44,7 @@ class GenerateText {
 
 		this.usedWithEditor = true;
 		this._onSelectionUpdate = this._onSelectionUpdate.bind(this);
+		this._onKeydown = this._handleKeydown.bind(this);
 		this._active = false;
 		this._capturedRange = null;
 	}
@@ -129,6 +131,17 @@ class GenerateText {
 
 		this.form = new FormController(this);
 		this.form.init();
+		this.target.addEventListener("keydown", this._onKeydown);
+	}
+
+	_handleKeydown(event: KeyboardEvent) {
+		if (event.key !== "Escape" || event.defaultPrevented || !this._active) {
+			return;
+		}
+		event.preventDefault();
+		event.stopPropagation();
+		this.toolbar.toggleForm(this.name);
+		this.editor.commands.focus();
 	}
 
 	_createInsertModeOptions() {
@@ -288,6 +301,11 @@ class GenerateText {
 			this.replaceSelectionRadio.checked = false;
 		}
 		this.form.resetSubmitButton();
+	}
+
+	destroy() {
+		this.target?.removeEventListener("keydown", this._onKeydown);
+		this.form?.destroy?.();
 	}
 }
 

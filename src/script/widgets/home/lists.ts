@@ -199,6 +199,7 @@ export class ToolReportList extends BaseList {
 
 	init() {
 		this.component.elt.addEventListener("click", this._click);
+		this._renderFilters();
 	}
 
 	get reportItems() {
@@ -391,10 +392,20 @@ export class ToolReportList extends BaseList {
 				void this._deleteExecuted(keys, route, modal);
 			});
 			await modal.attach(element);
-			(
-				modal.modal?.querySelector<HTMLElement>("[lp-control='close']") ??
-				confirm
-			).focus();
+			const activeModal = modal.modal;
+			const closeBtn =
+				activeModal?.querySelector<HTMLElement>("[lp-control='close']") ??
+				confirm;
+			closeBtn.focus();
+			requestAnimationFrame(() => {
+				if (
+					this._destroyed ||
+					this._deleteModal !== modal ||
+					!activeModal?.isConnected
+				)
+					return;
+				if (!activeModal.contains(document.activeElement)) closeBtn.focus();
+			});
 		} finally {
 			this._openingDelete = false;
 		}
@@ -491,6 +502,13 @@ export class StarredList extends BaseList {
 			"pointer-events-none",
 			this.itemCount === 0,
 		);
+		if (this.itemCount === 0) {
+			this.target.dataset.visible = "false";
+			if (this.component.active === this) {
+				this.component.active = null;
+			}
+			this._listToggle?.setAttribute("aria-expanded", "false");
+		}
 		this.target.setAttribute("loaded", "");
 	}
 }

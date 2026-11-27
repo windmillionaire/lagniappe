@@ -586,3 +586,70 @@ def test_page_notes_load_only_other_authors_and_preserve_visibility(monkeypatch)
         g._login_user = viewer
         assert notes.get_notes.__wrapped__(page.urlsafe_key, entity=page) == [("mine", "viewer"), ("shared", "other")]
     assert reads == [{other.key}]
+
+
+def test_page_visibility_retries_once_on_mutation_conflict_and_returns_409_when_persistent(
+    monkeypatch,
+):
+    from google.cloud.datastore import Entity, Key
+    from lagniappe.core import exceptions
+    from lagniappe.core.definitions import Action
+    from lagniappe.web.routes.pages import main as pages_main
+
+    def _make_page(fp: str):
+        row = Entity(key=Key("page", "pub-page", project="offline"))
+        row.update(
+            type="page",
+            name="Public Page",
+            hash="pubpage",
+            public=False,
+            public_id="existingpub123",
+            fingerprint=fp,
+        )
+        page = Entities.PAGE(row)
+        page.allowed = lambda action, **_kw: action == Action.PUBLISH
+        return page
+
+    stale_page = _make_page("fp-stale")
+    fresh_page = _make_page("fp-fresh")
+    monkeypatch.setattr(
+        pages_main.Entities,
+        "fetch_one",
+        lambda _key, **_kw: fresh_page,
+    )
+    monkeypatch.setattr(
+        pages_main.responses,
+        "page_document_settings",
+        lambda entity: ({"entity": entity}, 200),
+    )
+
+    # First conflict recovers on reload; persistent conflict returns 409 instead of 500.
+    saves = iter([exceptions.MutationConflict("concurrent sync"), None])
+
+    def _save_first_conflict(*entities):
+        outcome = next(saves)
+        if outcome is not None:
+            raise outcome
+
+    monkeypatch.setattr(pages_main.Entities, "save", _save_first_conflict)
+    with app.test_request_context(
+        f"/pages/{stale_page.urlsafe_key}/visibility",
+        method="PUT",
+        data={"visibility": "public", "public-settings-present": "false"},
+    ):
+        response = pages_main.visibility.__wrapped__(stale_page.urlsafe_key, entity=stale_page)
+        assert response[1] == 200
+        assert response[0]["entity"] is fresh_page
+
+    def _always_conflict(*_entities):
+        raise exceptions.MutationConflict("persistent conflict")
+
+    monkeypatch.setattr(pages_main.Entities, "save", _always_conflict)
+    with app.test_request_context(
+        f"/pages/{stale_page.urlsafe_key}/visibility",
+        method="PUT",
+        data={"visibility": "public", "public-settings-present": "false"},
+    ):
+        response = pages_main.visibility.__wrapped__(stale_page.urlsafe_key, entity=stale_page)
+        assert response.status_code == 409
+        assert "Please try again" in response.get_data(as_text=True)

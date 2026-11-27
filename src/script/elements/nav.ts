@@ -269,7 +269,8 @@ export class NavElement {
 			: this.component.elt.dataset?.[option];
 
 		if (option === "delete") {
-			element.dataset.visible = settings.key ? "true" : "false";
+			element.dataset.visible =
+				settings.key && settings.delete !== "false" ? "true" : "false";
 			return;
 		} else if (!value) {
 			element.dataset.visible = "false";

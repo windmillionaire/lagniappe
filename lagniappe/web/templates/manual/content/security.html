@@ -47,7 +47,7 @@
       client-side permission logic that can be bypassed or drift out of sync
       with the server.
     </p>
-    <ul class="text-base-medium space-y-2">
+    <ul class="list-disc pl-5 text-base-medium space-y-2">
       <li>
         <strong>Permission checks happen before rendering.</strong> Protected routes verify the current user and requested action before returning content.
       </li>
@@ -67,7 +67,7 @@
     <div class="grid md:grid-cols-2 gap-6">
       <div>
         {{ subheading("HTTP and Browser Policy") }}
-        <ul class="text-base-medium space-y-2">
+        <ul class="list-disc pl-5 text-base-medium space-y-2">
           <li>
             <strong>Login cookies are configured defensively.</strong> They are set up to travel over HTTPS, resist ordinary JavaScript access, and avoid being sent too broadly in cross-site requests. The exact settings can be found in the Flask app configuration; MDN's {{ link("https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/Cookies", "secure cookie guide") }} explains the browser terms.
           </li>
@@ -84,7 +84,7 @@
       </div>
       <div>
         {{ subheading("Auth and Internal Work") }}
-        <ul class="text-base-medium space-y-2">
+        <ul class="list-disc pl-5 text-base-medium space-y-2">
           <li>
             Identity Platform login tokens are checked for the exact project, issuer, and user before they become a Lagniappe session.
           </li>
@@ -188,7 +188,7 @@
       server. The password controls who may connect; TLS protects the
       connection carrying that password and the application data.
     </p>
-    <ul class="text-base-medium space-y-2">
+    <ul class="list-disc pl-5 text-base-medium space-y-2">
       <li>
         <strong>At rest:</strong> Redis Cloud supports encryption at rest for deployments, including databases hosted on Google Cloud.
       </li>
@@ -224,7 +224,7 @@
   {% endcall %}
   {{ heading("Optional Data Flows") }}
   {% call card() %}
-    <ul class="text-base-medium space-y-2">
+    <ul class="list-disc pl-5 text-base-medium space-y-2">
       <li>
         <strong>Error reporting:</strong> Disabled unless the operator enables
         it during setup. The operator can send privacy-reduced reports to the
@@ -265,7 +265,7 @@
   {% endcall %}
   {{ heading("Owner Checklist") }}
   {% call card() %}
-    <ul class="text-base-medium space-y-2">
+    <ul class="list-disc pl-5 text-base-medium space-y-2">
       <li>Use strong Google account protection and keep at least one recovery path for the Cloud project.</li>
       <li>
         Give Lagniappe owner and administrative permissions only to people who

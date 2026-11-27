@@ -42,6 +42,7 @@ export class SiteAdministrators extends SiteSetting<AdministratorEndpoints> {
 		this._demotionModal = null;
 		this._submit = this._submit.bind(this);
 		this._click = this._click.bind(this);
+		this._syncSubmit = this._syncSubmit.bind(this);
 	}
 
 	init() {
@@ -61,7 +62,10 @@ export class SiteAdministrators extends SiteSetting<AdministratorEndpoints> {
 		this.selector = new FacetsBox(input);
 		this.selector.init();
 		this.form?.addEventListener("submit", this._submit);
+		this.form?.addEventListener("updated", this._syncSubmit);
+		this.form?.addEventListener("change", this._syncSubmit);
 		this.list?.addEventListener("click", this._click);
+		this._syncSubmit();
 	}
 
 	updated(response: AdministratorResponse) {
@@ -85,11 +89,21 @@ export class SiteAdministrators extends SiteSetting<AdministratorEndpoints> {
 		this.selector?.clear({ notify: false });
 		this.selector?.updatePanel("");
 		this.form.dataset.visible = this._canManage ? "true" : "false";
-		const submit = this.form.querySelector("button");
-		if (submit) submit.disabled = !this._candidates.length;
+		this._syncSubmit();
 		this.updateSummary(
 			`${this._administrators.length} ${this._administrators.length === 1 ? "administrator" : "administrators"}`,
 		);
+	}
+
+	_syncSubmit() {
+		if (!this.form) return;
+		const select = this.form.querySelector<HTMLSelectElement>(
+			"select[name='user_key']",
+		);
+		const submit = this.form.querySelector<HTMLButtonElement>(
+			"button[type='submit']",
+		);
+		if (submit) submit.disabled = !this._candidates.length || !select?.value;
 	}
 
 	_administratorRow(administrator: Administrator) {
@@ -160,34 +174,52 @@ export class SiteAdministrators extends SiteSetting<AdministratorEndpoints> {
 		this._demotionModal?.destroy();
 		const modal = new Modal(this.view, button);
 		this._demotionModal = modal;
-		await modal.load(route);
+		await modal.load(route, (modalElt) => {
+			const confirm = modalElt.querySelector<HTMLButtonElement>(
+				"[data-role='delete']",
+			);
+			if (!confirm) return false;
+			let submitting = false;
+			confirm.addEventListener("click", async () => {
+				if (submitting) return;
+				submitting = true;
+				confirm.disabled = true;
+				const spinner = confirm.querySelector<HTMLElement>("#spinner");
+				if (spinner) spinner.dataset.visible = "true";
+
+				const response = await request.delete<AdministratorResponse>(route);
+				if (!response?.ok) {
+					submitting = false;
+					confirm.disabled = false;
+					if (spinner) spinner.dataset.visible = "false";
+					this._showError(response?.error);
+					return;
+				}
+
+				await modal.remove();
+				if (this._demotionModal === modal) this._demotionModal = null;
+				this.updated(response);
+				this._render();
+			});
+		});
 		if (this._demotionModal !== modal || !modal.modal) return;
 
 		const confirm = modal.modal.querySelector<HTMLButtonElement>(
 			"[data-role='delete']",
 		);
 		if (!confirm) return;
-		let submitting = false;
-		confirm.addEventListener("click", async () => {
-			if (submitting) return;
-			submitting = true;
-			confirm.disabled = true;
-			const spinner = confirm.querySelector<HTMLElement>("#spinner");
-			if (spinner) spinner.dataset.visible = "true";
-
-			const response = await request.delete<AdministratorResponse>(route);
-			if (!response?.ok) {
-				submitting = false;
-				confirm.disabled = false;
-				if (spinner) spinner.dataset.visible = "false";
-				this._showError(response?.error);
-				return;
+		const activeModal = modal.modal;
+		const closeBtn =
+			activeModal.querySelector<HTMLElement>("[lp-control='close']") ?? confirm;
+		closeBtn.focus();
+		requestAnimationFrame(() => {
+			if (
+				this._demotionModal === modal &&
+				activeModal.isConnected &&
+				!activeModal.contains(document.activeElement)
+			) {
+				closeBtn.focus();
 			}
-
-			await modal.remove();
-			if (this._demotionModal === modal) this._demotionModal = null;
-			this.updated(response);
-			this._render();
 		});
 	}
 
@@ -201,6 +233,8 @@ export class SiteAdministrators extends SiteSetting<AdministratorEndpoints> {
 		this._demotionModal?.destroy();
 		this._demotionModal = null;
 		this.form?.removeEventListener("submit", this._submit);
+		this.form?.removeEventListener("updated", this._syncSubmit);
+		this.form?.removeEventListener("change", this._syncSubmit);
 		this.list?.removeEventListener("click", this._click);
 		this.selector?.destroy();
 		super.destroy();

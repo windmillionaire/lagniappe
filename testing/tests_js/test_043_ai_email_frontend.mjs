@@ -135,4 +135,35 @@ test("test_create_tool_report_preserves_and_resets_auto_execute_control", async 
 	assert.deepEqual(widget.html, [contextElement, autoExecuteControl]);
 	widget._resetUI();
 	assert.equal(autoExecuteInput.checked, true);
+
+	const emailSubmissions = { role: "email-submissions" };
+	const emailWidget = new CreateToolReport({
+		target: {
+			querySelector(selector) {
+				if (selector === "[data-role='email-submissions']")
+					return emailSubmissions;
+				if (selector === "[data-role='auto-execute-control']")
+					return autoExecuteControl;
+				if (selector === "[name='auto_execute']") return autoExecuteInput;
+				return null;
+			},
+		},
+	});
+	assert.deepEqual(emailWidget.html, [
+		emailSubmissions,
+		contextElement,
+		autoExecuteControl,
+	]);
+
+	let copyCalls = 0;
+	emailWidget.copyEmailAddress = async () => {
+		copyCalls += 1;
+	};
+	emailWidget._onClick({
+		target: {
+			closest: (selector) =>
+				selector === "[data-role='email-copy']" ? {} : null,
+		},
+	});
+	assert.equal(copyCalls, 1);
 });

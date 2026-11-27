@@ -7,6 +7,7 @@ import { STYLES } from "../../generated/styles.mjs";
 import { captureError } from "../../shared/errors.ts";
 import type { RequestResult } from "../../types/api.d.ts";
 import type { TableWidgets } from "./types.d.ts";
+import { collapseEmbeddedTables } from "./visibilityState.ts";
 
 interface IndexTableView {
 	elt: HTMLElement;
@@ -119,8 +120,15 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 			const serialized = JSON.stringify(checked);
 			cell.dataset.editValue = serialized;
 			cell.dataset.sortValue = serialized;
+			const nameCell = row.querySelector<HTMLElement>("td[data-column='name']");
 			const taskName =
-				row.querySelector("td[data-column='name']")?.textContent?.trim() ||
+				nameCell?.querySelector("[data-role='title']")?.textContent?.trim() ||
+				nameCell
+					?.querySelector(":scope > div > span:first-child a:last-of-type")
+					?.textContent?.trim() ||
+				nameCell
+					?.querySelector(":scope > div > span:first-child")
+					?.textContent?.trim() ||
 				"task";
 			input.setAttribute(
 				"aria-label",
@@ -384,6 +392,7 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 	}
 
 	applyFilteredRows(html: Document): number {
+		collapseEmbeddedTables(this.target);
 		const editor = this.component?.widgets?.TableEditor;
 		const currentRows = Array.from(
 			this.target.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),
@@ -422,6 +431,7 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 	async clearFilteredRows() {
 		if (!this._filtered) return;
 		this._filtered = false;
+		collapseEmbeddedTables(this.target);
 
 		const editor = this.component?.widgets?.TableEditor;
 		const currentRows = Array.from(

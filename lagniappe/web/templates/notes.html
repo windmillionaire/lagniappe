@@ -2,7 +2,7 @@
 
 {% macro visibility_selector(allow_everyone=true) %}
   <fieldset class="flex flex-col gap-2">
-    <legend class="text-sm font-semibold text-note-dark">Who can see this?</legend>
+    <legend class="mb-2 text-sm font-semibold text-note-dark">Who can see this?</legend>
     <div class="grid grid-cols-1 gap-2 {{ 'sm:grid-cols-2' if allow_everyone else '' }}">
       {% if allow_everyone %}
         <label class="flex cursor-pointer items-center gap-2 rounded-md bg-white/70 px-3 py-2 text-sm font-medium text-base-dark outline outline-note-light has-checked:bg-white has-checked:outline-2 has-checked:outline-note-default">

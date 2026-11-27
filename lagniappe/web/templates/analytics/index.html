@@ -41,7 +41,7 @@
       <div class="{{ styles.attributes.container }}">
         {% for value, option in retention_options.items() %}
           <button type="button"
-                  class="{{ styles.attributes.button }}"
+                  class="{{ 'font-semibold pl-2 pr-3 py-2 flex items-center rounded-md gap-1 border border-delete-default bg-delete-bg text-delete-dark hover:bg-delete-default hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default transition-colors cursor-pointer' if value == 'all' else styles.attributes.button }}"
                   data-kind="{{ 'delete' if value == 'all' else 'page' }}"
                   data-role="analytics-clear"
                   data-retention="{{ value }}"
@@ -59,11 +59,14 @@
 
 {% macro job_id(value, role) %}
   {% if value %}
-    <details class="max-w-64 font-mono text-xs text-base-medium"
+    <details class="group max-w-64 font-mono text-xs text-base-medium"
              data-role="{{ role }}"
              data-job-id="{{ value }}">
-      <summary class="cursor-pointer whitespace-nowrap"
-               title="Show full job ID">…{{ value[-12:] }}</summary>
+      <summary class="inline-flex min-h-9 cursor-pointer list-none items-center gap-1 whitespace-nowrap sm:min-h-0 [&::-webkit-details-marker]:hidden"
+               title="Show full job ID">
+        <span>…{{ value[-12:] }}</span>
+        {{ render_icon("down", styles.disclosure.chevron) }}
+      </summary>
       <code class="mt-1 block break-all font-mono text-xs">{{ value }}</code>
     </details>
   {% else %}
@@ -114,9 +117,9 @@
 {% endmacro %}
 
 {% macro run_metric(label, value) %}
-  <div>
+  <div class="min-w-0">
     <dt class="text-base-medium">{{ label }}</dt>
-    <dd class="font-semibold tabular-nums text-base-dark">{{ "{:,}".format(value) if value is number else (value if value is not none else "Unavailable") }}</dd>
+    <dd class="break-words [overflow-wrap:anywhere] font-semibold tabular-nums text-base-dark">{{ "{:,}".format(value) if value is number else (value if value is not none else "Unavailable") }}</dd>
   </div>
 {% endmacro %}
 
@@ -158,7 +161,7 @@
             <button type="button" class="{{ styles.attributes.button }}" data-kind="page"
                     data-role="ai-run-copy"
                     data-route="{{ url_for('analytics.operation_diagnostic', job_id=operation.key) }}">Copy run JSON</button>
-            <a class="font-semibold text-base-default" data-role="deferred-operation-json"
+            <a class="inline-flex min-h-9 items-center font-semibold text-base-default sm:min-h-0" data-role="deferred-operation-json"
                href="{{ url_for('analytics.operation_diagnostic', job_id=operation.key) }}"
                target="_blank" rel="noopener">View JSON</a>
             <span role="status" aria-live="polite" data-role="ai-run-copy-status" class="text-base-medium"></span>

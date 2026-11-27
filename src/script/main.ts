@@ -90,6 +90,15 @@ function publishNavigationTransitionReadiness() {
 publishNavigationTransitionReadiness();
 
 let __activeView: Promise<ActiveView | null> | null = null;
+const COLD_VIEW_TRIGGER_SELECTOR =
+	"[lp-show], [lp-close], [lp-control], [data-role='menu-trigger'], [data-role='flipper'], #filter-bar [data-role='add-trigger'], #filter-bar [data-role='saved-trigger'], #filter-bar [data-role='clear-filters']";
+let _pendingColdTrigger: HTMLElement | null = null;
+
+function _clearPendingColdTrigger() {
+	_pendingColdTrigger?.removeAttribute("aria-busy");
+	_pendingColdTrigger = null;
+}
+
 const getView = async () => {
 	const viewElt = document.querySelector<ViewRoot>("[lp-view]");
 	if (!viewElt) return null;
@@ -102,6 +111,7 @@ const getView = async () => {
 	__activeView = (async () => {
 		const viewModule = await loadView(viewElt.dataset.kind);
 		if (!viewModule) {
+			_clearPendingColdTrigger();
 			const { captureError } = await import("./shared/errors.ts");
 			captureError(
 				new Error(`Unknown view kind: ${viewElt.dataset.kind || "missing"}`),
@@ -111,11 +121,22 @@ const getView = async () => {
 			return null;
 		}
 
-		if (disconnected()) return null;
+		if (disconnected()) {
+			_clearPendingColdTrigger();
+			return null;
+		}
 		const view = new viewModule.default(viewElt);
 		await view.init();
-		if (view._destroyed || disconnected()) return null;
+		if (view._destroyed || disconnected()) {
+			_clearPendingColdTrigger();
+			return null;
+		}
 		view.publish?.();
+		const replay = _pendingColdTrigger;
+		_clearPendingColdTrigger();
+		if (replay?.isConnected && viewElt.dataset?.interactive === "true") {
+			replay.click();
+		}
 		return view;
 	})();
 
@@ -363,6 +384,7 @@ function startServiceWorker() {
 
 async function startAuthenticatedLifecycle() {
 	startErrorHandling();
+	void syncView();
 
 	const [{ initializeLogoutForms }, { updateUserData }] = await Promise.all([
 		import("./shared/logout.ts"),
@@ -370,7 +392,6 @@ async function startAuthenticatedLifecycle() {
 	]);
 	initializeLogoutForms();
 	void startAnalytics();
-	void syncView();
 
 	document.addEventListener("visibilitychange", () => {
 		document.hidden ? suspendCurrentView() : syncView();
@@ -434,6 +455,25 @@ function installNavMenu() {
 		}
 		if (!target?.closest("[data-role='nav-menu']")) {
 			closeOpenMenus();
+		}
+
+		const viewElt = target?.closest<ViewRoot>("[lp-view]");
+		if (
+			viewElt &&
+			viewElt.dataset?.interactive !== "true" &&
+			!viewElt.hasAttribute("initialized")
+		) {
+			const coldTrigger = target?.closest<HTMLElement>(
+				COLD_VIEW_TRIGGER_SELECTOR,
+			);
+			if (coldTrigger && viewElt.contains(coldTrigger)) {
+				event.preventDefault();
+				if (_pendingColdTrigger && _pendingColdTrigger !== coldTrigger) {
+					_pendingColdTrigger.removeAttribute("aria-busy");
+				}
+				_pendingColdTrigger = coldTrigger;
+				coldTrigger.setAttribute("aria-busy", "true");
+			}
 		}
 	});
 

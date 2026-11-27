@@ -1,3 +1,5 @@
+{% from 'common.html' import desktop %}
+
 {% macro ingress_tab(file) %}
   <div id="ingress"
        lp-component
@@ -5,7 +7,10 @@
        data-default="ImportData"
        data-tab="true"
        data-visible="false"
-       data-kind="file">{{ ingress(file) }}</div>
+       data-kind="file">
+    {{ desktop("Data Import") }}
+    {{ ingress(file) }}
+  </div>
 {% endmacro %}
 
 {% macro ingress(file) %}
@@ -14,7 +19,7 @@
        data-stage="{{ file.stage.name }}"
        data-kind="file"
        data-visible="false"
-       class="border-t border-base-light/50 flex flex-row">
+       class="border-t border-base-light/50 hidden lg:flex lg:flex-row">
     <div data-role="stage"
          class="flex flex-col gap-3 basis-1/3 p-6 border-r border-base-light/50"></div>
     <div data-role="progress"

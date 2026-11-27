@@ -58,6 +58,8 @@ class PageMutation(StandardMutation["Page"]):
         for owner in owners:
             builder.touch(owner, reason="page-list-owner")
         if entity.is_public:
+            if not getattr(entity, "_testing", False) and not entity.db.get("public_id"):
+                _ = entity.public_id
             builder.invalidate_public_discovery(reason="public-page-save")
 
 

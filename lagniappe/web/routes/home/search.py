@@ -148,6 +148,8 @@ def _quick_create_entity(kind, form):
 @logged_in
 def index(kind: str) -> ResponseReturnValue:
     g.NO_CACHE = True
+    if kind == "administrator" and not current_user.is_owner:
+        abort(403)
     preloaded_hashes = set(request.values.getlist("preload"))
     query = request.values.get("q", "")
     browse = request.values.get("browse") == "true" and kind in {
@@ -288,7 +290,7 @@ def _search_page_pagination(page, results, total, per_page=10):
     last_result = page * per_page + len(results)
 
     return {
-        "showing": page * per_page + 1,
+        "showing": (page * per_page + 1) if total > 0 and results else 0,
         "to": last_result,
         "total": total,
         "previous": previous_page if isinstance(previous_page, int) else None,

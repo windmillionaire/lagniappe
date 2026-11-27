@@ -711,3 +711,191 @@ test("test_table_sorting_date_and_time_labels_and_mobile_status_states", async (
 	assert.equal(modStatus.dataset.visible, "false");
 	sorting.destroy();
 });
+
+test("test_table_sorting_disables_active_visibility_panel_when_opening", async (t) => {
+	createBrowser(t);
+	const { TableSorting } = await esmock.strict(
+		"../../src/script/widgets/tables/sorting.ts",
+		{
+			"../../src/script/shared/transitions.ts": {
+				withTransition: (commit) => {
+					commit();
+					return Promise.resolve();
+				},
+			},
+		},
+	);
+
+	document.body.innerHTML =
+		"<main><table id='table' data-open='TableVisibility'><thead><tr>" +
+		'<th data-column="name" data-ordering="lexical"><span data-role="title">Name</span><button data-toggle="filter">Sort</button></th>' +
+		'</tr><tr data-widget="TableVisibility" data-visible="true"></tr>' +
+		'<tr data-widget="TableSorting" data-visible="false"></tr></thead>' +
+		`<tbody>${rowHtml("one")}</tbody></table></main>`;
+
+	const visibilityTarget = document.querySelector(
+		"[data-widget='TableVisibility']",
+	);
+	const sortingTarget = document.querySelector("[data-widget='TableSorting']");
+	const visibility = {
+		name: "TableVisibility",
+		target: visibilityTarget,
+		visible: true,
+		disable() {
+			this.visible = false;
+		},
+		reconcile() {
+			this.target.dataset.visible = this.visible ? "true" : "false";
+		},
+	};
+	const view = {
+		elt: document.querySelector("main"),
+		hash: "handoff-test",
+		mobile: false,
+	};
+	const component = {
+		elt: document.querySelector("#table"),
+		active: visibility,
+		widgets: { TableVisibility: visibility },
+		preload: () => [],
+		render(visible) {
+			Object.values(this.widgets).forEach((widget) => {
+				widget?.reconcile?.();
+			});
+			this.elt.dataset.open = visible ? this.active?.name || "true" : "false";
+		},
+	};
+	const sorting = new TableSorting({
+		view,
+		component,
+		target: sortingTarget,
+		name: "TableSorting",
+		visible: false,
+		modified: false,
+		enable() {
+			this.visible = true;
+		},
+		disable() {
+			this.visible = false;
+		},
+		reconcile() {
+			this.target.dataset.visible = this.visible ? "true" : "false";
+		},
+	});
+	component.widgets.TableSorting = sorting;
+	sorting.init();
+
+	view.elt.dispatchEvent(
+		new CustomEvent("toggle-column-filter", { detail: { column: "name" } }),
+	);
+	assert.equal(visibility.visible, false);
+	assert.equal(visibilityTarget.dataset.visible, "false");
+	assert.equal(component.active, sorting);
+	assert.equal(sorting.visible, true);
+	assert.equal(component.elt.dataset.open, "TableSorting");
+	sorting.destroy();
+});
+
+test("test_entity_index_syncs_table_scroll_overflow_attribute", async (t) => {
+	createBrowser(t, {
+		html: '<div lp-view data-index="tasks"><div data-role="table-scroll" data-overflow-x="false"><table id="table"></table></div></div>',
+	});
+	window.matchMedia = () => ({
+		matches: false,
+		addEventListener() {},
+		removeEventListener() {},
+	});
+	const { default: EntityIndex } = await import(
+		"../../src/script/views/base/index.ts"
+	);
+
+	const root = document.querySelector("[lp-view]");
+	const wrapper = document.querySelector("[data-role='table-scroll']");
+	const tableElt = document.querySelector("#table");
+	const wrapperWidth = 800;
+	let tableWidth = 800;
+	Object.defineProperty(wrapper, "clientWidth", {
+		configurable: true,
+		get: () => wrapperWidth,
+	});
+	Object.defineProperty(tableElt, "scrollWidth", {
+		configurable: true,
+		get: () => tableWidth,
+	});
+
+	const view = new EntityIndex(root);
+	try {
+		view._syncTableScrollOverflow(tableElt);
+		assert.equal(wrapper.dataset.overflowX, "false");
+
+		tableWidth = 1120;
+		view._syncTableScrollOverflow(tableElt);
+		assert.equal(wrapper.dataset.overflowX, "true");
+
+		view.mobile = true;
+		view._syncTableScrollOverflow(tableElt);
+		assert.equal(wrapper.dataset.overflowX, "false");
+
+		view.mobile = false;
+		tableWidth = 800;
+		view._syncTableScrollOverflow(tableElt);
+		assert.equal(wrapper.dataset.overflowX, "false");
+	} finally {
+		view.destroy();
+	}
+});
+
+test("test_toggle_reopens_mobile_controls_when_dom_target_is_hidden", async (t) => {
+	createBrowser(t, {
+		html:
+			'<div lp-view data-index="forms">' +
+			'<button type="button" lp-show="table:MobileTableControls" data-toggle="true">Controls</button>' +
+			'<div id="mobile-controls" data-widget="MobileTableControls" data-visible="false"></div>' +
+			'<div data-role="table-scroll" data-overflow-x="false"><table id="table" lp-component data-preload="{}"><thead><tr><th>Name</th></tr></thead><tbody></tbody></table></div>' +
+			"</div>",
+	});
+	window.matchMedia = () => ({
+		matches: true,
+		addEventListener() {},
+		removeEventListener() {},
+	});
+	const { default: Core } = await import("../../src/script/views/base/core.ts");
+
+	const root = document.querySelector("[lp-view]");
+	const trigger = document.querySelector(
+		"button[lp-show='table:MobileTableControls']",
+	);
+	const mobileControls = document.querySelector("#mobile-controls");
+	const view = new Core(root);
+	await view.init();
+
+	try {
+		const table = view.getComponent(document.querySelector("#table"));
+		const widget = {
+			name: "MobileTableControls",
+			target: mobileControls,
+			visible: true,
+			modified: false,
+			enable() {
+				this.modified = true;
+				this.visible = true;
+			},
+			disable() {
+				this.modified = true;
+				this.visible = false;
+			},
+			async prepareReconcile() {},
+			reconcile() {
+				this.target.dataset.visible = this.visible ? "true" : "false";
+			},
+		};
+		table.widgets.MobileTableControls = widget;
+		table.active = widget;
+
+		await view.renderComponent(trigger);
+		assert.equal(widget.visible, true);
+		assert.equal(mobileControls.dataset.visible, "true");
+	} finally {
+		view.destroy();
+	}
+});

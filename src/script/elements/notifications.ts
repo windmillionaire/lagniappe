@@ -180,8 +180,11 @@ export class Notifications {
 		return Array.from(
 			html.querySelectorAll<HTMLElement>("[role='option'], [role='group']"),
 		).map((option) => {
-			option.setAttribute("role", "group");
-			return this._notificationOption(option.outerHTML, option.dataset.key);
+			const normalized = this._normalizeOptionElement(option);
+			return this._notificationOption(
+				normalized.outerHTML,
+				normalized.dataset.key,
+			);
 		});
 	}
 
@@ -225,17 +228,38 @@ export class Notifications {
 		return {
 			key: CLEAR_ALL_KEY,
 			html: `
-				<button role="group"
-					type="button"
-					data-action="clear-notifications"
-					class="${STYLES.dropdown.option.action} border-y border-base-light !rounded-none bg-base-bg text-delete-default">
-					${createIcon("trash.inactive", STYLES.dropdown.icon).outerHTML}
-					<span>Clear all notifications</span>
-				</button>
+				<div role="group"
+					data-key="${CLEAR_ALL_KEY}"
+					data-action="clear-notifications">
+					<button type="button"
+						class="${STYLES.dropdown.option.action} border-y border-base-light !rounded-none bg-base-bg text-delete-default">
+						${createIcon("trash.inactive", STYLES.dropdown.icon).outerHTML}
+						<span>Clear all notifications</span>
+					</button>
+				</div>
 			`,
 			onClick: this._clearNotifications,
 			closeOnClick: false,
 		};
+	}
+
+	_normalizeOptionElement(element: HTMLElement): HTMLElement {
+		if (element.tagName === "BUTTON") {
+			const wrapper = document.createElement("div");
+			wrapper.setAttribute("role", "group");
+			for (const attr of ["data-key", "data-action", "data-cursor"]) {
+				const value = element.getAttribute(attr);
+				if (value !== null) {
+					wrapper.setAttribute(attr, value);
+					element.removeAttribute(attr);
+				}
+			}
+			element.removeAttribute("role");
+			wrapper.appendChild(element.cloneNode(true));
+			return wrapper;
+		}
+		element.setAttribute("role", "group");
+		return element;
 	}
 
 	_htmlOption(html: string) {
@@ -244,8 +268,7 @@ export class Notifications {
 		const element = template.content.querySelector<HTMLElement>(
 			"[role='option'], [role='group']",
 		);
-		element?.setAttribute("role", "group");
-		return element;
+		return element ? this._normalizeOptionElement(element) : null;
 	}
 
 	async _selectNotification(

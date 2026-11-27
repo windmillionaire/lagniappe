@@ -181,7 +181,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty[LinkValue]):
 
     @property
     def sort_value(self) -> str | None:
-        if not self.value:
+        if not isinstance(self.value, Mapping):
             return None
         label = self.value.get("title") or self.value.get("name")
         return label.lower() if label else None
@@ -197,7 +197,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty[LinkValue]):
 
     @property
     def filter_value(self) -> str | None:
-        if not self.value:
+        if not isinstance(self.value, Mapping):
             return None
         elif self.is_entity_valued:
             return self.value.get("hash")

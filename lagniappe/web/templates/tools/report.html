@@ -286,7 +286,7 @@
       <nav class="{{ styles.layout.view.title }}" data-nav="view">
         <div class="flex min-w-0 items-center gap-2.5">
           {{ render_icon(report_icon, "icon-xl shrink-0 text-kind-default") }}
-          <span data-role="title">{{ report_title }}</span>
+          <h1 data-role="title">{{ report_title }}</h1>
         </div>
         <div class="{{ styles.layout.nav.group }}" data-role="actions">
           <a href="{{ url_for('home.home_page') }}"
@@ -513,7 +513,7 @@
                         data-role="expand"
                         data-open="false"
                         aria-expanded="false"
-                        class="flex w-fit items-center gap-2 text-sm font-semibold text-base-default">
+                        class="flex min-h-9 w-fit items-center gap-2 text-sm font-semibold text-base-default sm:min-h-0">
                   {{ render_icon("expand") }}
                   <span>Proposal JSON</span>
                 </button>
@@ -592,7 +592,7 @@
                         data-role="expand"
                         data-open="false"
                         aria-expanded="false"
-                        class="flex w-fit items-center gap-2 text-sm font-semibold text-base-default">
+                        class="flex min-h-9 w-fit items-center gap-2 text-sm font-semibold text-base-default sm:min-h-0">
                   {{ render_icon("expand") }}
                   <span>Result JSON</span>
                 </button>

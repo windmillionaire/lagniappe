@@ -4,6 +4,7 @@ import { sessionStore } from "../../shared/storage.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import type { LoadedWidget } from "../../types/widgets.d.ts";
 import type ViewComponent from "../../views/base/component.ts";
+import { collapseEmbeddedTables } from "./visibilityState.ts";
 
 type Row = HTMLTableRowElement;
 type Sort = RadioSort | CheckboxSort;
@@ -155,11 +156,24 @@ export class TableSorting {
 
 	reset() {
 		if (this._destroyed) return;
+		collapseEmbeddedTables(this.body);
+		let reorderRows = false;
+		const showRows = new Set<Row>();
+		this.sorts.forEach((sort) => {
+			if (sort.reordering && sort.sorted) reorderRows = true;
+			for (const row of sort.hiddenRows ?? []) showRows.add(row);
+			sort.clear();
+		});
+		const initialOrder = this._resetRows(reorderRows, showRows);
+		if (initialOrder) {
+			const rows = this.rows;
+			rows.sort((a, b) => {
+				return (initialOrder.get(a) ?? 0) - (initialOrder.get(b) ?? 0);
+			});
+			this.body?.append(...rows);
+		}
 		this.containers.forEach((container) => {
 			container.remove();
-		});
-		this.sorts.forEach((sort) => {
-			sort.clear();
 		});
 		this._clearState();
 		this.containers = new Map();
@@ -387,6 +401,9 @@ export class TableSorting {
 
 				this.modified = visible !== this.visible;
 				if (this.modified && this.visible) {
+					if (this.component.active && this.component.active !== this) {
+						this.component.active.disable();
+					}
 					this.component.active = this;
 					this.component.render(true);
 				} else if (this.modified && !this.visible) {
@@ -420,6 +437,7 @@ export class TableSorting {
 
 	sort() {
 		if (this._destroyed) return;
+		collapseEmbeddedTables(this.body);
 		let reorderRows = false;
 		const showRows = new Set<Row>();
 

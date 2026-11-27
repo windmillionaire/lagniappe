@@ -34,6 +34,8 @@ export default class EntityIndex extends Core {
 	declare _tableLoadingTimer?: ReturnType<typeof setTimeout> | null;
 	declare _tableLoadingTarget?: HTMLTableSectionElement | null;
 	declare _tableLoadingToken: number;
+	declare _tableScrollObserver?: ResizeObserver | null;
+	declare _onTableVisibilityToggle?: () => void;
 
 	constructor(node: ViewRoot) {
 		super(node);
@@ -43,6 +45,7 @@ export default class EntityIndex extends Core {
 		this._tableLoadingTimer = null;
 		this._tableLoadingTarget = null;
 		this._tableLoadingToken = 0;
+		this._tableScrollObserver = null;
 	}
 
 	async init() {
@@ -56,14 +59,6 @@ export default class EntityIndex extends Core {
 			this.elt.querySelector<HTMLElement>("#mobile-controls");
 		let indexTable: LoadedWidget | null = null;
 
-		if (this.mobile && tools) {
-			await this._createDropdown();
-			const toolsNav = document.querySelector<HTMLElement>(
-				"nav[data-nav='tools']",
-			);
-			if (toolsNav) toolsNav.style.display = "none";
-		}
-
 		const selected = table.preload("selected");
 		const columns = table.preload("columns");
 		this.TableVisibilityState = new TableVisibilityState({
@@ -75,6 +70,14 @@ export default class EntityIndex extends Core {
 			columns: Array.isArray(columns) ? columns.filter(isTableColumn) : [],
 		}).init();
 
+		if (this.mobile && tools) {
+			await this._createDropdown();
+			const toolsNav = document.querySelector<HTMLElement>(
+				"nav[data-nav='tools']",
+			);
+			if (toolsNav) toolsNav.style.display = "none";
+		}
+
 		if (!table.elt.hasAttribute("lp-prefetch")) {
 			indexTable = await table.loadWidget("IndexTable");
 		}
@@ -85,6 +88,7 @@ export default class EntityIndex extends Core {
 			},
 			{ label: "index:initial-table" },
 		);
+		this._syncTableScrollOverflow(table.elt);
 
 		if (table.elt.hasAttribute("lp-prefetch")) {
 			this._scheduleTableLoading(table.elt);
@@ -109,19 +113,55 @@ export default class EntityIndex extends Core {
 			await withTransition(
 				() => {
 					if (!this.mobile) {
-						if (mobileControls) mobileControls.dataset.visible = "false";
+						if (table.active?.name === "MobileTableControls") {
+							table.deactivate(false);
+						} else if (mobileControls) {
+							mobileControls.dataset.visible = "false";
+						}
 						this._setMobileControlsDropdownOpen(false);
 						toolsNav?.removeAttribute("style");
 					} else {
+						if (
+							table.active?.name === "TableVisibility" ||
+							table.active?.name === "TableSorting"
+						) {
+							table.deactivate(false);
+						}
 						if (tools) this.getComponent(tools)?.deactivate(false);
 						if (toolsNav) toolsNav.style.display = "none";
 					}
 					table.widgets.TableSorting?.reset();
+					if (this.mobile) {
+						const mobileWidget = table.widgets.MobileTableControls as
+							| (LoadedWidget & { sync?: () => void })
+							| undefined;
+						mobileWidget?.sync?.();
+					}
 				},
 				{ label: "index:mobile-resize" },
 			);
+			if (!this._destroyed) this._syncTableScrollOverflow(table.elt);
 		};
 		this.elt.addEventListener("mobile-resize", this._indexMobileResize);
+		this._onTableVisibilityToggle = () => {
+			requestAnimationFrame(() => {
+				if (!this._destroyed) this._syncTableScrollOverflow(table.elt);
+			});
+		};
+		this.elt.addEventListener(
+			"toggle-column-visibility",
+			this._onTableVisibilityToggle,
+		);
+		if (typeof ResizeObserver !== "undefined") {
+			const wrapper = table.elt.closest<HTMLElement>(
+				"[data-role='table-scroll']",
+			);
+			this._tableScrollObserver = new ResizeObserver(() => {
+				if (!this._destroyed) this._syncTableScrollOverflow(table.elt);
+			});
+			if (wrapper) this._tableScrollObserver.observe(wrapper);
+			this._tableScrollObserver.observe(table.elt);
+		}
 
 		if (tools) {
 			const thead = table.elt.querySelector("thead");
@@ -280,6 +320,14 @@ export default class EntityIndex extends Core {
 		return this.querySlug(this.queryParam("tool"));
 	}
 
+	_matchesToolSlug(candidate: string | null | undefined, target: string) {
+		const slug = this.querySlug(candidate);
+		if (!slug) return false;
+		return (
+			slug === target || slug.replace(/-/g, "") === target.replace(/-/g, "")
+		);
+	}
+
 	_defaultToolTarget(
 		tools: HTMLElement,
 	): { componentId: string; widgetName?: string } | null {
@@ -301,14 +349,16 @@ export default class EntityIndex extends Core {
 				button.getAttribute("aria-label"),
 			];
 
-			if (candidates.some((candidate) => this.querySlug(candidate) === tool)) {
+			if (
+				candidates.some((candidate) => this._matchesToolSlug(candidate, tool))
+			) {
 				return { componentId, widgetName };
 			}
 		}
 
 		const widget = Array.from(
 			tools.querySelectorAll<HTMLElement>("[data-widget]"),
-		).find((elt) => this.querySlug(elt.dataset.widget) === tool);
+		).find((elt) => this._matchesToolSlug(elt.dataset.widget, tool));
 		if (!widget) return null;
 
 		return {
@@ -416,15 +466,28 @@ export default class EntityIndex extends Core {
 	}
 
 	async prefetch() {
+		let table: ReturnType<EntityIndex["getComponent"]> = null;
 		try {
 			await super.prefetch();
 		} finally {
-			const table = this.getComponent(this.elt.querySelector("#table"));
+			table = this.getComponent(this.elt.querySelector("#table"));
 			const indexTable = table?.widgets?.IndexTable;
 			if (!indexTable?.loading || indexTable.loaded) {
 				this.clearTableLoading();
 			}
+			if (table && !this._destroyed) this._syncTableScrollOverflow(table.elt);
 		}
+	}
+
+	_syncTableScrollOverflow(tableElt: HTMLElement) {
+		const wrapper = tableElt.closest<HTMLElement>("[data-role='table-scroll']");
+		if (!wrapper) return;
+		if (this.mobile) {
+			wrapper.dataset.overflowX = "false";
+			return;
+		}
+		wrapper.dataset.overflowX =
+			tableElt.scrollWidth > wrapper.clientWidth + 1 ? "true" : "false";
 	}
 
 	_scheduleTableLoading(tableElt: HTMLElement) {
@@ -520,6 +583,15 @@ export default class EntityIndex extends Core {
 		this.clearTableLoading();
 		if (this._indexMobileResize)
 			this.elt.removeEventListener("mobile-resize", this._indexMobileResize);
+		if (this._onTableVisibilityToggle) {
+			this.elt.removeEventListener(
+				"toggle-column-visibility",
+				this._onTableVisibilityToggle,
+			);
+			this._onTableVisibilityToggle = undefined;
+		}
+		this._tableScrollObserver?.disconnect();
+		this._tableScrollObserver = null;
 		super.destroy();
 		this._setMobileControlsDropdownOpen(false);
 		this.dropdown?.destroy();

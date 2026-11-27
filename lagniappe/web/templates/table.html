@@ -23,6 +23,9 @@
 
 {% macro table(entities, parent, table_id=None, card=False) %}
   {% set resolved_id = table_id or ('table' if not parent.table.embedded else 'embedded-table') %}
+  {% if not parent.table.embedded and not card %}
+    <div class="{{ styles.table.scrollWrapper }}" data-role="table-scroll" data-overflow-x="false">
+  {% endif %}
   <table lp-component
          {% if entities is undefined and not parent.is_filter and not card %}lp-prefetch{% endif %}
          id="{{ resolved_id }}"
@@ -80,6 +83,9 @@
     </thead>
     {{ rows(entities, parent, card=card) }}
   </table>
+  {% if not parent.table.embedded and not card %}
+    </div>
+  {% endif %}
 {% endmacro %}
 
 {% macro rows(entities, parent, card=False) %}

@@ -10,10 +10,12 @@
       </a>
       {% if login_url %}
         {% if current_user.is_authenticated %}
-          <a class="action-button inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold"
+          <a data-kind="page"
+             class="action-button inline-flex min-h-9 items-center gap-2 rounded-md bg-page-default px-3 py-1.5 text-sm font-semibold text-white"
              href="{{ url_for('home.home_page') }}">Home</a>
         {% else %}
-          <a class="action-button inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold"
+          <a data-kind="page"
+             class="action-button inline-flex min-h-9 items-center gap-2 rounded-md bg-page-default px-3 py-1.5 text-sm font-semibold text-white"
              href="{{ login_url }}">Sign in</a>
         {% endif %}
       {% elif share %}

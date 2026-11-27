@@ -70,6 +70,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 	declare _documentHandlersAdded?: boolean;
 	declare _panelHandlersAdded?: boolean;
 	declare _observer?: IntersectionObserver | null;
+	declare _panelKeydown: (event: KeyboardEvent) => void;
 
 	constructor(element: HTMLElement) {
 		this._destroyed = false;
@@ -101,6 +102,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 
 		this._panelPointerMove = this._panelPointerMove.bind(this);
 		this._panelPointerDown = this._panelPointerDown.bind(this);
+		this._panelKeydown = this._handlePanelKeydown.bind(this);
 		this._optionClick = this._optionClick.bind(this);
 		this._handleIntersection = this._handleIntersection.bind(this);
 
@@ -215,6 +217,9 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		this.panel.addEventListener("pointermove", this._panelPointerMove);
 		this.panel.addEventListener("pointerdown", this._panelPointerDown);
 		this.panel.addEventListener("click", this._optionClick);
+		if (this.popupRole === "menu") {
+			this.panel.addEventListener("keydown", this._panelKeydown);
+		}
 		this._panelHandlersAdded = true;
 	}
 
@@ -224,6 +229,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		this.panel?.removeEventListener("pointermove", this._panelPointerMove);
 		this.panel?.removeEventListener("pointerdown", this._panelPointerDown);
 		this.panel?.removeEventListener("click", this._optionClick);
+		this.panel?.removeEventListener("keydown", this._panelKeydown);
 		this._panelHandlersAdded = false;
 	}
 
@@ -355,6 +361,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		this.options = [];
 		this.focusedIndex = -1;
 		this.element.removeAttribute("aria-activedescendant");
+		panel.removeAttribute("aria-activedescendant");
 		panel.innerHTML = html || "";
 		if (!html) {
 			this.hidePanel();
@@ -366,8 +373,13 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 			.forEach((optionElt, index) => {
 				optionElt.dataset.index = String(index);
 				if (!optionElt.id) optionElt.id = `${panel.id}-opt-${index}`;
+				if (this.popupRole === "menu") {
+					optionElt.tabIndex = -1;
+				}
 				if (this.items) {
-					this.items[index].id = optionElt.id;
+					if (!this.items[index].id) {
+						this.items[index].id = optionElt.id;
+					}
 					this.options.push(this.items[index]);
 				} else {
 					// Server-rendered rows serialize their option details in this attribute.
@@ -451,6 +463,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		if (this.panel) {
 			this.panel.dataset.visible = "false";
 			this.panel.dataset.positioned = "false";
+			this.panel.removeAttribute("aria-activedescendant");
 		}
 		this.element.setAttribute("aria-expanded", "false");
 		this.element.dataset.panel = "closed";
@@ -472,7 +485,12 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		this.element.focus();
 	}
 
-	elementKeydown(event: KeyboardEvent) {
+	_handlePanelKeydown(event: KeyboardEvent) {
+		if (this.popupRole !== "menu") return;
+		this._handleMenuKeydown(event);
+	}
+
+	_handleMenuKeydown(event: KeyboardEvent) {
 		const count = this.options.length;
 		const next = () =>
 			this.focusedIndex >= count - 1 ? 0 : this.focusedIndex + 1;
@@ -484,14 +502,40 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 				if (this.panelOpen && count > 0) {
 					event.stopPropagation();
 					event.preventDefault();
-					this.focusOption(next());
+					this.focusOption(this.focusedIndex < 0 ? 0 : next());
 				}
 				break;
 			case "ArrowUp":
 				if (this.panelOpen && count > 0) {
 					event.stopPropagation();
 					event.preventDefault();
-					this.focusOption(prev());
+					this.focusOption(this.focusedIndex < 0 ? count - 1 : prev());
+				}
+				break;
+			case "Home":
+				if (this.panelOpen && count > 0) {
+					event.stopPropagation();
+					event.preventDefault();
+					this.focusOption(0);
+				}
+				break;
+			case "End":
+				if (this.panelOpen && count > 0) {
+					event.stopPropagation();
+					event.preventDefault();
+					this.focusOption(count - 1);
+				}
+				break;
+			case " ":
+				if (
+					this.popupRole === "menu" &&
+					this.panelOpen &&
+					this.focusedIndex >= 0
+				) {
+					event.stopPropagation();
+					event.preventDefault();
+					const option = this.focusedOption();
+					if (option) this.selectOption(option);
 				}
 				break;
 			case "Enter": {
@@ -506,7 +550,35 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 			case "Tab":
 				if (this.panelOpen) this.hidePanel();
 				break;
+			case "Escape":
+				if (this.panelOpen && this.popupRole === "menu") {
+					event.stopPropagation();
+					event.preventDefault();
+					this.deactivate();
+					this.element.focus();
+				}
+				break;
 		}
+	}
+
+	elementKeydown(event: KeyboardEvent) {
+		if (
+			!this.panelOpen &&
+			(event.key === "ArrowDown" || event.key === "ArrowUp") &&
+			(this.popupRole === "menu" || this.options.length > 0)
+		) {
+			event.stopPropagation();
+			event.preventDefault();
+			void this.showPanel().then((opened) => {
+				if (opened && !this._destroyed && this.options.length > 0) {
+					this.focusOption(
+						event.key === "ArrowUp" ? this.options.length - 1 : 0,
+					);
+				}
+			});
+			return;
+		}
+		this._handleMenuKeydown(event);
 	}
 
 	focusedOption(): ComboboxOptionElement | null {
@@ -530,7 +602,12 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		option.setAttribute("aria-selected", "true");
 		option.scrollIntoView({ block: "nearest" });
 		this.focusedIndex = Number.parseInt(option.dataset.index ?? "", 10);
-		this.element.setAttribute("aria-activedescendant", option.id);
+		if (this.popupRole === "menu") {
+			this.panel?.setAttribute("aria-activedescendant", option.id);
+			option.focus({ preventScroll: true });
+		} else {
+			this.element.setAttribute("aria-activedescendant", option.id);
+		}
 	}
 
 	unfocusOption(option?: ComboboxOptionElement | null) {
@@ -540,6 +617,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		currentOption.setAttribute("aria-selected", "false");
 		this.focusedIndex = -1;
 		this.element.removeAttribute("aria-activedescendant");
+		this.panel?.removeAttribute("aria-activedescendant");
 	}
 
 	_panelPointerDown(event: PointerEvent) {
@@ -563,7 +641,12 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		if (this.panelOpen && event.key === "Escape") {
 			event.preventDefault?.();
 			event.stopPropagation?.();
+			const restoreFocus =
+				this.popupRole === "menu" &&
+				(document.activeElement === this.element ||
+					this.panel?.contains(document.activeElement));
 			this.deactivate();
+			if (restoreFocus) this.element.focus();
 		}
 	}
 

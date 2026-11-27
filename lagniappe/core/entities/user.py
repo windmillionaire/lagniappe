@@ -98,6 +98,8 @@ class User(AssetMixin, UserMixin, Entity):
 
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         """Authorize user rows from their own Users/group permission scope."""
+        if action == Action.DELETE and self.is_owner:
+            return False
         viewer = current_context_user(user)
         if (
             self.is_admin

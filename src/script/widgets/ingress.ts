@@ -364,8 +364,11 @@ export class ImportData {
 						if (destroyable.clear) destroyable.clear();
 					});
 					section.querySelectorAll("input").forEach((input) => {
-						input.checked = false;
-						input.value = "";
+						if (input.type === "radio" || input.type === "checkbox") {
+							input.checked = false;
+						} else {
+							input.value = "";
+						}
 					});
 				}
 			});
@@ -521,7 +524,13 @@ export class ImportData {
 			const { options } = (
 				e as CustomEvent<{ options: Record<string, ComboboxOption> }>
 			).detail;
-			Object.values(options).forEach((option) => {
+			const selected = Object.values(options);
+			if (!selected.length) {
+				createModel.dataset.parentKind = "none";
+				createModel.dataset.visible = "false";
+				return;
+			}
+			selected.forEach((option) => {
 				if (option.kind === "project") {
 					createModel.dataset.visible = "true";
 					createModel.dataset.parentKind = "project";
@@ -679,34 +688,53 @@ export class ImportData {
 
 	async _deleteImported(button: HTMLButtonElement) {
 		const modal = new Modal(this.view, button);
-		await modal.load(this.endpoints.deleteImported(this.key));
+		await modal.load(this.endpoints.deleteImported(this.key), (modalElt) => {
+			const deleteButton = modalElt.querySelector<HTMLButtonElement>(
+				"[data-role='delete-imported']",
+			);
+			if (!deleteButton) return false;
 
-		const deleteButton = modal.modal?.querySelector<HTMLButtonElement>(
+			deleteButton.addEventListener(
+				"click",
+				async () => {
+					deleteButton.disabled = true;
+					const spinner = deleteButton.querySelector<HTMLElement>("#spinner");
+					if (spinner) spinner.dataset.visible = "true";
+					const response = await request.delete<IngressStageFields>(
+						deleteButton.dataset.route as string,
+					);
+					if (!response?.ok) {
+						deleteButton.disabled = false;
+						if (spinner) spinner.dataset.visible = "false";
+						return;
+					}
+
+					await modal.remove();
+					this._setStage(response);
+				},
+				{ once: true },
+			);
+		});
+
+		const activeModal = modal.modal;
+		const deleteButton = activeModal?.querySelector<HTMLButtonElement>(
 			"[data-role='delete-imported']",
 		);
-		if (!deleteButton) return;
-
-		deleteButton.addEventListener(
-			"click",
-			async () => {
-				deleteButton.disabled = true;
-				const spinner = deleteButton.querySelector<HTMLElement>("#spinner");
-				if (spinner) spinner.dataset.visible = "true";
-				const response = await request.delete<IngressStageFields>(
-					deleteButton.dataset.route as string,
-				);
-				if (!response?.ok) {
-					deleteButton.disabled = false;
-					if (spinner) spinner.dataset.visible = "false";
-					return;
-				}
-
-				await modal.remove();
-				this._setStage(response);
-			},
-			{ once: true },
-		);
-		deleteButton.focus();
+		if (!activeModal || !deleteButton) return;
+		const closeBtn =
+			activeModal.querySelector<HTMLElement>("[lp-control='close']") ??
+			deleteButton;
+		closeBtn.focus();
+		requestAnimationFrame(() => {
+			if (
+				this._destroyed ||
+				!activeModal?.isConnected ||
+				activeModal.contains(document.activeElement)
+			) {
+				return;
+			}
+			closeBtn.focus();
+		});
 	}
 
 	_startImport() {

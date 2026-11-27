@@ -341,10 +341,15 @@ def _options_values(condition, field, comparator):
 
 
 def _filter_options_response(updates, condition, values, comparator):
+    field_label = (
+        getattr(condition.field, "filter_label", None)
+        or getattr(condition.field, "label", None)
+        or updates["field"]
+    )
     if comparator == "BETWEEN" and (len(values) < 2 or any(not v for v in values)):
-        return responses.error(f"{updates['field']} must have both a from and to value")
+        return responses.error(f"{field_label} must have both a from and to value.")
     elif not values:
-        return responses.error(f"No value provided for {updates['field']}")
+        return responses.error(f"Enter a value for {field_label}.")
 
     try:
         if isinstance(condition.field, DateMixin):
@@ -380,7 +385,7 @@ def _filter_options_response(updates, condition, values, comparator):
     except FilterContractError as error:
         return _contract_error_response(error)
     except Exception as e:
-        return responses.error(f"Invalid value for {updates['field']}: {e}")
+        return responses.error(f"Invalid value for {field_label}: {e}")
 
     return responses.filter_condition(updates, condition, filter=True)
 

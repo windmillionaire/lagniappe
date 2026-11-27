@@ -580,7 +580,7 @@ def file_info(file: models.File) -> tuple[str, int]:
     )
 
 
-def file_download(file_entity: models.File) -> ResponseReturnValue:
+def file_download(file_entity: models.File | models.Ingress) -> ResponseReturnValue:
     g.NO_CACHE = True
     asset = file_entity.properties.file.value
     if not isinstance(asset, FileAsset):
@@ -590,7 +590,7 @@ def file_download(file_entity: models.File) -> ResponseReturnValue:
     mimetype = file_entity.mimetype
     disposition = f'attachment; filename="{filename.replace(chr(34), "")}"'
 
-    if file_entity.large:
+    if getattr(file_entity, "large", False):
         if asset.visibility.value == "private":
             signed_url = database_assets.get_signed_url(
                 asset.path,

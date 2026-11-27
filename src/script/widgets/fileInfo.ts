@@ -162,6 +162,14 @@ export class FileInfo extends FormWidget {
 		status.dataset.role = taskSettings.role;
 
 		if (!taskOptions?.enabled) {
+			if (this.readonly) return null;
+			if (
+				taskSettings.role === "extract" &&
+				(this.target.dataset.extractable === "false" ||
+					this.target.dataset.hasText === "true")
+			) {
+				return null;
+			}
 			status.appendChild(
 				primitives.checkbox({
 					name: `enable-${taskSettings.role}`,

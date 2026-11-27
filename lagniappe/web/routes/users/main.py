@@ -77,7 +77,9 @@ def create() -> ResponseReturnValue:
     requested_email = str(request.form.get("email") or "").strip().casefold()
     owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().casefold()
     if requested_email and requested_email == owner_email:
-        abort(403)
+        return responses.error(
+            "The site owner's email address cannot be used to create a new user."
+        )
     try:
         new_user = Entities.USER.create(
             user_data(request),

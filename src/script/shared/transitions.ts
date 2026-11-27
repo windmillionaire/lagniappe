@@ -136,28 +136,28 @@ const executeTransition = async (entries: TransitionEntry[]) => {
 		}
 	}
 
-	if (!transition) {
-		if (!updateState.started) update();
-		if (updateState.batch?.pending) await updateState.batch.pending;
-		entries.forEach((entry, index) => {
-			entry.resolve(updateState.batch?.results[index] ?? false);
-		});
-		return;
+	if (transition) {
+		const observeTransitionError = (error: unknown) => {
+			if (!isSkippedViewTransitionError(error)) captureError(error);
+		};
+		void transition.ready?.catch(observeTransitionError);
+
+		const updateDone = transition.updateCallbackDone || transition.finished;
+		if (transition.finished !== updateDone) {
+			void transition.finished?.catch(observeTransitionError);
+		}
+		try {
+			await updateDone;
+		} catch (error) {
+			observeTransitionError(error);
+		}
 	}
 
-	const observeTransitionError = (error: unknown) => {
-		if (!isSkippedViewTransitionError(error)) captureError(error);
-	};
-	void transition.ready?.catch(observeTransitionError);
-
-	const updateDone = transition.updateCallbackDone || transition.finished;
-	if (transition.finished !== updateDone) {
-		void transition.finished?.catch(observeTransitionError);
+	if (!updateState.started) {
+		update();
 	}
-	try {
-		await updateDone;
-	} catch (error) {
-		observeTransitionError(error);
+	if (updateState.batch?.pending) {
+		await updateState.batch.pending;
 	}
 
 	entries.forEach((entry, index) => {

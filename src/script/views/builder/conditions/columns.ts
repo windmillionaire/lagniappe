@@ -27,6 +27,7 @@ export default class Columns extends Condition<Partial<FormFieldSchema>> {
 			this.setting = { ...this.element.schema.columns?.[this.index] };
 		} else {
 			this.setTitle("Create Column");
+			this.messages.submit = "Add Column";
 			this.setting = {};
 		}
 

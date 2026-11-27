@@ -27,8 +27,13 @@ export class SelectBox extends Submitter(Combobox) {
 		this.select.name = String(this.name);
 		this.select.multiple = multiple;
 		this.select.style.display = "none";
+		this.select.hidden = true;
 		this.select.setAttribute("aria-hidden", "true");
 		this.select.tabIndex = -1;
+		if (this.select.id) {
+			this.id = this.select.id;
+			this.select.removeAttribute("id");
+		}
 
 		const input = document.createElement("input");
 		this.element = input;

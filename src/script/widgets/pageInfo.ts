@@ -328,6 +328,36 @@ export class PageInfo extends PageForm {
 	postreconcile() {
 		super.postreconcile();
 		this.setEntityMetadata();
+		this.target
+			.querySelectorAll<HTMLElement>("[data-role='empty-info']")
+			.forEach((node) => {
+				node.remove();
+			});
+		if (this.readonly) {
+			const hasVisibleContent = Array.from(this.target.children).some(
+				(child) => {
+					if (!(child instanceof HTMLElement)) return false;
+					if (child.hidden || child.dataset.visible === "false") return false;
+					if (child.matches("input[type='hidden']")) return false;
+					if (
+						child.hasAttribute("lp-edited-marker") ||
+						child.matches(
+							"[data-role='error'], [data-role='submit-group'], [data-role='autofill'], [data-role='empty-info']",
+						)
+					) {
+						return false;
+					}
+					return true;
+				},
+			);
+			if (!hasVisibleContent) {
+				const empty = document.createElement("p");
+				empty.dataset.role = "empty-info";
+				empty.className = "text-sm italic text-base-medium";
+				empty.textContent = "No details to display.";
+				this.target.append(empty);
+			}
+		}
 	}
 }
 

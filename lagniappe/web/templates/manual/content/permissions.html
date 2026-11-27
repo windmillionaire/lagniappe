@@ -14,7 +14,7 @@
 
   {{ heading("Basic Model", icon="permissions", kind="user") }}
   {% call card() %}
-    <ul class="text-base-medium space-y-2 mb-3">
+    <ul class="list-disc pl-5 text-base-medium space-y-2 mb-3">
       <li><strong>Primary Owner:</strong> the single configured business identity. The Owner has full application access, governs the Administrator roster, protects the canonical Owner account, and can download secret-bearing installation configuration.</li>
       <li><strong>Administrators:</strong> trusted managed users who can administer ordinary settings, users, groups, ingress, exports, and content. They cannot change the Owner or another Administrator, govern the Administrator roster, or retrieve installation secrets.</li>
       <li><strong>Provider access is separate:</strong> promoting a user to Administrator does not enable Lagniappe-funded model calls. That entitlement is assigned independently; provider-free external-agent plans still follow normal permissions.</li>
@@ -104,7 +104,7 @@
 
   {{ heading("Helpful Habits") }}
   {% call card() %}
-    <ul class="text-base-medium space-y-2">
+    <ul class="list-disc pl-5 text-base-medium space-y-2">
       <li>Lean on groups for the heavy lifting and use page-level restrictions for genuine exceptions.</li>
       <li>Keep group names readable; a small naming convention helps when groups start to overlap.</li>
       <li>Remember that global permissions can grant access more broadly than an entity-specific rule.</li>

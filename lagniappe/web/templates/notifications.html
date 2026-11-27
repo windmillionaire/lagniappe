@@ -63,27 +63,29 @@
 
 {% macro list(notifications, aggregate, cursor=None, can_message=False) %}
   {% if can_message %}
-    <button role="option"
-            type="button"
-            data-key="__message_user__"
-            data-action="message-user"
-            class="{{ styles.dropdown.option.action }}">
-      {{ render_icon("email", styles.dropdown.icon) }}
-      <span>Message a user</span>
-    </button>
+    <div role="group"
+         data-key="__message_user__"
+         data-action="message-user">
+      <button type="button"
+              class="{{ styles.dropdown.option.action }}">
+        {{ render_icon("email", styles.dropdown.icon) }}
+        <span>Message a user</span>
+      </button>
+    </div>
   {% endif %}
   {{ aggregate_item(aggregate) }}
   {% for notification in notifications %}{{ item(notification) }}{% endfor %}
   {% if cursor %}
-    <button role="option"
-            type="button"
-            data-key="__load_notifications__"
-            data-cursor="{{ cursor }}"
-            data-action="load-notifications"
-            class="{{ styles.dropdown.option.action }}">
-      {{ render_icon("next", styles.dropdown.icon) }}
-      <span>Load older notifications</span>
-    </button>
+    <div role="group"
+         data-key="__load_notifications__"
+         data-cursor="{{ cursor }}"
+         data-action="load-notifications">
+      <button type="button"
+              class="{{ styles.dropdown.option.action }}">
+        {{ render_icon("next", styles.dropdown.icon) }}
+        <span>Load older notifications</span>
+      </button>
+    </div>
   {% endif %}
 {% endmacro %}
 

@@ -96,8 +96,8 @@
               {{ render_icon(direction, styles.builder.settings.toggle.icon) }}
             </button>
           {% endfor %}
-          {{ controls.delete() }}
         {% endif %}
+        {% if t.allowed(Action.DELETE) %}{{ controls.delete() }}{% endif %}
       </nav>
     </div>
     <form lp-update

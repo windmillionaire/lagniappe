@@ -26,6 +26,7 @@ interface TablePanel {
 
 export interface TableComponent {
 	elt: HTMLElement;
+	active?: TablePanel | null;
 	widgets: {
 		TableVisibility?: TablePanel | null;
 		TableSorting?: (TablePanel & { refreshRows?(): unknown }) | null;
@@ -150,6 +151,13 @@ export class BaseTable<
 						if (widget) widget.disable();
 						if (widget) widget.reconcile();
 					});
+					if (
+						this.component.active === visibility ||
+						this.component.active === sorting
+					) {
+						this.component.active = null;
+						this.component.elt.dataset.open = "false";
+					}
 				});
 			return;
 		}
@@ -186,6 +194,13 @@ export class BaseTable<
 					if (widget) widget.disable();
 					if (widget) widget.reconcile();
 				});
+				if (
+					this.component.active === visibility ||
+					this.component.active === sorting
+				) {
+					this.component.active = null;
+					this.component.elt.dataset.open = "false";
+				}
 			});
 		}
 	}

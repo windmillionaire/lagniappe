@@ -539,6 +539,15 @@ class IsPublic(FilterMixin, DBProperty[bool, "Entity", bool]):
             raise TypeError("public must be a boolean")
 
         self.entity.db["public"] = value
+        if (
+            value
+            and not getattr(self.entity, "_testing", False)
+            and "public_id" in self.entity.properties
+            and not self.entity.db.get("public_id")
+        ):
+            public_id = self.entity.properties["public_id"]
+            if isinstance(public_id, PublicID):
+                _ = public_id.value
 
     # Filter Attributes
     _field_type = FieldType.BOOLEAN

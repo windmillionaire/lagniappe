@@ -47,7 +47,7 @@
       </label>
     </fieldset>
     <div data-option="use-columns"
-         data-visible="{{ (choose_form.form_choice != 'existing-form' and not file.form)|yesno }}">
+         data-visible="{{ (choose_form.form_choice == 'use-columns' and not file.form)|yesno }}">
       <h3 class="{{ styles.label.sectionHeading }}">Form Name</h3>
       <input type="text"
              autocomplete="off"

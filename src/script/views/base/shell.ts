@@ -423,13 +423,20 @@ export default class ShellView {
 		if (!command) return;
 
 		let copied = false;
-		try {
-			if (navigator.clipboard?.writeText) {
-				await navigator.clipboard.writeText(command);
-				copied = true;
+		if (navigator.clipboard?.writeText) {
+			let timeoutId: ReturnType<typeof setTimeout> | undefined;
+			try {
+				copied = await Promise.race([
+					navigator.clipboard.writeText(command).then(() => true),
+					new Promise<boolean>((resolve) => {
+						timeoutId = setTimeout(() => resolve(false), 250);
+					}),
+				]);
+			} catch {
+				copied = false;
+			} finally {
+				if (timeoutId !== undefined) clearTimeout(timeoutId);
 			}
-		} catch {
-			copied = false;
 		}
 
 		if (!copied) {

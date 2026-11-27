@@ -935,15 +935,27 @@ export default class Core extends ShellView {
 				? activeWidget
 				: requestedWidget;
 
+		const editor = component.widgets?.TableEditor;
+		const toggleEditorOff =
+			trigger.dataset.toggle === "true" &&
+			requestedWidget === "TableEditor" &&
+			editor?.visible === true;
 		const toggleWidget =
-			trigger.dataset.toggle === "true" && activeWidget === widgetName;
+			(trigger.dataset.toggle === "true" && activeWidget === widgetName) ||
+			toggleEditorOff;
 		const toggleComponent = component.visible && widgetName === "default";
 		const showActiveWidget = widgetName === "active" && component.active;
 
 		if (toggleWidget || toggleComponent) {
 			const active = component.active;
-			widgetName =
-				active && "visible" in active && active.visible ? null : activeWidget;
+			const activeTarget =
+				active && "target" in active && active.target instanceof HTMLElement
+					? active.target
+					: null;
+			const activeVisible =
+				Boolean(active && "visible" in active && active.visible) &&
+				activeTarget?.dataset.visible !== "false";
+			widgetName = activeVisible ? null : activeWidget;
 		} else if (showActiveWidget) {
 			widgetName = activeWidget;
 		}

@@ -192,14 +192,14 @@
         {% if Resource.FORMS.allowed(Action.VIEW) %}
           <a href="{{ url_for('forms.form_index') }}"
              data-kind="form"
-             class="inline-flex items-center gap-1.5 rounded-md border border-base-light bg-white px-3 py-1.5 text-sm font-semibold text-base-dark shadow-xs hover:bg-base-bg">
+             class="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-base-light bg-white px-3 py-1.5 text-sm font-semibold text-base-dark shadow-xs hover:bg-base-bg">
             {{ render_icon("form", "icon-sm text-kind-default", "form") }}
             <span>Back to Forms</span>
           </a>
         {% endif %}
         <a href="{{ url_for('home.home_page') }}"
            data-kind="page"
-           class="inline-flex items-center gap-1.5 rounded-md border border-base-light bg-white px-3 py-1.5 text-sm font-semibold text-base-dark shadow-xs hover:bg-base-bg">
+           class="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-base-light bg-white px-3 py-1.5 text-sm font-semibold text-base-dark shadow-xs hover:bg-base-bg">
           {{ render_icon("home", "icon-sm text-kind-default", "page") }}
           <span>Go to Home</span>
         </a>

@@ -18,6 +18,7 @@ export default class Visibility extends ConditionTarget {
 			this.setting = { ...this.element.schema.visibility?.[this.index] };
 		} else {
 			this.setTitle("Create Visibility Condition");
+			this.messages.submit = "Add Visibility Condition";
 			this.setting = {};
 		}
 

@@ -77,19 +77,36 @@ export class CreateToolReport extends BaseUpload {
 		this.context.description?.addEventListener("input", () => {
 			this.form?.showSubmitButton();
 		});
-		this.emailCopyButton?.addEventListener("click", () => {
-			void this.copyEmailAddress();
+		this.target?.addEventListener("click", (event) => {
+			this._onClick(event);
 		});
 		this.dropzone?.show();
 	}
 
+	_onClick(e: Event) {
+		const target = e.target as Element | null;
+		if (target?.closest?.("[data-role='email-copy']")) {
+			void this.copyEmailAddress();
+		}
+	}
+
 	get html() {
-		return [this.context.element, this.autoExecuteControl];
+		return [
+			...(this.emailSubmissions ? [this.emailSubmissions] : []),
+			this.context.element,
+			this.autoExecuteControl,
+		];
 	}
 
 	async copyEmailAddress() {
-		const button = this.emailCopyButton;
-		const address = this.emailAddress?.textContent?.trim();
+		const button =
+			this.target?.querySelector<HTMLButtonElement>(
+				"[data-role='email-copy']",
+			) ?? this.emailCopyButton;
+		const address = (
+			this.target?.querySelector<HTMLElement>("[data-role='email-address']") ??
+			this.emailAddress
+		)?.textContent?.trim();
 		if (!button || !address) return;
 		let copied = false;
 		try {

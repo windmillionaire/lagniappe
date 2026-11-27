@@ -1,5 +1,6 @@
 import { InputElement } from "../elements/input.ts";
 import { RadioElement } from "../elements/radio.ts";
+import type { FormSubmitOptions } from "../forms/controller.ts";
 import { FormWidget } from "./base/formWidget.ts";
 
 export class CreateForm extends FormWidget {
@@ -13,6 +14,32 @@ export class CreateForm extends FormWidget {
 		};
 
 		void super.init();
+	}
+
+	async prepareSubmit(options?: FormSubmitOptions) {
+		const nameInput =
+			this.target.querySelector<HTMLInputElement>("input[name='name']");
+		if (!nameInput?.value.trim()) {
+			this.form?.showError("Please enter a form name.");
+			nameInput?.focus();
+			return false;
+		}
+
+		const formType = this.target.querySelector<HTMLInputElement>(
+			"input[name='form-type']:checked",
+		);
+		if (!formType) {
+			this.form?.showError(
+				"Please choose whether this is a Page or Task form.",
+			);
+			this.target
+				.querySelector<HTMLInputElement>("input[name='form-type']")
+				?.focus();
+			return false;
+		}
+
+		this.form?.hideError();
+		return super.prepareSubmit(options);
 	}
 
 	get html() {

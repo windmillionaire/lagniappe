@@ -116,6 +116,7 @@ export class PDFPreview {
 		this._onToolbarClick = this._onToolbarClick.bind(this);
 		this._onToolbarChange = this._onToolbarChange.bind(this);
 		this._onToolbarKeydown = this._onToolbarKeydown.bind(this);
+		this._onDocumentKeydown = this._onDocumentKeydown.bind(this);
 	}
 
 	get url() {
@@ -189,6 +190,7 @@ export class PDFPreview {
 		this.target.addEventListener("click", this._onToolbarClick);
 		this.target.addEventListener("change", this._onToolbarChange);
 		this.target.addEventListener("keydown", this._onToolbarKeydown);
+		document.addEventListener("keydown", this._onDocumentKeydown);
 	}
 
 	postreconcile() {
@@ -286,7 +288,7 @@ export class PDFPreview {
 	_pageControl() {
 		const label = document.createElement("label");
 		label.className =
-			"flex min-h-8 items-center gap-1 rounded-md bg-white px-2 py-1 text-sm font-semibold text-base-default shadow-sm outline outline-base-light/50";
+			"flex min-h-9 sm:min-h-8 items-center gap-1 rounded-md bg-white px-2 py-1 text-sm font-semibold text-base-default shadow-sm outline outline-base-light/50";
 
 		const screenReaderLabel = document.createElement("span");
 		screenReaderLabel.className = "sr-only";
@@ -586,6 +588,25 @@ export class PDFPreview {
 		}
 	}
 
+	_onDocumentKeydown(event: KeyboardEvent) {
+		if (
+			event.defaultPrevented ||
+			event.key !== "Escape" ||
+			this.target.dataset.fullscreen !== "true"
+		) {
+			return;
+		}
+		if (
+			event.target instanceof Element &&
+			event.target.matches("[data-role='pdf-page-input']")
+		) {
+			return;
+		}
+		event.preventDefault();
+		this._toggleFullscreen();
+		this.fullscreenButton?.focus({ preventScroll: true });
+	}
+
 	async _goToPage(value: string | number) {
 		const number = this._clampPage(value);
 		if (!number) {
@@ -652,7 +673,10 @@ export class PDFPreview {
 
 	_toggleFullscreen() {
 		const active = this.target.dataset.fullscreen === "true";
-		this.target.dataset.fullscreen = active ? "false" : "true";
+		const next = !active;
+		this.target.dataset.fullscreen = String(next);
+		document.body.classList.toggle("editor-focus-mode", next);
+		if (next && this.toolbar) this.toolbar.dataset.visible = "true";
 		this._updateFullscreenButton();
 		requestAnimationFrame(() => {
 			this._renderPage(this._currentPage, { force: true });
@@ -760,6 +784,7 @@ export class PDFPreview {
 
 	destroy() {
 		this._destroyed = true;
+		document.body.classList.remove("editor-focus-mode");
 		if (this._resizeTimer !== null) clearTimeout(this._resizeTimer);
 		if (this._loadRetryTimer !== null) clearTimeout(this._loadRetryTimer);
 		this._loadRetryResolve?.();
@@ -768,6 +793,7 @@ export class PDFPreview {
 		this.target.removeEventListener("click", this._onToolbarClick);
 		this.target.removeEventListener("change", this._onToolbarChange);
 		this.target.removeEventListener("keydown", this._onToolbarKeydown);
+		document.removeEventListener("keydown", this._onDocumentKeydown);
 		this._renderObserver?.disconnect();
 		this._activeObserver?.disconnect();
 		this._resizeObserver?.disconnect();

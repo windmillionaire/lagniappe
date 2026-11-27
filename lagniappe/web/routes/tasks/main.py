@@ -807,7 +807,10 @@ def patch(
             except (exceptions.TaskCompletionError, exceptions.ValidationError) as e:
                 return responses.error(str(e))
         else:
-            field.value = value
+            try:
+                field.value = value
+            except exceptions.ValidationError as error:
+                return responses.error(str(error))
     else:
         field = task.properties.submission.fields.get(schema_id)
         if not field:
@@ -820,10 +823,10 @@ def patch(
                 actor=current_user,
                 normalized=True,
             )
+            field = task.properties.submission.patch(schema_id, value)
+            task.save_submission()
         except exceptions.ValidationError as error:
             return responses.error(str(error))
-        field = task.properties.submission.patch(schema_id, value)
-        task.save_submission()
 
     task.save()
 

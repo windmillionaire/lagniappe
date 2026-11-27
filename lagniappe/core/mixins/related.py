@@ -60,7 +60,10 @@ class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
 
     @property
     def sort_value(self) -> dict[str, str | None] | int | None:
-        return {cast(str, e["hash"]): cast("str | None", e["name"]) for e in self.column_value}
+        return {
+            cast(str, e["hash"]): cast("str | None", e["name"])
+            for e in self.column_value
+        } or None
 
     @property
     def column_value(self) -> list[dict[str, object]]:

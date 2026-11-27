@@ -4,13 +4,15 @@ import type { TableWidgets } from "./types.d.ts";
 import type { TableVisibilityToggle } from "./visibilityState.ts";
 
 interface MobileTableControlAttributes {
-	view: { elt: HTMLElement };
+	view: { elt: HTMLElement; mobile?: boolean };
 	component: ViewComponent & { widgets: TableWidgets };
+	visible?: boolean;
 }
 
 export class MobileTableControls {
 	declare view: MobileTableControlAttributes["view"];
 	declare component: MobileTableControlAttributes["component"];
+	declare visible?: boolean;
 
 	constructor(attributes: MobileTableControlAttributes) {
 		Object.assign(this, attributes);
@@ -23,14 +25,26 @@ export class MobileTableControls {
 	}
 
 	async init() {
-		await this.component.loadWidget("TableVisibility");
-		const visibility = this.component.widgets.TableVisibility;
-
-		this._syncVisibilityButtons(visibility?.visibleColumns ?? []);
+		await Promise.all([
+			this.component.loadWidget("TableVisibility"),
+			this.component.loadWidget("TableSorting"),
+		]);
+		this.sync();
 		this.target?.addEventListener("click", (e) => this._handleButtonClick(e));
 	}
 
+	sync() {
+		const visibility = this.component.widgets.TableVisibility;
+		this._syncVisibilityButtons(visibility?.visibleColumns ?? []);
+		const sorting = this.component.widgets.TableSorting;
+		if (sorting && !sorting.initialized) sorting.init?.();
+	}
+
 	postreconcile() {
+		if (this.target && this.visible !== undefined) {
+			this.target.dataset.visible = this.visible ? "true" : "false";
+		}
+		this.sync();
 		const sorting = this.component.widgets.TableSorting;
 		if (sorting?.initialized) sorting.refreshRows?.();
 	}

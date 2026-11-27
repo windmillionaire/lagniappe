@@ -89,6 +89,27 @@ function parseHtmlElement(markup: string): HTMLElement | null {
 	return template.content.firstElementChild as HTMLElement | null;
 }
 
+function canonicalJsonValue(value: unknown): unknown {
+	if (Array.isArray(value)) {
+		return value.map(canonicalJsonValue);
+	}
+	if (value && typeof value === "object") {
+		const sorted: Record<string, unknown> = {};
+		for (const key of Object.keys(value).sort()) {
+			sorted[key] = canonicalJsonValue((value as Record<string, unknown>)[key]);
+		}
+		return sorted;
+	}
+	return value;
+}
+
+function contractSignature(conditions: unknown[]): string {
+	const normalized = conditions
+		.map((condition) => JSON.stringify(canonicalJsonValue(condition)))
+		.sort();
+	return JSON.stringify(normalized);
+}
+
 export class FilterBar {
 	declare target: HTMLElement;
 	declare component: ViewComponent;
@@ -113,6 +134,8 @@ export class FilterBar {
 	declare _chips: ActiveChip[];
 	declare _activeForm: ActiveFormContext | null;
 	declare _savedFilters: SavedFilterItem[] | null;
+	declare _savedContracts: Set<string>;
+	declare _saveButtonLabel: string;
 	declare _savedLoading: boolean;
 	declare _openPopover: "saved" | "add" | null;
 	declare _optionSelect: FacetsBox | SelectBox | null;
@@ -150,6 +173,9 @@ export class FilterBar {
 		this._chips = [];
 		this._activeForm = null;
 		this._savedFilters = null;
+		this._savedContracts = new Set();
+		this._saveButtonLabel =
+			this.saveButton?.textContent?.trim() || "Save filter";
 		this._savedLoading = false;
 		this._openPopover = null;
 		this._optionSelect = null;
@@ -198,11 +224,16 @@ export class FilterBar {
 	_clampPopover(popover: HTMLElement) {
 		popover.style.left = "";
 		popover.style.right = "";
+		popover.style.maxWidth = "";
 		popover.classList.remove("right-0");
 		popover.classList.add("left-0");
 		const margin = 12;
+		const viewportWidth =
+			document.documentElement.clientWidth || window.innerWidth;
+		const maxWidth = Math.max(0, viewportWidth - margin * 2);
+		popover.style.maxWidth = `${maxWidth}px`;
 		const rect = popover.getBoundingClientRect();
-		if (rect.right > window.innerWidth - margin) {
+		if (rect.right > viewportWidth - margin) {
 			popover.classList.remove("left-0");
 			popover.classList.add("right-0");
 			const flipped = popover.getBoundingClientRect();
@@ -212,7 +243,7 @@ export class FilterBar {
 				if (parentRect) {
 					const maxLeft = Math.max(
 						margin,
-						window.innerWidth - margin - flipped.width,
+						viewportWidth - margin - flipped.width,
 					);
 					const desiredLeft = Math.min(
 						Math.max(margin, parentRect.left),
@@ -220,6 +251,13 @@ export class FilterBar {
 					);
 					popover.style.left = `${Math.round(desiredLeft - parentRect.left)}px`;
 				}
+			}
+		} else if (rect.left < margin) {
+			const parentRect = popover.offsetParent?.getBoundingClientRect();
+			if (parentRect) {
+				const maxLeft = Math.max(margin, viewportWidth - margin - rect.width);
+				const desiredLeft = Math.min(Math.max(margin, rect.left), maxLeft);
+				popover.style.left = `${Math.round(desiredLeft - parentRect.left)}px`;
 			}
 		}
 	}
@@ -240,7 +278,8 @@ export class FilterBar {
 	_handleDocumentClick(event: MouseEvent) {
 		if (!this._openPopover) return;
 		const target = event.target as Element | null;
-		if (!target) return;
+		// Clicking inside a popover step can replaceChildren() synchronously before bubbling finishes.
+		if (!target?.isConnected) return;
 		if (
 			this.savedAnchor.contains(target) ||
 			this.addAnchor.contains(target) ||
@@ -293,6 +332,8 @@ export class FilterBar {
 				} else {
 					this._savedFilters = [];
 				}
+				this._rebuildSavedContracts();
+				this._syncBarActions();
 			} finally {
 				this._savedLoading = false;
 			}
@@ -366,6 +407,9 @@ export class FilterBar {
 	}
 
 	_applySavedFilter(item: SavedFilterItem) {
+		this._savedContracts.add(
+			contractSignature(item.conditions.map((cond) => cond.definition)),
+		);
 		void this.applyConditions(item.conditions);
 	}
 
@@ -392,6 +436,8 @@ export class FilterBar {
 			this._savedFilters = (this._savedFilters ?? []).filter(
 				(entry) => entry.key !== item.key,
 			);
+			this._rebuildSavedContracts();
+			this._syncBarActions();
 			this._renderSavedList();
 		} else {
 			button.disabled = false;
@@ -432,6 +478,7 @@ export class FilterBar {
 				e.preventDefault();
 				e.stopPropagation();
 				this._renderFieldPicker(false);
+				this._clampPopover(this.addPopover);
 			});
 			const title = document.createElement("span");
 			title.className = "truncate text-xs font-semibold text-form-default";
@@ -636,6 +683,7 @@ export class FilterBar {
 			e.preventDefault();
 			e.stopPropagation();
 			this._renderFieldPicker();
+			this._clampPopover(this.addPopover);
 		});
 
 		const title = document.createElement("span");
@@ -659,6 +707,7 @@ export class FilterBar {
 			if (fieldType) form.dataset.fieldType = fieldType;
 			heading.remove();
 		}
+		form.dataset.fieldLabel = title.textContent?.trim() || fallbackLabel;
 
 		if (
 			form.dataset.fieldType === "timestamp" ||
@@ -728,14 +777,63 @@ export class FilterBar {
 		}
 	}
 
+	_validateConditionForm(form: HTMLFormElement, raw: FormData): string | null {
+		const label = form.dataset.fieldLabel || form.dataset.field || "this field";
+		const range = form.querySelector<HTMLElement>("[data-role='range']");
+		const isRange = range?.dataset.visible === "true";
+
+		if (isRange && range) {
+			const fromInput = range.querySelector<HTMLInputElement>(
+				"input[name$='_value_from']",
+			);
+			const toInput = range.querySelector<HTMLInputElement>(
+				"input[name$='_value_to']",
+			);
+			const fromVal = fromInput?.value.trim() ?? "";
+			const toVal = toInput?.value.trim() ?? "";
+			if (!fromVal || !toVal) {
+				return `Please provide a value for ${label}.`;
+			}
+			if (fromInput?.type === "number" && Number(fromVal) > Number(toVal)) {
+				return `Please provide a valid range for ${label}.`;
+			}
+			if (fromInput?.type === "date" && fromVal > toVal) {
+				return `Please provide a valid range for ${label}.`;
+			}
+			return null;
+		}
+
+		const valueEntries = Array.from(raw.entries()).filter(([key]) =>
+			key.endsWith("_value"),
+		);
+		if (
+			valueEntries.length === 0 ||
+			valueEntries.every(([, val]) => String(val).trim() === "")
+		) {
+			return `Please provide a value for ${label}.`;
+		}
+		return null;
+	}
+
 	async _submitCondition(
 		form: HTMLFormElement,
 		submitBtn: HTMLButtonElement | null,
 	) {
 		form.querySelector("[data-role='popover-error']")?.remove();
-		if (submitBtn) submitBtn.disabled = true;
 
 		const raw = new FormData(form);
+		const validationError = this._validateConditionForm(form, raw);
+		if (validationError) {
+			this._showPopoverError(validationError, form);
+			const focusTarget = form.querySelector<HTMLElement>(
+				"[data-role='range'][data-visible='true'] input, input:not([type='hidden']):not([type='radio']), select",
+			);
+			focusTarget?.focus({ preventScroll: true });
+			return;
+		}
+
+		if (submitBtn) submitBtn.disabled = true;
+
 		const params = new URLSearchParams();
 		for (const [key, value] of raw.entries()) {
 			params.append(key, String(value));
@@ -863,11 +961,43 @@ export class FilterBar {
 		await this._runFilter();
 	}
 
+	_currentContractSignature(): string {
+		return contractSignature(
+			this._chips.map((chip) => JSON.parse(chip.definition) as unknown),
+		);
+	}
+
+	_rebuildSavedContracts() {
+		this._savedContracts = new Set(
+			(this._savedFilters ?? []).map((item) =>
+				contractSignature(item.conditions.map((cond) => cond.definition)),
+			),
+		);
+	}
+
 	_syncBarActions() {
 		const hasChips = this._chips.length > 0;
 		this.barActions.dataset.visible = hasChips ? "true" : "false";
 		if (!hasChips) {
 			this.matchStatus.textContent = "";
+		}
+		if (this.saveButton) {
+			if (this._saveFeedbackTimer) {
+				clearTimeout(this._saveFeedbackTimer);
+				this._saveFeedbackTimer = null;
+			}
+			const alreadySaved =
+				hasChips && this._savedContracts.has(this._currentContractSignature());
+			if (alreadySaved) {
+				this.saveButton.disabled = true;
+				this.saveButton.replaceChildren(
+					createIcon("check", "icon-xs"),
+					document.createTextNode("Saved"),
+				);
+			} else {
+				this.saveButton.disabled = false;
+				this.saveButton.textContent = this._saveButtonLabel;
+			}
 		}
 	}
 
@@ -909,9 +1039,14 @@ export class FilterBar {
 	}
 
 	async saveCurrentFilter() {
-		if (!this._chips.length || !this.saveButton) return;
+		if (
+			!this._chips.length ||
+			!this.saveButton ||
+			this._savedContracts.has(this._currentContractSignature())
+		) {
+			return;
+		}
 		this.saveButton.disabled = true;
-		const originalText = this.saveButton.textContent || "Save filter";
 		this.saveButton.textContent = "Saving…";
 
 		try {
@@ -926,27 +1061,19 @@ export class FilterBar {
 				if (response.fingerprint) {
 					this.view.elt.dataset.fingerprint = response.fingerprint;
 				}
+				const sig = this._currentContractSignature();
 				if (response.filter && this._savedFilters !== null) {
 					this._savedFilters = [response.filter, ...this._savedFilters];
+					this._rebuildSavedContracts();
 				}
-				this.saveButton.replaceChildren(
-					createIcon("check", "icon-xs"),
-					document.createTextNode("Saved"),
-				);
-				if (this._saveFeedbackTimer) clearTimeout(this._saveFeedbackTimer);
-				this._saveFeedbackTimer = setTimeout(() => {
-					this._saveFeedbackTimer = null;
-					if (this.saveButton?.isConnected) {
-						this.saveButton.textContent = originalText;
-						this.saveButton.disabled = false;
-					}
-				}, 1500);
+				this._savedContracts.add(sig);
+				this._syncBarActions();
 				return;
 			}
-			this.saveButton.textContent = originalText;
+			this.saveButton.textContent = this._saveButtonLabel;
 			this.saveButton.disabled = false;
 		} catch {
-			this.saveButton.textContent = originalText;
+			this.saveButton.textContent = this._saveButtonLabel;
 			this.saveButton.disabled = false;
 		}
 	}

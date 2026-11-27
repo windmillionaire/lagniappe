@@ -156,7 +156,10 @@ def initialize(app: Flask) -> None:
         }
     )
     app.jinja_env.filters.pop("safe", None)
-    from lagniappe.web.ai_display import auto_execute_site_enabled
+    from lagniappe.web.ai_display import (
+        auto_execute_site_enabled,
+        oauth_connection_available,
+    )
     from lagniappe.web.deferred_autofill import form_state
 
     app.jinja_env.globals.update(
@@ -178,5 +181,6 @@ def initialize(app: Flask) -> None:
             "Resource": Resource,
             "owner_allows_assignments": owner_allows_assignments,
             "auto_execute_site_enabled": auto_execute_site_enabled,
+            "oauth_connection_available": oauth_connection_available,
         }
     )

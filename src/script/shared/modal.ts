@@ -11,6 +11,7 @@ interface ModalView {
 }
 
 type ModalElement = HTMLElement & { _lp_modal?: Modal };
+type BeforeModalAttach = (modal: ModalElement) => unknown;
 type ModalTrigger = HTMLElement & { disabled?: boolean };
 
 type ComponentElement = HTMLElement & {
@@ -143,7 +144,7 @@ export class Modal {
 		);
 	}
 
-	async load(route: string) {
+	async load(route: string, beforeAttach?: BeforeModalAttach) {
 		if (this._destroyed || this.view?._destroyed) return null;
 		if (this.trigger) this.trigger.disabled = true;
 		try {
@@ -161,8 +162,8 @@ export class Modal {
 				if (this.trigger) this.trigger.disabled = false;
 				return null;
 			}
-			const attached = await this.attach(modal.html);
-			if (this.trigger) this.trigger.disabled = false;
+			const attached = await this.attach(modal.html, undefined, beforeAttach);
+			if (this.trigger && !attached) this.trigger.disabled = false;
 			return attached;
 		} catch (error) {
 			captureError(error, this.trigger, this.view?.dataset);
@@ -173,6 +174,7 @@ export class Modal {
 	async attach(
 		html: Document | HTMLElement,
 		component?: unknown,
+		beforeAttach?: BeforeModalAttach,
 	): Promise<ModalElement | null | undefined> {
 		if (this._destroyed || this.view?._destroyed) return null;
 		try {
@@ -180,6 +182,10 @@ export class Modal {
 				html.querySelector<ModalElement>("#modal") ||
 				(html instanceof HTMLElement ? html : null);
 			if (!modal) return null;
+			if (beforeAttach?.(modal) === false) {
+				if (this.trigger) this.trigger.disabled = false;
+				return null;
+			}
 			if (this.trigger) this.trigger.disabled = true;
 			await withTransition(
 				() => {
@@ -222,21 +228,23 @@ export class DeleteModal extends Modal {
 			return;
 		}
 
+		let missingDeleteButton = false;
 		await this.load(
 			trigger.dataset.deleteModalRoute || ENDPOINTS.delete(this.key),
+			(modalElt) => {
+				const deleteButton = modalElt.querySelector<HTMLButtonElement>(
+					"[data-role='delete']",
+				);
+				if (!deleteButton) {
+					missingDeleteButton = true;
+					return false;
+				}
+				this.deleteButton = deleteButton;
+				this.deleteButton.addEventListener("click", this.delete.bind(this));
+			},
 		);
 
-		const modal = this.modal;
-		if (!modal) {
-			if (this.trigger) this.trigger.disabled = false;
-			return;
-		}
-
-		this.deleteButton = modal.querySelector<HTMLButtonElement>(
-			"[data-role='delete']",
-		);
-		if (!this.deleteButton) {
-			if (this.trigger) this.trigger.disabled = false;
+		if (missingDeleteButton) {
 			captureError(
 				new Error("Delete modal missing [data-role='delete']"),
 				this.trigger,
@@ -244,11 +252,23 @@ export class DeleteModal extends Modal {
 			);
 			return;
 		}
-		this.deleteButton.addEventListener("click", this.delete.bind(this));
-		(
+
+		const modal = this.modal;
+		if (!modal) {
+			if (this.trigger) this.trigger.disabled = false;
+			return;
+		}
+
+		const closeBtn =
 			modal.querySelector<HTMLElement>("[lp-control='close']") ??
-			this.deleteButton
-		).focus();
+			this.deleteButton;
+		if (closeBtn) {
+			closeBtn.focus();
+			requestAnimationFrame(() => {
+				if (this._destroyed || !modal.isConnected) return;
+				if (!modal.contains(document.activeElement)) closeBtn.focus();
+			});
+		}
 	}
 
 	removeEntity(key: string) {

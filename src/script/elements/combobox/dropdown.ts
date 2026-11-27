@@ -166,6 +166,6 @@ export class Dropdown extends Combobox<[menu: DropdownMenu]> {
 	hidePanel(): undefined {
 		const hidden = super.hidePanel();
 		if (hidden) this.onHide?.();
-		this.element.blur();
+		if (this.popupRole !== "menu") this.element.blur();
 	}
 }

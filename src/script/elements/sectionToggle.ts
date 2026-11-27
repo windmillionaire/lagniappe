@@ -430,7 +430,13 @@ export class FacetControl {
 			)
 			.filter((row) => row !== null);
 
-		if (rows.length === 0) return;
+		if (rows.length === 0) {
+			const empty = document.createElement("p");
+			empty.className = "text-sm italic text-base-medium";
+			empty.textContent = "None";
+			this.source.replaceWith(empty);
+			return;
+		}
 		this.source.replaceWith(...rows);
 	}
 

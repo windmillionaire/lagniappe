@@ -187,7 +187,13 @@ const visibility = (schema: FormFieldSchema) => {
 		label: "Visibility",
 		tag: "h3",
 	});
-	const toggle = _toggle("add", "add");
+	const toggle = _toggle(
+		"add",
+		"add",
+		"form",
+		false,
+		"Add visibility condition",
+	);
 	title.append(label, toggle);
 
 	if (schema.visibility) {
@@ -208,7 +214,7 @@ const status = (schema: FormFieldSchema) => {
 		label: "Status",
 		tag: "h3",
 	});
-	const toggle = _toggle("add", "add");
+	const toggle = _toggle("add", "add", "form", false, "Add status message");
 	title.append(label, toggle);
 
 	if (schema.status) {
@@ -230,7 +236,7 @@ const options = (schema: FormFieldSchema) => {
 		label: "Options",
 		tag: "h3",
 	});
-	const toggle = _toggle("add", "add");
+	const toggle = _toggle("add", "add", "form", false, "Add option");
 	title.append(label, toggle);
 
 	if (schema.options) {
@@ -253,7 +259,7 @@ const editor = () => {
 		label: "Editor",
 		tag: "h3",
 	});
-	const toggle = _toggle("edit", "edit");
+	const toggle = _toggle("edit", "edit", "form", false, "Edit HTML content");
 	title.append(label, toggle);
 	return _section("html", [title]);
 };
@@ -315,7 +321,7 @@ const columns = (schema: FormFieldSchema) => {
 		label: "Columns",
 		tag: "h3",
 	});
-	const toggle = _toggle("add", "add");
+	const toggle = _toggle("add", "add", "form", false, "Add column");
 	title.append(label, toggle);
 
 	if (schema.columns?.length) {

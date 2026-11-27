@@ -45,7 +45,7 @@
       data-role="unavailable-starred-item"
       data-state="{{ item.state }}">
     <div class="{{ styles.home.card.item }}">
-      <div>{{ item.message }}</div>
+      <div class="{{ styles.home.card.title }}">{{ item.message }}</div>
       {{ controls.star(True) }}
     </div>
   </li>
@@ -57,7 +57,7 @@
       lp-link
       lp-entity>
     <div class="{{ styles.home.card.item }}">
-      <div>{{ format_name(entity.column('name').column_value) }}</div>
+      <div class="{{ styles.home.card.title }}">{{ format_name(entity.column('name').column_value) }}</div>
       {{ controls.star(True) }}
     </div>
   </li>

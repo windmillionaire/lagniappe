@@ -65,7 +65,7 @@
       data-name="{{ p.name }}"
       class="group/item cursor-pointer">
     <div class="{{ styles.home.card.item }}" data-role="header">
-      <a class="{{ styles.link.title }}"
+      <a class="{{ styles.link.title }} {{ styles.home.card.title }}"
          data-role="title"
          href="{{ url_for('projects.view', key=p.urlsafe_key) }}">{{- p.name -}}</a>
       <div class="{{ styles.home.card.actions }}">

@@ -79,6 +79,12 @@ export class LinkElement extends BaseElement {
 		return isLinkSubmission(this.submission) ? this.submission : null;
 	}
 
+	get hasSubmission() {
+		const submission = this.linkSubmission;
+		if (!submission) return false;
+		return Boolean(submission.id ? submission.name : submission.url);
+	}
+
 	get read() {
 		if (this._read) return this._read;
 		const submission = this.linkSubmission;

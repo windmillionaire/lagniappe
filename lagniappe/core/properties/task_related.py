@@ -101,8 +101,8 @@ class TaskCategories(
         return "In Categories"
 
     @property
-    def sort_value(self) -> dict[str, str | None]:
-        return {entity.hash: entity.name for entity in self.value}
+    def sort_value(self) -> dict[str, str | None] | None:
+        return {entity.hash: entity.name for entity in self.value} or None
 
     def filter_details(self, condition: Condition) -> dict[str, object]:
         details = super().filter_details(condition)

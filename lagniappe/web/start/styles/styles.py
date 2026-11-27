@@ -36,7 +36,7 @@ STYLES = {
 		"model": "form-element rounded-md bg-base-bg p-2 text-sm data-[selected=true]:outline-2 data-[selected=true]:outline-kind-default",
 		"generate": "flex grow flex-row items-center gap-3 rounded-md bg-kind-bg px-3 py-1.5 text-base font-semibold text-base-dark shadow-sm outline-2 outline-kind-default hover:bg-kind-light hover:outline-kind-dark",
 		"sections": {
-			"side": "basis-1/4 group-data-[expanded=true]/builder:hidden",
+			"side": "basis-1/4 lg:sticky lg:top-20 self-start max-h-[calc(100vh-6rem)] overflow-y-auto group-data-[expanded=true]/builder:hidden",
 			"main": "basis-1/2 justify-self-center group-data-[expanded=true]/builder:basis-2/3"
 		},
 		"settings": {
@@ -53,7 +53,7 @@ STYLES = {
 	"button": {
 		"submit": "grid w-full grow place-items-center rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm action-button",
 		"secondary": "grid w-full grow place-items-center rounded-md bg-white px-3 py-1.5 text-base font-semibold text-kind-default shadow-xs action-button-secondary",
-		"close": "ml-2 shrink-0 text-center text-sm sm:text-base rounded-md px-3 py-1 font-semibold border border-base-light bg-white text-base-dark shadow-xs transition-colors hover:bg-base-bg hover:border-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-medium",
+		"close": "ml-2 shrink-0 min-h-9 text-center text-sm sm:text-base rounded-md px-3 py-1 font-semibold border border-base-light bg-white text-base-dark shadow-xs transition-colors hover:bg-base-bg hover:border-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-medium",
 		"group": "flex flex-col sm:flex-row gap-3",
 		"cancel": "ml-auto grid size-6 translate-x-1 place-items-center rounded-md text-delete-default hover:outline-2 hover:outline-delete-default focus-visible:outline-2 focus-visible:outline-delete-default hover:bg-delete-bg focus-visible:bg-delete-bg transition-colors duration-100"
 	},
@@ -74,7 +74,7 @@ STYLES = {
 		"popover": "lp-dp-popover"
 	},
 	"disclosure": {
-		"summary": "flex w-full cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden",
+		"summary": "flex min-h-9 w-full cursor-pointer list-none items-center justify-between gap-3 sm:min-h-0 [&::-webkit-details-marker]:hidden",
 		"chevron": "shrink-0 text-base-medium transition-transform duration-150 motion-reduce:transition-none group-open:rotate-180"
 	},
 	"dropdown": {
@@ -108,7 +108,7 @@ STYLES = {
 			"divider": "mx-1 hidden h-6 w-px bg-base-light/50 md:block md:first:hidden md:last:hidden",
 			"section": "flex flex-row flex-wrap items-center gap-2",
 			"saveStatus": "editor-save-status inline-flex h-8 shrink-0 items-center gap-1 px-1 text-xs font-medium text-base-medium whitespace-nowrap",
-			"tool": "grid size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm",
+			"tool": "grid size-9 sm:size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm",
 			"menu": "flex min-h-8 w-fit flex-row items-center gap-1 rounded-md bg-white outline outline-base-light/50 px-2 py-1 text-center text-base font-semibold shadow-sm",
 			"optionHeader": "text-lg font-bold pt-2 text-kind-default pb-1",
 			"optionPanel": "outline rounded-md px-4 pb-4 flex flex-col bg-white outline-base-light mt-2",
@@ -198,7 +198,8 @@ STYLES = {
 			"directory": "flex flex-row items-center gap-2 px-3 py-2 text-base font-semibold hover:bg-kind-bg group/item",
 			"directoryAction": "flex w-full cursor-pointer flex-row items-center gap-2 text-left font-semibold text-kind-default focus-visible:outline-none",
 			"list": "bg-white rounded-md outline-2 outline-kind-default",
-			"actions": "flex flex-row items-center gap-1"
+			"title": "min-w-0 flex-1 break-words [overflow-wrap:anywhere]",
+			"actions": "flex shrink-0 flex-row items-center gap-1"
 		},
 		"column": "flex flex-col gap-4 sm:gap-6 lg:gap-8",
 		"count": "font-bold ml-auto text-kind-default",
@@ -226,7 +227,7 @@ STYLES = {
 		"linkIndicator": "shrink-0 text-base-medium",
 		"taskFeedback": "flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-md border border-kind-light bg-kind-bg px-3 py-2 text-sm text-base-dark",
 		"taskFeedbackLink": "shrink-0 font-semibold text-kind-dark hover:underline focus-visible:underline",
-		"taskFeedbackDismiss": "grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-delete-default transition-colors duration-100 hover:bg-delete-bg hover:outline-2 hover:outline-delete-default focus-visible:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default",
+		"taskFeedbackDismiss": "grid size-9 shrink-0 cursor-pointer place-items-center rounded-md text-delete-default transition-colors duration-100 hover:bg-delete-bg hover:outline-2 hover:outline-delete-default focus-visible:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default sm:size-6",
 		"view": "grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 w-full p-4 sm:pb-0 sm:pt-6 lg:pt-8 sm:px-6 lg:px-8 mx-auto max-w-7xl"
 	},
 	"note": {
@@ -303,7 +304,7 @@ STYLES = {
 		"main": "min-h-full pt-16 pb-16 text-slate-900 px-0 sm:px-6 lg:px-8 max-w-7xl mx-auto",
 		"nav": {
 			"mobile": "group/nav flex flex-row items-center justify-between gap-4 border-y border-base-light/50 bg-base-bg pr-4 py-1 text-lg",
-			"flipper": "inline-grid place-items-center focus:outline-none text-kind-default sm:hidden text-lg",
+			"flipper": "inline-grid min-w-9 min-h-9 place-items-center focus:outline-none text-kind-default sm:hidden text-lg",
 			"group": "flex flex-row items-center",
 			"header": "min-h-8 gap-2 flex min-w-0 flex-1 flex-row items-center justify-start",
 			"title": "layout-nav-title gap-2 flex w-full flex-row items-center justify-between pl-4 py-3 sm:px-6 sm:py-5 text-lg font-semibold",
@@ -363,7 +364,7 @@ STYLES = {
 		"button": "flex grow flex-row items-center justify-center gap-2 rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm",
 		"codeShell": "bg-base-dark rounded-lg my-2 w-full min-w-0 max-w-full overflow-hidden",
 		"codeToolbar": "flex justify-end px-2 pt-2",
-		"copyButton": "rounded-md border border-base-light/50 px-2 py-1 text-xs font-semibold text-white hover:bg-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+		"copyButton": "min-h-9 min-w-9 rounded-md border border-base-light/50 px-2 py-1 text-xs font-semibold text-white hover:bg-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:min-h-0 sm:min-w-0",
 		"code": "text-project-light px-4 pb-4 pt-2 font-mono text-sm block w-full min-w-0 max-w-full overflow-x-auto whitespace-pre",
 		"content": "sm:rounded-lg sm:shadow-sm w-full sm:border bg-white sm:border-base-light/50 sm:p-6",
 		"heading": "flex items-center gap-3 text-2xl font-semibold text-base-dark mb-4",
@@ -395,19 +396,19 @@ STYLES = {
 		"actions": "flex flex-row gap-3"
 	},
 	"nav": {
-		"button": "action-icon-button transition-colors duration-100",
-		"mobileButton": "action-icon-button transition-colors duration-100 mobile",
+		"button": "action-icon-button min-w-9 min-h-9 sm:min-w-0 sm:min-h-0 transition-colors duration-100",
+		"mobileButton": "action-icon-button min-w-9 min-h-9 transition-colors duration-100 mobile",
 		"desktopButton": "action-icon-button transition-colors duration-100 desktop",
 		"bar": {
 			"wrapper": "fixed top-0 z-50 w-full bg-page-default",
 			"contents": "mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between w-full"
 		},
-		"link": "shrink-0 focus-visible:outline-2 hover:outline-2 focus-visible:outline-offset-2 hover:outline-offset-2 rounded-full focus-visible:outline-white hover:outline-white",
+		"link": "inline-grid size-9 place-items-center shrink-0 focus-visible:outline-2 hover:outline-2 focus-visible:outline-offset-2 hover:outline-offset-2 rounded-full focus-visible:outline-white hover:outline-white",
 		"user": "size-8 flex rounded-full items-center justify-center",
 		"search": {
 			"icon": "nav-search-icon pointer-events-none text-slate-400 absolute left-1.5 mr-1 z-10",
-			"input": "nav-search-input sm:text-sm rounded-md pl-8 pr-7 h-8 w-48 sm:w-64 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
-			"clearButton": "nav-search-clear absolute right-1 z-10 inline-grid size-6 cursor-pointer place-items-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-page-default"
+			"input": "nav-search-input sm:text-sm rounded-md pl-8 pr-9 sm:pr-7 min-h-9 sm:min-h-0 sm:h-8 w-48 sm:w-64 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+			"clearButton": "nav-search-clear absolute right-0 sm:right-1 z-10 inline-grid size-9 sm:size-6 cursor-pointer place-items-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-page-default"
 		},
 		"menu": {
 			"trigger": "group/navmenu inline-flex h-10 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-white transition-colors hover:bg-white/15 aria-expanded:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
@@ -454,6 +455,7 @@ STYLES = {
 	},
 	"table": {
 		"container": "min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white",
+		"scrollWrapper": "table-scroll-wrapper w-full",
 		"default": "w-full table-auto border-collapse divide-y sm:text-sm mt-4",
 		"card": "w-full table-auto border-collapse divide-y sm:text-sm",
 		"cardWrap": "w-full min-w-0 sm:px-2 sm:pb-2",
@@ -588,8 +590,8 @@ STYLES = {
 		"row": "flex flex-col gap-2",
 		"chipsGroup": "flex min-w-0 flex-row flex-wrap items-center gap-2",
 		"chips": "contents",
-		"savedButton": "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/80 bg-white px-2.5 py-1 text-sm font-medium text-base-dark transition-colors hover:border-base-medium hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
-		"addButton": "inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-base-medium/70 bg-white px-2.5 py-1 text-sm font-medium text-base-medium transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
+		"savedButton": "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-base-light/80 bg-white px-2.5 py-1 text-sm font-medium text-base-dark transition-colors hover:border-base-medium hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default max-sm:min-h-9",
+		"addButton": "inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-base-medium/70 bg-white px-2.5 py-1 text-sm font-medium text-base-medium transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default max-sm:min-h-9",
 		"icon": "icon-sm text-base-medium",
 		"chevron": "icon-xs text-base-medium",
 		"actions": "flex w-fit max-w-full flex-row flex-wrap items-center gap-3 rounded-md bg-white/80 px-3 py-1.5",

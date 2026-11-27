@@ -226,9 +226,32 @@ export class TableEditor {
 		const cells = this.rows?.target.querySelectorAll<Cell>(
 			'td[data-editable="true"]',
 		);
-		return Array.from(cells ?? []).filter(
-			(candidate) => this._schema(candidate) && this._route(candidate),
-		);
+		const visibilityState =
+			this.view?.TableVisibilityState ??
+			this.component?.widgets?.TableVisibility?.state;
+		return Array.from(cells ?? []).filter((candidate) => {
+			if (!this._schema(candidate) || !this._route(candidate)) return false;
+			if (candidate.dataset.visible === "false" || candidate.hidden)
+				return false;
+			const row = candidate.closest("tr");
+			if (row?.dataset.visible === "false" || row?.hidden) return false;
+			const column = candidate.dataset.column;
+			if (visibilityState && column) {
+				const index = visibilityState.columnIndexes.get(column);
+				if (
+					index !== undefined &&
+					visibilityState.hiddenColumns.includes(index) &&
+					!visibilityState.temporaryVisible.has(index)
+				) {
+					return false;
+				}
+			}
+			const getStyle =
+				candidate.ownerDocument?.defaultView?.getComputedStyle ??
+				globalThis.getComputedStyle;
+			if (getStyle && getStyle(candidate).display === "none") return false;
+			return true;
+		});
 	}
 
 	_isCheckboxCell(cell: Cell) {
@@ -395,6 +418,24 @@ export class TableEditor {
 			this.checkboxEdits.set(cell, edit);
 			cell.dataset.editState = "editing";
 			cell.replaceChildren(editor);
+			const control = this._control(editor);
+			if (control instanceof HTMLInputElement && control.type === "checkbox") {
+				const columnLabel =
+					edit.column?.title || cell.dataset.column || "Checkbox";
+				const nameCell = cell
+					.closest("tr")
+					?.querySelector<HTMLElement>("td[data-column='name']");
+				const rowName =
+					nameCell?.querySelector("[data-role='title']")?.textContent?.trim() ||
+					nameCell
+						?.querySelector(":scope > div > span:first-child a:last-of-type")
+						?.textContent?.trim() ||
+					nameCell
+						?.querySelector(":scope > div > span:first-child")
+						?.textContent?.trim() ||
+					"row";
+				control.setAttribute("aria-label", `${columnLabel} for ${rowName}`);
+			}
 			if (error) this._showError(cell, error);
 		}
 		batch.edits.clear();
@@ -434,6 +475,12 @@ export class TableEditor {
 
 	async _click(e: MouseEvent) {
 		if (!this.visible) return;
+		if (
+			e.target instanceof Element &&
+			e.target.closest("[lp-control='delete'], [lp-delete]")
+		) {
+			return;
+		}
 
 		e.stopPropagation();
 
@@ -659,7 +706,9 @@ export class TableEditor {
 				return false;
 			}
 			const html =
-				(response.html || null)?.body?.innerHTML ?? edit.before ?? "";
+				typeof response.html === "string"
+					? response.html
+					: (response.html?.body?.innerHTML ?? edit.before ?? "");
 			cell.dataset.editValue = JSON.stringify(payload.value);
 			if (checkbox && this.checkboxEdits.get(cell) === edit) {
 				edit.before = html;
@@ -778,6 +827,7 @@ export class TableEditor {
 			this._invalidatePreparation();
 			return;
 		}
+		this._syncCompletedColumn(true);
 		await this._prepareCheckboxes();
 	}
 

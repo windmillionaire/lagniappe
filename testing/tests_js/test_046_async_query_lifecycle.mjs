@@ -551,3 +551,77 @@ test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async
 	assert.equal(documentListeners.has("click"), false);
 	assert.equal(builder.SearchBox, null);
 });
+
+test("test_delete_modal_binds_confirm_listener_before_mount", async (t) => {
+	createBrowser(t);
+	const deleteRoutes = [];
+	let finishTransition;
+	const { DeleteModal } = await esmock.strict(
+		"../../src/script/shared/modal.ts",
+		{
+			"../../src/script/generated/styles.mjs": {
+				STYLES: {
+					modal: { wrapper: "", content: "", header: "" },
+					button: { close: "" },
+				},
+			},
+			"../../src/script/shared/endpoints.ts": {
+				ENDPOINTS: { delete: (key) => `/l/delete/${key}`, help: () => "" },
+			},
+			"../../src/script/shared/errors.ts": {
+				captureError: (error) => {
+					throw error;
+				},
+			},
+			"../../src/script/shared/request.ts": {
+				request: {
+					get: async () => {
+						const modal = document.createElement("div");
+						modal.id = "modal";
+						modal.innerHTML =
+							'<div id="modal-content" role="dialog">' +
+							'<button type="button" lp-control="close">Cancel</button>' +
+							'<button type="button" data-role="delete" data-route="/pages/page-1/delete">' +
+							'<span id="spinner" data-visible="false"></span>Delete</button>' +
+							"</div>";
+						return { ok: true, html: modal };
+					},
+					delete: async (route) => {
+						deleteRoutes.push(route);
+						return { ok: true };
+					},
+				},
+			},
+			"../../src/script/shared/transitions.ts": {
+				withTransition: (callback) => {
+					callback();
+					return new Promise((resolve) => {
+						finishTransition = () => resolve(true);
+					});
+				},
+			},
+		},
+	);
+
+	const host = document.createElement("div");
+	host.setAttribute("lp-entity", "");
+	host.dataset.key = "page-1";
+	const trigger = document.createElement("button");
+	host.append(trigger);
+	document.body.append(host);
+
+	const modal = new DeleteModal({}, trigger);
+	const initPromise = modal.init();
+	await new Promise((resolve) => setTimeout(resolve, 0));
+
+	const confirm = document.querySelector("#modal [data-role='delete']");
+	assert.ok(confirm);
+	confirm.click();
+	assert.deepEqual(deleteRoutes, ["/pages/page-1/delete"]);
+
+	finishTransition();
+	await initPromise;
+	finishTransition?.();
+	modal.destroy();
+	host.remove();
+});

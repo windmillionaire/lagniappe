@@ -871,4 +871,33 @@ test("test_messages_view_refreshes_read_races_and_uses_delete_modal", async (t) 
 		),
 	);
 	assert.equal(view.mobileClearConversationContainer.dataset.visible, "false");
+
+	const renderedNodes = [];
+	const createElement = (tag) => ({
+		tagName: tag.toUpperCase(),
+		dataset: {},
+		className: "",
+		textContent: "",
+		children: [],
+		append(...nodes) {
+			this.children.push(...nodes);
+		},
+	});
+	replaceGlobal(t, "document", { createElement });
+	const msgView = Object.create(Messages.prototype);
+	msgView.history = {
+		scrollTop: 0,
+		scrollHeight: 100,
+		replaceChildren: (...nodes) => renderedNodes.push(...nodes),
+	};
+	msgView.loadMessagesButton = { classList: { toggle() {} } };
+	msgView.messageCursor = null;
+	msgView.renderMessages([{ id: "m1", body: "hi", mine: true, created: "" }]);
+	const article = renderedNodes[0];
+	const footer = article.children[1];
+	const removeBtn = footer.children[1];
+	assert.equal(removeBtn.dataset.action, "delete-message");
+	assert.ok(removeBtn.className.includes("opacity-100"));
+	assert.ok(removeBtn.className.includes("focus-visible:opacity-100"));
+	assert.ok(removeBtn.className.includes("min-h-9"));
 });

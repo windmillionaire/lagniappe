@@ -26,7 +26,11 @@ async function loadImportData({ request = {} } = {}) {
 		{
 			"../../src/script/elements/buttons.ts": { buttons },
 			"../../src/script/elements/combobox/index.ts": {
-				FacetsBox: class {},
+				FacetsBox: class {
+					init() {}
+					clear() {}
+					destroy() {}
+				},
 				SelectBox: class {},
 			},
 			"../../src/script/elements/primitives.ts": { primitives: {} },
@@ -221,4 +225,58 @@ test("test_ingress_polling_tracks_widget_visibility", async (t) => {
 	widget._setImportStopped();
 	assert.equal(subscriptions.size, 0);
 	assert.equal(widget.importRequestStarted, false);
+});
+
+test("test_ingress_choose_parent_toggles_and_resets_create_model", async (t) => {
+	createBrowser(t);
+	const ImportData = await loadImportData();
+	const { progress, target } = ingressTarget("CHOOSE_PARENT");
+	const form = document.createElement("form");
+	const existing = document.createElement("div");
+	existing.dataset.option = "existing-parent";
+	const createModel = document.createElement("div");
+	createModel.dataset.section = "create-model";
+	createModel.dataset.parentKind = "none";
+	createModel.dataset.visible = "false";
+	form.append(existing, createModel);
+	progress.append(form);
+
+	const widget = new ImportData({ key: "ingress-key", target });
+	widget.stageSettings = { target: form, destroyables: [] };
+	widget._setChooseParent();
+
+	form.dispatchEvent(
+		new CustomEvent("updated", {
+			bubbles: true,
+			detail: { options: { p1: { id: "p1", kind: "project" } } },
+		}),
+	);
+	assert.equal(createModel.dataset.parentKind, "project");
+	assert.equal(createModel.dataset.visible, "true");
+
+	form.dispatchEvent(
+		new CustomEvent("updated", {
+			bubbles: true,
+			detail: { options: { m1: { id: "m1", kind: "model" } } },
+		}),
+	);
+	assert.equal(createModel.dataset.parentKind, "model");
+	assert.equal(createModel.dataset.visible, "false");
+
+	form.dispatchEvent(
+		new CustomEvent("updated", {
+			bubbles: true,
+			detail: { options: { p1: { id: "p1", kind: "project" } } },
+		}),
+	);
+	assert.equal(createModel.dataset.visible, "true");
+
+	form.dispatchEvent(
+		new CustomEvent("updated", {
+			bubbles: true,
+			detail: { options: {} },
+		}),
+	);
+	assert.equal(createModel.dataset.parentKind, "none");
+	assert.equal(createModel.dataset.visible, "false");
 });

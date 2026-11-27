@@ -20,12 +20,12 @@
 
 {% macro completed_result(result) %}
   <li class="py-4"
-      {% if result.entity %}data-key="{{ result.entity.id }}"{% endif %}>
+      {% if result.entity %}lp-entity data-key="{{ result.entity.id }}"{% endif %}>
     <div class="font-semibold text-base">
       {% if result.entity %}
         <div class="flex flex-row justify-between w-full">
           <div class="flex flex-row items-center gap-1">{{ format_name(result.entity, icon=True) }}</div>
-          {{ controls.delete() }}
+          {{ controls.delete(label="Delete " ~ (result.entity.name or "imported record")) }}
         </div>
       {% endif %}
       {% for warning in result.warnings %}

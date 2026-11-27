@@ -274,8 +274,8 @@ class Categories(
         return "In Categories"
 
     @property
-    def sort_value(self) -> dict[str, str | None]:
-        return {entity.hash: entity.name for entity in self.value}
+    def sort_value(self) -> dict[str, str | None] | None:
+        return {entity.hash: entity.name for entity in self.value} or None
 
 
 class Projects(
@@ -299,8 +299,8 @@ class Projects(
         return "In Projects"
 
     @property
-    def sort_value(self) -> dict[str, str | None]:
-        return {entity.hash: entity.name for entity in self.value}
+    def sort_value(self) -> dict[str, str | None] | None:
+        return {entity.hash: entity.name for entity in self.value} or None
 
 
 class ModelTasks(RelatedEntityListMixin["ModelTask"], ColumnMixin, Property[list["ModelTask"]]):

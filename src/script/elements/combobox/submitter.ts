@@ -47,6 +47,9 @@ export const Submitter = <Base extends ComboboxConstructor>(
 				this.select.multiple = Boolean(this.multiple);
 				this.select.name = String(this.name);
 				this.select.style.display = "none";
+				this.select.hidden = true;
+				this.select.setAttribute("aria-hidden", "true");
+				this.select.tabIndex = -1;
 			}
 		}
 

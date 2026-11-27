@@ -4,7 +4,7 @@
 
 {% block title %}{{ topic.title }} — Help{% endblock title %}
 {% block content %}
-  <main lp-view data-kind="help" data-readonly="true" class="group/view max-w-4xl mx-auto">
+  <div lp-view data-kind="help" data-readonly="true" class="group/view max-w-4xl mx-auto">
     <div class="{{ styles.layout.view.header }}" data-flipped="false">
       <nav class="{{ styles.layout.view.title }}" data-nav="view">
         <div class="flex min-w-0 items-center">
@@ -21,5 +21,5 @@
         {{ body(topic) }}
       </article>
     </div>
-  </main>
+  </div>
 {% endblock content %}

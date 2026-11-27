@@ -19,6 +19,7 @@ export default class Status extends ConditionTarget {
 			this.setting = { ...this.element.schema.status?.[this.index] };
 		} else {
 			this.setTitle("Create Status Message");
+			this.messages.submit = "Add Status Message";
 			this.setting = {};
 		}
 

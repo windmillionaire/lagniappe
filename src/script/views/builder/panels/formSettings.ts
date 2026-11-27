@@ -78,9 +78,16 @@ export class FormSettings {
 		this.column?.addEventListener("click", this._click);
 
 		if (this.restrictions && this.restrictionForm) {
+			this.restrictions.addEventListener("submit", this._saveRestrictions);
 			await this.restrictionForm.init();
 			if (this._destroyed) return;
-			this.restrictions.addEventListener("submit", this._saveRestrictions);
+			if (this._restrictionPromise) {
+				this.restrictionForm.setSubmitButton({
+					message: "submitting",
+					icon: "spinner",
+					disabled: true,
+				});
+			}
 		}
 	}
 
@@ -125,10 +132,19 @@ export class FormSettings {
 		if (!form || !restrictions || !route) return;
 		const data = new FormData(restrictions);
 		const snapshot = JSON.stringify([...data]);
-		form.submitting();
-		const button = form.submitButton;
-		if (button) button.disabled = true;
+		if (typeof form.setSubmitButton === "function") {
+			form.setSubmitButton({
+				message: "submitting",
+				icon: "spinner",
+				disabled: true,
+			});
+			form.hideError?.();
+		} else {
+			form.submitting();
+			if (form.submitButton) form.submitButton.disabled = true;
+		}
 		this._restrictionPromise = (async () => {
+			let handled = false;
 			try {
 				const response = await request.put(route, data);
 				if (this._destroyed) return;
@@ -139,19 +155,39 @@ export class FormSettings {
 						form.resetSubmitButton();
 						form.markUnsavedState();
 					}
-				} else
+					handled = true;
+				} else {
 					form.showError(
 						response?.error || "Could not save restrictions. Try again.",
 					);
+					handled = true;
+				}
 			} catch (error) {
 				captureError(error, this.restrictions, {
 					context: "builder-save-restrictions",
 				});
-				if (!this._destroyed)
+				if (!this._destroyed) {
 					form.showError("Could not save restrictions. Try again.");
+					handled = true;
+				}
 			} finally {
-				if (!this._destroyed && button) button.disabled = false;
 				this._restrictionPromise = null;
+				if (!this._destroyed && form.submitButton) {
+					if (!handled) {
+						if (typeof form.setSubmitButton === "function") {
+							form.setSubmitButton({
+								message: "submit",
+								icon: form.icon,
+								disabled: false,
+							});
+						} else {
+							form.submitButton.disabled = false;
+						}
+					} else {
+						form.submitButton.disabled = false;
+						form.submitButton.setAttribute?.("aria-disabled", "false");
+					}
+				}
 			}
 		})();
 		return this._restrictionPromise;

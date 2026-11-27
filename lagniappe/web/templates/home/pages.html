@@ -74,7 +74,7 @@
       data-fingerprint="{{ p.fingerprint }}"
       class="group/item cursor-pointer">
     <div class="{{ styles.home.card.item }}" data-role="header">
-      <div>{{ format_name(p.details) }}</div>
+      <div class="{{ styles.home.card.title }}">{{ format_name(p.details) }}</div>
       <div class="{{ styles.home.card.actions }}">
         {{ controls.star(is_starred(p)) }}
       </div>

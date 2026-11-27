@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 from flask import abort, request, g, make_response
 
 from flask_login import current_user
-from lagniappe.core.definitions import Action, Fetch, Resource
+from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
 from lagniappe.core.properties.home import ToolsList
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
@@ -49,6 +49,8 @@ def home_page(*, poll_revisions: dict[str, str]) -> ResponseReturnValue:
 @home_permission(poll_channels=_home_poll_channels)
 def get(kind: str, *, poll_revisions: dict[str, str]) -> ResponseReturnValue:
     if kind == "tools" and getattr(current_user, "is_public", False):
+        abort(403)
+    if kind == "ingress" and not Resource.SITE.allowed(Action.EDIT):
         abort(403)
     home = Entities.HOME(user=authenticated_user())
     section = home.section(kind, cursor=request.args.get("cursor"))
@@ -194,6 +196,13 @@ def toggle_star(key: str) -> ResponseReturnValue:
         entity = Entities.fetch_one(key, request=Fetch.direct())
         if entity is None:
             abort(404)
+        if isinstance(entity, (Entities.TASK, Entities.FILE)):
+            Entities.fetch(
+                entity,
+                request=Fetch.nested(
+                    because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION,
+                ),
+            )
         if not entity.allowed(Action.VIEW, user=current_user):
             abort(403)
         starred = current_user.properties.starred.add(entity)

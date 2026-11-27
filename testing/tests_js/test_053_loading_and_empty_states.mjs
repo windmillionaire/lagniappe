@@ -301,6 +301,12 @@ test("test_notifications_empty_popover_opens_for_zero_notifications", async (t) 
 			notifications.dropdown.panel?.querySelectorAll("[role='group']").length,
 			1,
 		);
+		const messageUserRow = notifications.dropdown.panel?.querySelector(
+			"[role='group'][data-action='message-user']",
+		);
+		const messageUserButton = messageUserRow?.querySelector("button");
+		assert.ok(messageUserButton);
+		assert.equal(messageUserButton.getAttribute("role"), null);
 		assert.equal(
 			notifications.dropdown.panel?.querySelector("[data-role='empty']")
 				?.className,

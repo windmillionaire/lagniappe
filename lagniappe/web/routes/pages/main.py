@@ -86,6 +86,15 @@ def view(key: str, **kwargs: Unpack[EntityContext[models.Page]]) -> ResponseRetu
         kwargs["entity"],
         restrictions=Resource.USER.allowed(Action.PERMISSIONS),
     )
+    if (
+        page.is_public
+        and isinstance(page, Entities.PAGE)
+        and not getattr(page, "_testing", False)
+        and not page.db.get("public_id")
+        and page.key is not None
+    ):
+        _ = page.public_id
+        Entities.save(page)
 
     return responses.page(page)
 
@@ -472,7 +481,10 @@ def patch(
                 page.update_user({"name": value}, user=current_user)
             except PermissionError:
                 abort(403)
-        field.value = value
+        try:
+            field.value = value
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
     else:
         field = page.properties.submission.fields.get(schema_id)
         if not field or not field.editable:
@@ -483,10 +495,10 @@ def patch(
                 actor=current_user,
                 normalized=True,
             )
+            field = page.properties.submission.patch(schema_id, value)
+            page.save_submission()
         except exceptions.ValidationError as error:
             return responses.error(str(error))
-        field = page.properties.submission.patch(schema_id, value)
-        page.save_submission()
 
     page.save()
 
@@ -642,17 +654,11 @@ def delete(
     return responses.ok()
 
 
-@pages.route("<key>/visibility", methods=["PUT"])
-@permission(Resource.PAGE, Action.PUBLISH)
-def visibility(
-    key: str, **kwargs: Unpack[EntityContext[models.Page]]
-) -> ResponseReturnValue:
-    page = kwargs["entity"]
-
-    page.is_public = request.form.get("visibility") == "public"
-    if request.form.get("public-settings-present") == "true":
-        preview = request.form.get("preview-image-asset") or None
-        directory_category = request.form.get("directory-category") or None
+def _apply_page_visibility(page, form) -> ResponseReturnValue | None:
+    page.is_public = form.get("visibility") == "public"
+    if form.get("public-settings-present") == "true":
+        preview = form.get("preview-image-asset") or None
+        directory_category = form.get("directory-category") or None
         valid_images = {
             image.name for image in public_page_service.document_images(page)
         }
@@ -665,18 +671,50 @@ def visibility(
             )
         try:
             page.public_settings = {
-                "allow_indexing": request.form.get("allow-indexing") == "true",
-                "title": request.form.get("public-title"),
-                "description": request.form.get("public-description"),
+                "allow_indexing": form.get("allow-indexing") == "true",
+                "title": form.get("public-title"),
+                "description": form.get("public-description"),
                 "preview_image_asset": preview,
                 "directory_category": directory_category,
-                "directory_order": request.form.get("directory-order"),
+                "directory_order": form.get("directory-order"),
             }
         except ValidationError as error:
             return responses.error(error)
     if page.is_public:
         _ = page.public_id
-    Entities.save(page)
+    return None
+
+
+@pages.route("<key>/visibility", methods=["PUT"])
+@permission(Resource.PAGE, Action.PUBLISH)
+def visibility(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
+    page = kwargs["entity"]
+    error_response = _apply_page_visibility(page, request.form)
+    if error_response is not None:
+        return error_response
+    try:
+        Entities.save(page)
+    except exceptions.MutationConflict:
+        # Concurrent document syncs advance `assets`; reload once before reporting conflict.
+        fresh = Entities.fetch_one(page.key, request=Fetch.direct())
+        if not isinstance(fresh, Entities.PAGE):
+            abort(404)
+        if not fresh.allowed(Action.PUBLISH):
+            abort(403)
+        page = fresh
+        error_response = _apply_page_visibility(page, request.form)
+        if error_response is not None:
+            return error_response
+        try:
+            Entities.save(page)
+        except exceptions.MutationConflict:
+            return Response(
+                "This page changed while saving visibility settings. Please try again.",
+                status=409,
+                mimetype="text/plain",
+            )
 
     return responses.page_document_settings(page)
 

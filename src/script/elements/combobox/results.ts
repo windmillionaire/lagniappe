@@ -140,7 +140,7 @@ const search = (result: SearchResult) => {
 
 		const formValueText = document.createElement("span");
 		formValueText.className = "ml-1";
-		formValueText.textContent = `${result.form_value}`;
+		appendHighlightedSearchText(formValueText, String(result.form_value ?? ""));
 		p2.appendChild(formValueText);
 
 		option.appendChild(p2);

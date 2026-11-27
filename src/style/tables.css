@@ -358,9 +358,6 @@ tr[data-widget="TableSorting"] .table-sort-option:has(> input:checked) {
 /* @style table.default table.card */
 @media (min-width: 640px) {
 	table#table:not([data-embedded]) {
-		margin-inline: -0.75rem;
-		width: calc(100% + 1.5rem);
-
 		& > tbody > tr > td[data-column="name"] {
 			max-width: 22rem;
 			white-space: normal;
@@ -485,5 +482,14 @@ tr[data-widget="TableSorting"] .table-sort-option:has(> input:checked) {
 		& > tbody > tr > td[data-column="delete"] {
 			display: none;
 		}
+	}
+}
+
+/* @style table.scrollWrapper */
+.table-scroll-wrapper[data-overflow-x="true"] {
+	overflow-x: auto;
+
+	& > table > thead {
+		position: static;
 	}
 }
