@@ -246,7 +246,10 @@ def require_submission_available(report: AIReport) -> str:
     return reusable_status
 
 
-def submit_plan_request(report: AIReport, user: User, data: dict[str, object], *, request_id: str | None) -> AIReport:
+def submit_plan_request(
+    report: AIReport, user: User, data: dict[str, object], *,
+    request_id: str | None, draft_only: bool = False,
+) -> AIReport:
     require_plan_access(report, user)
     plan_id = report.urlsafe_key
     reusable_status = require_submission_available(report)
@@ -273,6 +276,8 @@ def submit_plan_request(report: AIReport, user: User, data: dict[str, object], *
         # overwrite a newly staged manifest or be overwritten by a stale
         # upload creator.
         report = load_plan(plan_id, user)
+        if draft_only:
+            require_draft(report)
         reusable_status = require_submission_available(report)
         validation_errors = submission_validation_errors(
             data,

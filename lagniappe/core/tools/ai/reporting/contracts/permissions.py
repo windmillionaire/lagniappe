@@ -28,7 +28,7 @@ def allowed_report_actions(user: models.User) -> tuple[str, ...]:
     if capabilities["can_create_pages"]:
         allowed.add("create_page")
     if capabilities["can_update_pages"]:
-        allowed.update({"append_page_document", "replace_page_document"})
+        allowed.update({"append_page_document", "replace_page_document", "create_artifact"})
     if capabilities["can_update_pages"] or capabilities["can_update_tasks"]:
         allowed.add("attach_file")
         allowed.add("move_file")
@@ -73,6 +73,8 @@ def report_action_permission_context(
         rules.append("Document replacement requires an exact editable Page, explicit user intent, and the complete replacement text. The previous document is pinned before the collaborative edit.")
     if "attach_file" in allowed_set:
         rules.append("Attaching files requires an editable target. Each File has one owning Page or Task; attach_file never moves an already-owned File. Repeating the same attachment is a no-op. Use move_file for explicit ownership changes, or the existing File URL for references elsewhere. TaskHistory evidence remains owned by its live Task.")
+    if "create_artifact" in allowed_set:
+        rules.append("Creating an interactive HTML artifact requires an editable Page. The artifact is added to its Files section. Bundle JavaScript, CSS and data in the HTML; the preview blocks external dependencies.")
     if "move_task" in allowed_set:
         rules.append("Moving tasks requires editable source and target entities.")
     if "move_file" in allowed_set:

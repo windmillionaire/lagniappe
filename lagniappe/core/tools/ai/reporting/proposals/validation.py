@@ -18,6 +18,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools import dates
 from lagniappe.core.tools.forms.drafts import validate_draft_schema
+from lagniappe.core.tools.files.artifacts import artifact_content
 
 from ...debug import ai_debug
 from ...form_content import static_form_markdown
@@ -162,6 +163,10 @@ def validate_proposal(
             action_label,
             seen_actions,
         )
+        if action_type == "create_artifact":
+            target_action = _data_action_reference(action.get("data") or {}, "page")
+            if target_action and (seen_actions.get(target_action) or {}).get("type") != "create_page":
+                raise exceptions.AIException(f"Action {action_label} requires an earlier create_page action.")
         if validate_reference_kinds:
             raw_actions = (
                 raw_proposal.get("actions") if isinstance(raw_proposal, dict) else None
@@ -294,6 +299,7 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
             ("model", {"model"}),
         ),
         "attach_file": (("entity", {"page", "task", "task_history"}),),
+        "create_artifact": (("page", {"page"}),),
         "append_page_document": (("page", {"page"}),),
         "replace_page_document": (("page", {"page"}),),
         "summarize_file": (("file", {"file"}),),
@@ -406,6 +412,17 @@ def _validate_action_data_shape(
         "display_name",
     }:
         raise exceptions.AIException(f"Action {action_label} uses entity/entity_action for its attachment target.")
+    if action_type == "create_artifact":
+        page = _proposal_string(data.get("page"))
+        page_action = _proposal_string(data.get("page_action"))
+        if page == page_action:
+            raise exceptions.AIException(
+                f"Action {action_label} requires exactly one of data.page or data.page_action."
+            )
+        try:
+            artifact_content(data.get("name"), data.get("artifact_html"))
+        except exceptions.ValidationError as error:
+            raise exceptions.AIException(f"Action {action_label}: {error}") from error
     if action_type == "update_form_schema":
         _validate_update_form_schema_action_data(data, action_label)
     if action_type == "create_page" and not _proposal_string(data.get("name")):

@@ -246,10 +246,12 @@ def _plan_input_schema() -> dict[str, object]:
     return schema
 
 
-def _plan_id_input(properties: dict[str, object]) -> dict[str, object]:
+def _plan_id_input(
+    properties: dict[str, object], *, required: tuple[str, ...] = (),
+) -> dict[str, object]:
     return {
         "type": "object",
-        "required": ["plan_id"],
+        "required": ["plan_id", *required],
         "properties": {
             "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048},
             **properties,
@@ -527,6 +529,20 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
             ENRICHED_UPLOAD_RESULT_SCHEMA,
             "upload",
             UPLOAD_ANNOTATIONS,
+        ),
+        ToolDefinition(
+            "create_artifact",
+            "Submit one interactive HTML File to a dedicated draft Plan with instructions and without uploads. Supply the exact "
+            "hash of an editable Page and a self-contained HTML document with inline scripts, CSS, and data. "
+            "The artifact appears in the Page's Files section once executed. Present preview_url for review "
+            "or use execute_plan if authorized. For mixed requests, use a create_artifact action in submit_plan.",
+            _plan_id_input(
+                _WIRE["createArtifact"]["properties"],
+                required=tuple(_WIRE["createArtifact"]["required"]),
+            ),
+            SAFE_RECEIPT_SCHEMA,
+            "create_artifact",
+            START_ANNOTATIONS,
         ),
         ToolDefinition(
             "submit_plan",

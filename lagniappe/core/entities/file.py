@@ -7,6 +7,7 @@ from ..definitions.fingerprints import restricted_fingerprint
 from ..mixins import AssetMixin
 from ..properties import file_assets, file_entity, file_options, file_related, common_entity
 from ..tools.auth.context import current_context_user
+from ..tools.files.constants import ARTIFACT_MIMETYPE
 from .entity import Entity, EntityProperties
 from ..tools.auth.restrictions import permission_relation
 
@@ -83,6 +84,10 @@ class File(AssetMixin, Entity):
         def properties(self) -> property_types.FileProperties: ...
 
     entity_kind = "file"
+
+    @property
+    def is_artifact(self) -> bool:
+        return self.mimetype == ARTIFACT_MIMETYPE
 
     @property
     def searchable(self) -> bool:

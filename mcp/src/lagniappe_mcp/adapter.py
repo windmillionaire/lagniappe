@@ -300,6 +300,13 @@ class LagniappeAdapter:
                 )
             elif definition.kind == "submit":
                 result = await self._submit_plan(value)
+            elif definition.kind == "create_artifact":
+                plan_id = cast(str, value["plan_id"])
+                raw, _request_id = await self.rest.request_json(
+                    "POST", f"plans/{quote_path_segment(plan_id)}/artifacts",
+                    body={key: value[key] for key in ("page", "name", "html")},
+                )
+                result = AdapterResult(self._safe_receipt(raw, expected_plan_id=plan_id))
             elif definition.kind == "execute_plan":
                 plan_id = cast(str, value["plan_id"])
                 raw, _request_id = await self.rest.request_json(

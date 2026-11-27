@@ -11,6 +11,7 @@ import pytest
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
+from lagniappe.core.definitions import Action
 from lagniappe.core.entities.ai_report import AIReport, REPORT_FORMAT_VERSION
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai.external import contracts as external_contracts
@@ -24,7 +25,9 @@ from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.core.tools.database import agent_api as credential_store
 from lagniappe.core.tools.database import get as database_get
-from testing.utility.ai_report_fakes import _fetch_one_from, _patch_fake_keys, _test_file, _test_user
+from lagniappe.core.tools.database import assets as database_assets
+from lagniappe.core.tools.files.constants import ARTIFACT_MIMETYPE, MAX_ARTIFACT_BYTES
+from testing.utility.ai_report_fakes import FakeKey, _fetch_one_from, _patch_fake_keys, _test_file, _test_user
 from testing.utility.test_entities import TestEntities
 
 
@@ -134,6 +137,68 @@ def test_fileless_organize_creates_task_and_moves_existing_file(monkeypatch, ori
     assert file.db.get("page") is None
     assert file.db["task"] == task.key
     assert result["actions"][1]["moved"]["to"]["id"] == task.urlsafe_key
+
+
+@pytest.mark.unit
+def test_artifact_proposal_creates_one_interactive_file_on_the_page(monkeypatch):
+    _patch_fake_keys(monkeypatch)
+    actor = _test_user("artifact-owner")
+    page = TestEntities.get("PAGE", {"name": "Food History", "hash": "foodhistory1"})
+    details = {page.hash: {"id": page.urlsafe_key, "name": page.name, "kind": "page"}}
+    saved = []
+    uploads = []
+
+    def save_file(upload, path, mimetype, visibility):
+        content = upload.read()
+        uploads.append((content, mimetype, visibility))
+        return SimpleNamespace(size=len(content))
+
+    monkeypatch.setattr(database_assets, "save_file", save_file)
+    monkeypatch.setattr(
+        "lagniappe.core.tools.database.utility.create_named_key", lambda kind, name: FakeKey(name),
+    )
+    monkeypatch.setattr(external_validation.Entities, "save", lambda *items: saved.extend(items))
+    monkeypatch.setattr(external_validation.Entities, "fetch", lambda *ids, request: [page] if ids == (page.urlsafe_key,) else [])
+    monkeypatch.setattr(external_validation.Entities, "fetch_one", _fetch_one_from({page.urlsafe_key: page}))
+    monkeypatch.setattr(external_validation.cache, "get_details_by_hash", lambda hashes: {
+        key: details[key] for key in hashes if key in details
+    })
+
+    html = "<button>Timeline</button><script>const label = 'hash:unrecognized';</script>"
+    data = {"name": "Sandwich timeline", "page": "hash:foodhistory1", "artifact_html": html}
+    proposal = {
+        "summary": "Add a timeline.", "confidence": 1,
+        "actions": [{"id": "timeline", "type": "create_artifact", "data": data}],
+    }
+    report = external_api.create_plan(actor, instructions="Save a sandwich timeline to Food History.")
+    with monkeypatch.context() as denied:
+        denied.setattr(type(page), "allowed", lambda self, action, user=None: action is Action.VIEW)
+        with pytest.raises(exceptions.AIException, match="requires an editable Page"):
+            external_validation.validate_external_proposal(proposal, report, actor, file_usage=[])
+    with pytest.raises(exceptions.AIException, match="at most 256 KiB"):
+        external_validation.validate_external_proposal(
+            {**proposal, "actions": [{"type": "create_artifact", "data": {**data, "artifact_html": "é" * MAX_ARTIFACT_BYTES}}]},
+            report, actor, file_usage=[],
+        )
+    assert external_api.submission_validation_errors(
+        {"contract_version": external_api.CONTRACT_VERSION, "proposal": proposal, "file_usage": []},
+        report, actor,
+    ) == []
+    external_api.submit_plan(
+        report, actor, proposal, contract_version=external_api.CONTRACT_VERSION, file_usage=[],
+    )
+    assert not uploads
+    assert external_api.public_plan_proposal(report)["actions"][0]["data"]["artifact_html"] == html
+
+    result = report_runner.run_report(report, actor)
+    assert result["status"] == "complete"
+    assert report_runner.run_report(report, actor) == result
+    artifact, = [entity for entity in saved if entity.entity_kind == "file"]
+    assert artifact.page == page
+    assert artifact.is_artifact
+    assert artifact.filename == "Sandwich_timeline.html"
+    assert uploads == [(html.encode(), ARTIFACT_MIMETYPE, "private")]
+    assert result["actions"][0]["entity"]["id"] == artifact.urlsafe_key
 
 
 def _contract_actor():

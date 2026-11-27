@@ -96,7 +96,8 @@ def _collect_hash_references(value):
     if isinstance(value, dict):
         for key, child in value.items():
             hashes.extend(_collect_hash_references(key))
-            hashes.extend(_collect_hash_references(child))
+            if key != "artifact_html":
+                hashes.extend(_collect_hash_references(child))
     elif isinstance(value, list):
         for child in value:
             hashes.extend(_collect_hash_references(child))
@@ -110,7 +111,8 @@ def _collect_hash_prefixed_ids(value):
     if isinstance(value, dict):
         for key, child in value.items():
             ids.extend(_collect_hash_prefixed_ids(key))
-            ids.extend(_collect_hash_prefixed_ids(child))
+            if key != "artifact_html":
+                ids.extend(_collect_hash_prefixed_ids(child))
     elif isinstance(value, list):
         for child in value:
             ids.extend(_collect_hash_prefixed_ids(child))
@@ -122,9 +124,8 @@ def _collect_hash_prefixed_ids(value):
 def _replace_hash_references(value, replacements):
     if isinstance(value, dict):
         return {
-            _replace_hash_references(key, replacements): _replace_hash_references(
-                child,
-                replacements,
+            _replace_hash_references(key, replacements): (
+                child if key == "artifact_html" else _replace_hash_references(child, replacements)
             )
             for key, child in value.items()
         }

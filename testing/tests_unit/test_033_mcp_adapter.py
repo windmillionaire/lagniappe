@@ -356,7 +356,7 @@ class _WorkflowREST:
             return contract, "request-contract"
         if target in {"plans/abcdefghijkl/tools/search", "tools/search"}:
             return {"result": ["first", "second"]}, "request-search"
-        if target == "https://example.com/api/v1/plans/abcdefghijkl/submit":
+        if target in {"https://example.com/api/v1/plans/abcdefghijkl/submit", "plans/abcdefghijkl/artifacts"}:
             return {
                 "id": "abcdefghijkl",
                 "status": "ready",
@@ -370,6 +370,31 @@ class _WorkflowREST:
 
     async def aclose(self) -> None:
         return None
+
+
+def test_create_artifact_submits_to_the_existing_draft_plan() -> None:
+    async def exercise():
+        rest = _WorkflowREST()
+        adapter = LagniappeAdapter(
+            ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"),
+            rest=rest,  # type: ignore[arg-type]
+        )
+        await adapter.initialize()
+        arguments = {
+            "plan_id": "abcdefghijkl", "page": "hash:foodhistory1",
+            "name": "Sandwich timeline", "html": "<script>void 0</script>",
+        }
+        with pytest.raises(SchemaError):
+            await adapter.execute("create_artifact", {"plan_id": arguments["plan_id"]})
+        receipt = await adapter.execute("create_artifact", arguments)
+        assert receipt.value["status"] == "ready"
+        assert receipt.value["preview_url"] == "https://example.com/tools/api-plan/abcdefghijkl"
+        assert rest.requests == [("POST", "plans/abcdefghijkl/artifacts", {
+            key: arguments[key] for key in ("page", "name", "html")
+        })]
+        await adapter.aclose()
+
+    asyncio.run(exercise())
 
 
 @pytest.mark.parametrize("allowed", [False, True])

@@ -197,6 +197,11 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "required": ("file",),
         "required_groups": (("entity", "entity_action"),),
     },
+    "create_artifact": {
+        "fields": ("name", "page", "page_action", "artifact_html"),
+        "required": ("name", "artifact_html"),
+        "required_groups": (("page", "page_action"),),
+    },
     "suggest_page_deletion": {
         "fields": ("page", "page_action", "page_name"),
         "required_groups": (("page", "page_action"),),

@@ -1,8 +1,17 @@
-"""File movement, attachment, and summary report actions."""
+"""File creation, movement, attachment, and summary report actions."""
+
+from io import BytesIO
+
+from werkzeug.datastructures import FileStorage
+from werkzeug.utils import secure_filename
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.files.artifacts import artifact_content
+from lagniappe.core.tools.files.constants import ARTIFACT_MIMETYPE
+
+from .checkpoints import _prepared_output_key
 
 from .references import (
     _add_file_to_endpoint,
@@ -20,6 +29,26 @@ from .results import (
     _entity_result,
     _file_summary_result,
 )
+
+
+def _create_artifact(action, _report, user, created, context=None):
+    data = _data(action)
+    page = _resolve_entity(
+        data.get("page") or data.get("page_action"), created, expected=Entities.PAGE,
+    )
+    _require_allowed(
+        page.allowed(Action.EDIT, user=user),
+        "You do not have permission to attach artifacts to this Page.",
+    )
+    name, content = artifact_content(data.get("name"), data.get("artifact_html"))
+    filename = f"{secure_filename(name)[:160] or 'artifact'}.html"
+    upload = FileStorage(stream=BytesIO(content), filename=filename, content_type=ARTIFACT_MIMETYPE)
+    file = Entities.FILE.create(
+        page=page, upload=upload, data={"name": name}, key=_prepared_output_key(context),
+    )
+    if file.file is None:
+        raise exceptions.ValidationError("The artifact could not be saved to storage.")
+    return file, [file], {"target": _entity_result(page)}
 
 
 def _move_file(action, _report, user, created):

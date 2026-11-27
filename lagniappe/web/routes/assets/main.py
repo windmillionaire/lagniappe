@@ -14,6 +14,7 @@ from lagniappe.core.definitions.asset import FileAsset, ImageAsset
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.definitions.asset import LARGE_ASSET_BYTES
 from lagniappe.core.mixins.assets import AssetMixin
+from lagniappe.core.entities import Entities
 from lagniappe.core.tools.files import ranges as file_ranges
 from lagniappe.core.tools.database import assets as database_assets
 from lagniappe.web.auth import load_route_entity, permission
@@ -129,6 +130,8 @@ def get_image(
             return responses.not_found("Content not found")
         return responses.image_response(content, asset.content_type)
     elif isinstance(asset, FileAsset):
+        if isinstance(entity, Entities.FILE) and entity.is_artifact:
+            return responses.not_found("Content not found")
         if request.method == "HEAD":
             return _asset_metadata_response(asset, entity.mimetype)
         return _file_response(asset, entity.mimetype)

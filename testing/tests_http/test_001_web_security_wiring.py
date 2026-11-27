@@ -11,12 +11,18 @@ from flask import Flask, session
 from werkzeug.test import EnvironBuilder
 
 from lagniappe import CONFIG
+from lagniappe.core.definitions.asset import FileAsset
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.files.constants import ARTIFACT_MIMETYPE
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.auth import agent_api as agent_auth
 from lagniappe.web import CSP, app, configure_flask_security
+from lagniappe.web import auth as web_auth
+from lagniappe.web.routes.api import main as agent_routes
+from lagniappe.web.routes.assets import main as asset_routes
 from lagniappe.web.start import blueprints as blueprint_start
 from lagniappe.web.start import login as login_start
+from testing.utility.test_entities import TestEntities
 
 
 pytestmark = pytest.mark.http
@@ -355,6 +361,83 @@ def test_common_security_headers():
     assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
     assert response.headers["Content-Security-Policy"] == CSP
     assert response.headers["Cache-Control"] == "private, no-cache"
+
+
+def test_interactive_preview_requires_file_access_and_has_its_own_sandbox(monkeypatch, http_client):
+    html = b"<style>button {color: red}</style><button>Timeline</button><script>void 0</script>"
+    TestEntities.initialize(Entities)
+    file = TestEntities.get("FILE", {"name": "Timeline"})
+    file.mimetype = ARTIFACT_MIMETYPE
+    file.filename = "timeline.html"
+    reads = []
+    asset = FileAsset({"size": len(html)}, name="file", entity=file)
+    monkeypatch.setattr(asset, "get", lambda: reads.append(True) or html)
+    monkeypatch.setattr(type(file), "get_asset", lambda self, name: asset if name == "file" else None)
+    actor = SimpleNamespace(is_authenticated=True, can_view=False)
+    monkeypatch.setattr(web_auth, "_load_request_context", lambda *args, **kwargs: (actor, file))
+    monkeypatch.setattr(type(file), "allowed", lambda self, action, user: user.can_view)
+    path = "/files/artifact-key/artifact-preview"
+
+    denied = http_client.get(path)
+    assert denied.status_code == 403
+    assert not reads
+    actor.can_view = True
+    preview = http_client.get(path)
+    assert preview.status_code == 200
+    assert preview.data == html
+    assert preview.content_type == "text/html; charset=utf-8"
+    policy = preview.headers["Content-Security-Policy"].split("; ")
+    assert "sandbox allow-scripts" in policy
+    assert "default-src 'none'" in policy
+    assert "script-src 'unsafe-inline'" in policy
+    assert "frame-ancestors 'self'" in policy
+    assert preview.headers["Cache-Control"] == "no-store"
+    assert preview.headers["Referrer-Policy"] == "no-referrer"
+
+    monkeypatch.setattr(asset_routes, "load_route_entity", lambda entity, **kwargs: entity)
+    assert http_client.head("/assets/artifact-key/file").status_code == 404
+    download = http_client.get("/files/artifact-key/download")
+    assert download.status_code == 200
+    assert download.headers["Content-Disposition"] == 'attachment; filename="timeline.html"'
+    assert download.data == html
+
+    file.mimetype = "text/html"
+    assert http_client.get(path).status_code == 404
+    assert reads == [True, True]
+
+
+def test_create_artifact_submits_a_single_action_on_a_draft_plan(monkeypatch, http_client):
+    actor = SimpleNamespace(is_public=False, urlsafe_key="artifact-api-actor")
+    report = SimpleNamespace(status="draft")
+    monkeypatch.setattr(agent_auth, "authenticate_credential", lambda token: (actor, {}))
+    monkeypatch.setattr(agent_routes, "_load_plan", lambda plan_id: report)
+    monkeypatch.setattr(agent_routes, "_submission_receipt", lambda report: {"status": report.status})
+    submissions = []
+
+    def submit(plan, user, data, *, request_id, draft_only):
+        assert plan is report and user is actor and draft_only
+        submissions.append(data)
+        return SimpleNamespace(status="ready")
+
+    monkeypatch.setattr(external_api, "submit_plan_request", submit)
+    path = "/api/v1/plans/artifact-draft/artifacts"
+    html = "<button>Timeline</button><script>void 0</script>"
+    body = {"page": "hash:foodhistory1", "name": "Sandwiches", "html": html}
+    assert http_client.post(path, json=body).status_code == 401
+    headers = {"Authorization": "Bearer valid-key"}
+    response = http_client.post(path, json=body, headers=headers)
+    assert response.status_code == 200
+    assert response.json == {"status": "ready"}
+    payload, = submissions
+    assert payload["file_usage"] == []
+    action, = payload["proposal"]["actions"]
+    assert action["type"] == "create_artifact"
+    assert action["data"] == {
+        "page": body["page"], "name": body["name"], "artifact_html": html,
+    }
+    report.status = "ready"
+    assert http_client.post(path, json=body, headers=headers).status_code == 409
+    assert len(submissions) == 1
 
 
 @pytest.mark.parametrize("path", ("/api", "/api/v1"))

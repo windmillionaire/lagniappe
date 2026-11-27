@@ -440,7 +440,8 @@ def _walk_strings(value):
     if isinstance(value, dict):
         for key, child in value.items():
             yield from _walk_strings(key)
-            yield from _walk_strings(child)
+            if key != "artifact_html":
+                yield from _walk_strings(child)
     elif isinstance(value, list):
         for child in value:
             yield from _walk_strings(child)
@@ -525,6 +526,16 @@ def _validate_reference_visibility(proposal, report, user):
             raise exceptions.AIException(
                 "Proposal contains an inaccessible or unknown entity reference."
             )
+    for action in proposal.get("actions") or []:
+        if not isinstance(action, dict) or action.get("type") != "create_artifact":
+            continue
+        data = action.get("data")
+        page = data.get("page") if isinstance(data, dict) else None
+        match = HASH_REFERENCE_REGEX.fullmatch(page) if isinstance(page, str) else None
+        if match:
+            entity = by_hash[match[1]]
+            if not isinstance(entity, Entities.PAGE) or not entity.allowed(Action.EDIT, user=user):
+                raise exceptions.AIException("Creating an artifact requires an editable Page.")
 
 
 def _validate_top_level(proposal):
@@ -542,12 +553,12 @@ def _validate_top_level(proposal):
             f"Proposal contains unsupported fields: {', '.join(sorted(unsupported))}"
         )
     try:
-        encoded = json.dumps(proposal, ensure_ascii=False, separators=(",", ":"))
+        encoded = json.dumps(proposal, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     except (TypeError, ValueError) as error:
         raise exceptions.AIException(
             "Proposal must contain valid JSON values."
         ) from error
-    if len(encoded.encode("utf-8")) > MAX_PROPOSAL_BYTES:
+    if len(encoded) > MAX_PROPOSAL_BYTES:
         raise exceptions.AIException("Proposal is too large.")
     if not isinstance(proposal.get("summary"), str) or not proposal["summary"].strip():
         raise exceptions.AIException("Proposal summary must be a non-empty string.")

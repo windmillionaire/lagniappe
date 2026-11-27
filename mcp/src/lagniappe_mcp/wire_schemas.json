@@ -879,5 +879,30 @@
         "pattern": "^[A-Za-z0-9._-]{1,128}$"
       }
     }
+  },
+  "createArtifact": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "page",
+      "name",
+      "html"
+    ],
+    "properties": {
+      "page": {
+        "type": "string",
+        "pattern": "^hash:[0-9a-z]{12}$"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "html": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 262144
+      }
+    }
   }
 }

@@ -124,6 +124,22 @@ CSP = "; ".join(
     ]
 )
 
+ARTIFACT_CSP = "; ".join(
+    (
+        "sandbox allow-scripts",
+        "default-src 'none'",
+        "script-src 'unsafe-inline'",
+        "script-src-attr 'none'",
+        "style-src 'unsafe-inline'",
+        "img-src data: blob:",
+        "font-src data:",
+        "media-src data: blob:",
+        "base-uri 'none'",
+        "form-action 'none'",
+        "frame-ancestors 'self'",
+    )
+)
+
 
 def _client_cache_invalidation_requested():
     invalidate = bool(session.get(CONFIG.LOGIN_INVALIDATE_CACHE_KEY))
@@ -197,6 +213,11 @@ def add_lagniappe_headers(response: Response) -> Response:
         "Cache-Control": "no-store" if g.get("NO_CACHE") else "private, no-cache",
         "Content-Security-Policy": CSP,
     }
+
+    if g.get("artifact_preview"):
+        headers["Content-Security-Policy"] = ARTIFACT_CSP
+        headers["Referrer-Policy"] = "no-referrer"
+        headers["Cross-Origin-Opener-Policy"] = "same-origin"
 
     if google_style_nonce := g.get("google_style_nonce"):
         # Authorize only this response's GIS button stylesheet; keep arbitrary
