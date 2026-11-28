@@ -5,9 +5,18 @@
        data-title="Preview"
        data-visible="false"
        data-tab="true"
-       data-default="{{ 'PDFPreview' if file.mimetype == 'application/pdf' else 'FilePreview' }}"
+       {% if not file.is_artifact %}
+         data-default="{{ 'PDFPreview' if file.mimetype == 'application/pdf' else 'FilePreview' }}"
+       {% endif %}
        data-kind="file">
-    {% if file.mimetype == 'application/pdf' %}
+    {% if file.is_artifact %}
+      <iframe src="{{ url_for('files.artifact_preview', key=file.urlsafe_key) }}"
+              sandbox="allow-scripts"
+              referrerpolicy="no-referrer"
+              title="{{ file.name }}"
+              loading="lazy"
+              class="block h-[75vh] min-h-96 w-full"></iframe>
+    {% elif file.mimetype == 'application/pdf' %}
       <div data-widget="PDFPreview"
            data-visible="false"
            data-url="{{ file.preview }}"

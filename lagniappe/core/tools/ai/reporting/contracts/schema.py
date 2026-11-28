@@ -3,6 +3,8 @@
 from collections.abc import Iterable
 from typing import NotRequired, TypedDict, cast
 
+from lagniappe.core.tools.files.constants import MAX_ARTIFACT_BYTES, MAX_ARTIFACT_NAME_LENGTH
+
 from ...autofill import submission_response_schema
 from ..schedules import task_schedule_response_schema
 from .actions import ACTION_ORDER, REPORT_ACTION_DATA_CONTRACTS
@@ -327,6 +329,14 @@ def _report_action_data_properties():
             "type": "string",
             "description": "Markdown for the new document, requested addition, or complete explicit replacement. append_page_document preserves existing text; replace_page_document pins it before replacement. The server prefixes trusted source/time attribution.",
         },
+        "artifact_html": {
+            "type": "string",
+            "description": (
+                f"A self-contained HTML document, up to {MAX_ARTIFACT_BYTES // 1024} KiB in UTF-8. "
+                "Include CSS and JavaScript in style and script elements, using event listeners "
+                "for interactions. Bundle any libraries. The preview blocks network resources."
+            ),
+        },
         "due_date": {"type": "string"},
         "schedule": task_schedule_response_schema(),
         "completed": {"type": "boolean"},
@@ -631,6 +641,9 @@ def _external_report_action_response_schema(
         changes["due_date"] = {"type": ["string", "null"], "format": "date"}
         changes["schedule"] = {"anyOf": [external_task_schedule_response_schema(), {"type": "null"}]}
 
+    if action_type == "create_artifact":
+        data_schema["properties"]["name"].update(minLength=1, maxLength=MAX_ARTIFACT_NAME_LENGTH)
+        data_schema["properties"]["artifact_html"].update(minLength=1, maxLength=MAX_ARTIFACT_BYTES)
     if action_type == "summarize_file":
         terms_schema = data_schema["properties"]["retrieval_terms"]
         terms_schema["uniqueItems"] = True

@@ -146,6 +146,30 @@ It exposes `upload_files` for ChatGPT attachment objects and
 `prepare_file_uploads` / `finalize_file_uploads` for terminal clients. No remote
 argument selects a server filesystem path. All draft/review and permission rules
 above apply to MCP and direct REST access.
+
+### Interactive artifacts
+
+Start a dedicated draft Plan with the user's request as `instructions` and
+`actions=["create_artifact"]`.
+Call MCP `create_artifact` with its `plan_id`, the editable destination
+Page's `hash:…` reference as `page`, a `name`, and the full `html`.
+REST clients use `POST /api/v1/plans/{plan_id}/artifacts` with the same
+fields in the body except for `plan_id`. The receipt links to the usual Plan
+review; connections allowed to execute can use the receipt's fingerprint
+with `execute_plan`. After execution, the resulting File appears under
+the Page's **Files** and the execution result includes its File page link.
+
+For a Plan with other changes, submit an action of type `create_artifact`
+with `data.name`, `data.artifact_html`, and either `data.page` (existing
+Page reference) or `data.page_action` (id of an earlier `create_page`
+action). The HTML may be up to 512 KiB in UTF-8, including data and any
+bundled JS or CSS. The serialized proposal can be up to 750 KiB. The
+sandboxed File preview runs script and
+style elements and blocks external subresources and Fetch/XHR requests. Use
+`addEventListener` for interactions.
+
+### File transfers
+
 Terminal uploads send user-selected bytes directly to existing Google Storage
 resumable sessions, then finalize the exact batch through authenticated MCP.
 Only `prepare_file_uploads` exposes validated storage write URLs, in an explicit

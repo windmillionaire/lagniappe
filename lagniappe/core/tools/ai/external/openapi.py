@@ -441,6 +441,28 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
                 },
             }
         },
+        "/api/v1/plans/{plan_id}/artifacts": {
+            "post": {
+                "operationId": "createArtifact",
+                "summary": "Submit an interactive HTML artifact for attachment to a Page",
+                "description": (
+                    "Use a dedicated draft Plan with instructions and without uploads. Supply the hash reference of "
+                    "an editable Page, a name, and HTML with bundled CSS, JavaScript, and data. "
+                    "The artifact is created in the Page's Files section when the Plan executes. "
+                    "Use submitPlan with a create_artifact action for mixed proposals."
+                ),
+                "tags": ["Plans"],
+                "parameters": [plan_parameter],
+                "requestBody": {"required": True, **json_content(definitions.artifact_request_schema())},
+                "responses": {
+                    "200": {
+                        "description": "Compact receipt for the artifact proposal.",
+                        **json_content({"$ref": "#/components/schemas/SubmissionReceipt"}),
+                    },
+                    "default": error_response,
+                },
+            }
+        },
         "/api/v1/plans/{plan_id}/submit": {
             "post": {
                 "operationId": "submitPlan",

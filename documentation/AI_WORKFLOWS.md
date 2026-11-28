@@ -196,6 +196,14 @@ worksheet, row, cell, time, or prompt-text traversal reaches its fixed ceiling
 after producing useful text, the model receives that prefix with an explicit
 partial-extraction note.
 
+## Interactive HTML artifacts
+
+Ask the built-in Vertex AI planner to create an interactive artifact and
+attach it to an editable Page. The Plan proposes a `create_artifact` action.
+After execution, the artifact appears in the Page's **Files** and opens in
+the sandboxed File preview. HTML, scripts, styles, and data share a 512 KiB
+UTF-8 limit. The serialized proposal can be up to 750 KiB.
+
 ## Reviewed report execution
 
 The cohesive-update preparation service is

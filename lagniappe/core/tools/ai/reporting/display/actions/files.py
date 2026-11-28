@@ -56,6 +56,14 @@ def summary_details(
     details.add("Summary", data.get("summary"))
 
 
+def artifact_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
+    details.reference("Page", data, "page")
+
+
 def file_action_displays() -> tuple[ProposalActionDisplay, ...]:
     return (
         ProposalActionDisplay(
@@ -71,6 +79,7 @@ def file_action_displays() -> tuple[ProposalActionDisplay, ...]:
             attachment_details,
             grouping=ProposalActionGrouping.ATTACHMENT,
         ),
+        ProposalActionDisplay("create_artifact", "Create Interactive Artifact", artifact_details),
         ProposalActionDisplay(
             "summarize_file",
             "Summary",

@@ -7,7 +7,7 @@
 {% import 'badge.html' as badges %}
 {% import 'controls.html' as controls %}
 {% import 'menus.html' as menus %}
-{% set has_preview_tab = file.kind != "ingress" and file.preview %}
+{% set has_preview_tab = file.kind != "ingress" and (file.is_artifact or file.preview) %}
 {% set has_text_tab = file.kind != "ingress" and file.properties.text.markup %}
 {% if file.kind == "ingress" %}
   {% set default_tab = "ingress" %}
@@ -70,7 +70,7 @@
                 aria-label="Preview"
                 title="Preview"
                 class="{{ styles.entity.tabIcon }}">
-          {{ render_icon("document") }}
+          {{ render_icon("html" if file.is_artifact else "document") }}
         </button>
       {% endif %}
       {% if has_text_tab %}

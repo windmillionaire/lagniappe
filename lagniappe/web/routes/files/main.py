@@ -10,13 +10,14 @@ if TYPE_CHECKING:
 
 from dataclasses import dataclass
 
-from flask import request
+from flask import Response, g, request
 
 from lagniappe.core.definitions import AI, Action, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools.ai.reporting.completion import files as report_files
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
+from lagniappe.core.tools.files.constants import MAX_ARTIFACT_BYTES
 from lagniappe.web.auth import (
     authenticated_user,
     abort_public_user_action,
@@ -53,6 +54,24 @@ def download(
         return responses.not_found("File not found")
 
     return responses.file_download(entity)
+
+
+@files.route("/<key>/artifact-preview", methods=["GET"])
+@permission(Resource.FILE, Action.VIEW, no_store=True)
+def artifact_preview(
+    key: str, **kwargs: Unpack[EntityContext[models.File]]
+) -> ResponseReturnValue:
+    file = kwargs["entity"]
+    if not isinstance(file, Entities.FILE) or not file.is_artifact:
+        return responses.not_found("Artifact not found")
+    asset = file.file
+    if asset is None or asset.size is None or not 0 < asset.size <= MAX_ARTIFACT_BYTES:
+        return responses.not_found("Artifact not found")
+    content = asset.get()
+    if not content or len(content) > MAX_ARTIFACT_BYTES:
+        return responses.not_found("Artifact not found")
+    g.artifact_preview = True
+    return Response(content, content_type="text/html; charset=utf-8")
 
 
 @files.route("/<key>/delete", methods=["DELETE"])

@@ -127,11 +127,14 @@ def _finish_reason_name(reason: object) -> str | None:
 def clean_json_references(obj: ModelValue) -> ModelValue:
     """Recursively remove numeric reference citations from JSON strings."""
     if isinstance(obj, dict):
-        return {k: clean_json_references(v) for k, v in obj.items()}
+        return {
+            key: value if key == "artifact_html" else clean_json_references(value)
+            for key, value in obj.items()
+        }
     elif isinstance(obj, list):
         return [clean_json_references(item) for item in obj]
     elif isinstance(obj, str):
-        return REFERENCE_REGEX.sub(r"", obj)
+        return REFERENCE_REGEX.sub(r"", TYPE_REGEX.sub(r"\2", obj))
     return obj
 
 
@@ -219,8 +222,10 @@ class GenAI:
         Returns:
             Parsed JSON object or cleaned text string.
         """
-        response_text = TYPE_REGEX.sub(r"\2", response_text).strip()
         if output_format == "JSON":
+            response_text = response_text.strip()
+            if fenced := TYPE_REGEX.fullmatch(response_text):
+                response_text = fenced[2]
             try:
                 result = json.loads(response_text)
             except json.JSONDecodeError as exc:
@@ -237,7 +242,7 @@ class GenAI:
                 ) from exc
             result = clean_json_references(result)
         else:
-            result = REFERENCE_REGEX.sub(r"", response_text)
+            result = REFERENCE_REGEX.sub(r"", TYPE_REGEX.sub(r"\2", response_text).strip())
         return result
 
     @staticmethod

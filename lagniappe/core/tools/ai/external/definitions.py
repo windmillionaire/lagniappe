@@ -8,6 +8,7 @@ from lagniappe.core.report_contracts import (
     MAX_PROPOSAL_ACTIONS as MAX_PROPOSAL_ACTIONS,
     UPLOAD_BATCH_ID_PATTERN as UPLOAD_BATCH_ID_PATTERN,
 )
+from lagniappe.core.tools.files.constants import MAX_ARTIFACT_BYTES, MAX_ARTIFACT_NAME_LENGTH
 
 
 class ObjectSchema(TypedDict):
@@ -54,6 +55,19 @@ REFERENCE_FIELDS = frozenset(
 
 def _text_bytes(value):
     return len(str(value or "").encode("utf-8"))
+
+
+def artifact_request_schema() -> ObjectSchema:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["page", "name", "html"],
+        "properties": {
+            "page": {"type": "string", "pattern": "^hash:[0-9a-z]{12}$"},
+            "name": {"type": "string", "minLength": 1, "maxLength": MAX_ARTIFACT_NAME_LENGTH},
+            "html": {"type": "string", "minLength": 1, "maxLength": MAX_ARTIFACT_BYTES},
+        },
+    }
 
 
 def actor_schema() -> dict[str, object]:

@@ -3,7 +3,7 @@ from ...contracts.actions import ALLOWED_ACTIONS, DELETE_TARGETS, REPORT_ACTION_
 from ...entity_updates import UPDATE_TARGETS, execute_update_action
 from .base import ReportActionAdapter
 from .entities import _create_form, _create_category, _create_project, _create_model_task, _create_page, _delete_entity, _move_task, _suggest_page_deletion, _skip_action, _needs_review_action
-from .files import _attach_file, _move_file, _summarize_file
+from .files import _attach_file, _create_artifact, _move_file, _summarize_file
 from .forms import _update_form_schema
 from .tasks import _create_task
 from .documents import _append_page_document
@@ -25,6 +25,7 @@ REPORT_ACTION_ADAPTERS = {adapter.action_type: adapter for adapter in (
     ReportActionAdapter("move_file", _move_file),
     ReportActionAdapter("update_form_schema", _update_form_schema, uses_context=True),
     ReportActionAdapter("attach_file", _attach_file, required=True),
+    ReportActionAdapter("create_artifact", _create_artifact, uses_context=True),
     ReportActionAdapter("suggest_page_deletion", _suggest_page_deletion),
     ReportActionAdapter("summarize_file", _summarize_file),
     ReportActionAdapter("skip", _skip_action),

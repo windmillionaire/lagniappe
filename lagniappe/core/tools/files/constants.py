@@ -2,6 +2,11 @@
 
 ENCODINGS = ["utf-8", "utf-8-sig", "cp1252", "utf-16", "ascii", "iso-8859-1"]
 
+ARTIFACT_MIMETYPE = "application/vnd.lagniappe.artifact+html"
+MAX_ARTIFACT_BYTES = 512 * 1024
+MAX_ARTIFACT_PROPOSAL_BYTES = 750 * 1024
+MAX_ARTIFACT_NAME_LENGTH = 160
+
 TEXT_MIMETYPES = {
     "txt": "text/plain",
     "md": "text/markdown",

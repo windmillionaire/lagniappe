@@ -46,11 +46,8 @@ def absolute_entity_links(value: object, *, origin: str) -> object:
 def _replace_internal_references(value, replacements):
     if isinstance(value, dict):
         return {
-            _replace_internal_references(
-                key, replacements
-            ): _replace_internal_references(
-                child,
-                replacements,
+            _replace_internal_references(key, replacements): (
+                child if key == "artifact_html" else _replace_internal_references(child, replacements)
             )
             for key, child in value.items()
         }

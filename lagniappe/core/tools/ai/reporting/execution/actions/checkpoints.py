@@ -180,6 +180,9 @@ def _prepare_action_checkpoint(action, report, user, created, context, record):
                 context.setdefault("prepared_keys", {})[
                     f"{record['idempotency_key']}:history"
                 ] = history_key
+    elif action.get("type") == "create_artifact":
+        # A retry after storage upload must reuse the same File and blob path.
+        output_key = database_utility.create_named_key("file", f"artifact-{record['idempotency_key']}")
     else:
         output_key = _allocate_action_output_key(action, created, context)
     if output_key is not None:

@@ -207,7 +207,7 @@ def render_mcp() -> str:
     schemas = {name: expand(components[name]) for name in names}
     paths = cast(dict[str, dict[str, Any]], api["paths"])
     operations = {op["operationId"]: op for route in paths.values() for op in route.values()}
-    for name in ("createPlan", "submitPlan", "executePlan"):
+    for name in ("createPlan", "submitPlan", "executePlan", "createArtifact"):
         schemas[name] = expand(operations[name]["requestBody"]["content"]["application/json"]["schema"])
     return json.dumps(schemas, indent=2) + "\n"
 

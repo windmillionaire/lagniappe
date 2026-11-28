@@ -22,7 +22,7 @@ from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai.external import definitions
 from lagniappe.core.tools.ai.external.openapi import build_openapi_document
 from lagniappe.core.tools.ai import functions as ai_functions
-from lagniappe.core.tools.ai.references import hash_reference
+from lagniappe.core.tools.ai.references import HASH_REFERENCE_REGEX, hash_reference
 from lagniappe.core.tools.cache.rate_limit import client_ip
 
 from . import api, api_family
@@ -492,6 +492,42 @@ def finalize_uploads(plan_id: str) -> ResponseReturnValue:
         report, g.agent_api_user, data, request_id=g.agent_api_request_id,
     )
     return _plan_payload(finalized)
+
+
+@api.post("/plans/<plan_id>/artifacts")
+@api_route
+def create_artifact(plan_id: str) -> ResponseReturnValue:
+    """Submit one interactive HTML File for attachment by the normal Plan runner."""
+    report = _load_plan(plan_id)
+    external_api.require_draft(report)
+    data = json_body()
+    page = data.get("page")
+    if (
+        set(data) != {"page", "name", "html"}
+        or not isinstance(page, str)
+        or not HASH_REFERENCE_REGEX.fullmatch(page)
+    ):
+        raise APIProblem("invalid_artifact", "Supply an exact Page hash, name, and self-contained HTML.", 422)
+    submitted = external_api.submit_plan_request(
+        report,
+        g.agent_api_user,
+        {
+            "contract_version": external_api.CONTRACT_VERSION,
+            "file_usage": [],
+            "proposal": {
+                "summary": "Attach an interactive HTML artifact to the selected Page.",
+                "confidence": 1,
+                "actions": [{
+                    "id": "artifact",
+                    "type": "create_artifact",
+                    "data": {"page": page, "name": data["name"], "artifact_html": data["html"]},
+                }],
+            },
+        },
+        request_id=g.agent_api_request_id,
+        draft_only=True,
+    )
+    return _submission_receipt(submitted)
 
 
 @api.post("/tools/<tool_name>", defaults={"plan_id": None})
