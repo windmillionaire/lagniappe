@@ -20,7 +20,7 @@
 
 {% macro completed_result(result) %}
   <li class="py-4"
-      {% if result.entity %}lp-entity data-key="{{ result.entity.id }}"{% endif %}>
+      {% if result.entity %}lp-entity data-key="{{ result.entity.id }}" data-fingerprint="{{ result.entity.get('fingerprint', '') }}"{% endif %}>
     <div class="font-semibold text-base">
       {% if result.entity %}
         <div class="flex flex-row justify-between w-full">
