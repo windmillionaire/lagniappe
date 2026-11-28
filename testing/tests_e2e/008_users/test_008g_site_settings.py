@@ -102,7 +102,7 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     _open_help_and_expect(
         owner,
         installation_access.locator("button[lp-help='site_installation_access']"),
-        "The running web application cannot administer human Google Cloud IAM",
+        "the web app itself never administers Google Cloud IAM",
     )
 
     open_site_settings_section(settings_panel, "deployment")

@@ -193,7 +193,7 @@ def _build_term_list(
     if allow_help:
         expanded_terms = [
             f"((@name:{token} | @name:{token}*) | "
-            f"(@keywords:{token} | @keywords:{token}*) | "
+            f"((@keywords:{token} | @keywords:{token}*) => {{ $weight: 0.05; }}) | "
             f"(@desc:{token} | @desc:{token}*) | "
             f"(@doc:{token} | @doc:{token}*) | "
             f"(@values:{token} | @values:{token}*))"

@@ -824,6 +824,8 @@ test("test_entity_index_syncs_table_scroll_overflow_attribute", async (t) => {
 	});
 
 	const view = new EntityIndex(root);
+	const queued = [];
+	const canceled = [];
 	try {
 		view._syncTableScrollOverflow(tableElt);
 		assert.equal(wrapper.dataset.overflowX, "false");
@@ -840,9 +842,29 @@ test("test_entity_index_syncs_table_scroll_overflow_attribute", async (t) => {
 		tableWidth = 800;
 		view._syncTableScrollOverflow(tableElt);
 		assert.equal(wrapper.dataset.overflowX, "false");
+
+		globalThis.requestAnimationFrame = (callback) => {
+			queued.push(callback);
+			return queued.length;
+		};
+		globalThis.cancelAnimationFrame = (id) => {
+			canceled.push(id);
+		};
+		tableWidth = 1120;
+		view._scheduleTableScrollOverflow(tableElt);
+		view._scheduleTableScrollOverflow(tableElt);
+		assert.equal(queued.length, 1);
+		assert.equal(wrapper.dataset.overflowX, "false");
+		queued[0](0);
+		assert.equal(wrapper.dataset.overflowX, "true");
+
+		tableWidth = 800;
+		view._scheduleTableScrollOverflow(tableElt);
+		assert.equal(queued.length, 2);
 	} finally {
 		view.destroy();
 	}
+	assert.deepEqual(canceled, [2]);
 });
 
 test("test_toggle_reopens_mobile_controls_when_dom_target_is_hidden", async (t) => {

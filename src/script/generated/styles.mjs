@@ -108,7 +108,7 @@ const STYLES = {
       "divider": "mx-1 hidden h-6 w-px bg-base-light/50 md:block md:first:hidden md:last:hidden",
       "section": "flex flex-row flex-wrap items-center gap-2",
       "saveStatus": "editor-save-status inline-flex h-8 shrink-0 items-center gap-1 px-1 text-xs font-medium text-base-medium whitespace-nowrap",
-      "tool": "grid size-9 sm:size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm",
+      "tool": "grid size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm",
       "menu": "flex min-h-8 w-fit flex-row items-center gap-1 rounded-md bg-white outline outline-base-light/50 px-2 py-1 text-center text-base font-semibold shadow-sm",
       "optionHeader": "text-lg font-bold pt-2 text-kind-default pb-1",
       "optionPanel": "outline rounded-md px-4 pb-4 flex flex-col bg-white outline-base-light mt-2",

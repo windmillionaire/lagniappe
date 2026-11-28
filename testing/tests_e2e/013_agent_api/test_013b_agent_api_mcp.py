@@ -692,6 +692,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "/api/v1/me": "get",
             "/api/v1/plans": "post",
             "/api/v1/plans/{plan_id}": "get",
+            "/api/v1/plans/{plan_id}/artifacts": "post",
             "/api/v1/plans/{plan_id}/contract": "get",
             "/api/v1/plans/{plan_id}/submit": "post",
             "/api/v1/plans/{plan_id}/execute": "post",

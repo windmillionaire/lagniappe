@@ -243,6 +243,7 @@ def test_home_notes_exclude_notifications(get_admin, get_user):
 
 # @template home/notes.html::add_note_form
 # @template notes.html::note_item
+@pytest.mark.e2e_serial
 def test_create_note_body_and_photo_from_home(get_admin, get_user):
     user = get_admin()
     home = user.go(SitePages.HOME)

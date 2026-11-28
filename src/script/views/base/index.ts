@@ -35,6 +35,7 @@ export default class EntityIndex extends Core {
 	declare _tableLoadingTarget?: HTMLTableSectionElement | null;
 	declare _tableLoadingToken: number;
 	declare _tableScrollObserver?: ResizeObserver | null;
+	declare _tableScrollSyncFrame?: number | null;
 	declare _onTableVisibilityToggle?: () => void;
 
 	constructor(node: ViewRoot) {
@@ -46,6 +47,7 @@ export default class EntityIndex extends Core {
 		this._tableLoadingTarget = null;
 		this._tableLoadingToken = 0;
 		this._tableScrollObserver = null;
+		this._tableScrollSyncFrame = null;
 	}
 
 	async init() {
@@ -144,9 +146,7 @@ export default class EntityIndex extends Core {
 		};
 		this.elt.addEventListener("mobile-resize", this._indexMobileResize);
 		this._onTableVisibilityToggle = () => {
-			requestAnimationFrame(() => {
-				if (!this._destroyed) this._syncTableScrollOverflow(table.elt);
-			});
+			this._scheduleTableScrollOverflow(table.elt);
 		};
 		this.elt.addEventListener(
 			"toggle-column-visibility",
@@ -157,7 +157,7 @@ export default class EntityIndex extends Core {
 				"[data-role='table-scroll']",
 			);
 			this._tableScrollObserver = new ResizeObserver(() => {
-				if (!this._destroyed) this._syncTableScrollOverflow(table.elt);
+				if (!this._destroyed) this._scheduleTableScrollOverflow(table.elt);
 			});
 			if (wrapper) this._tableScrollObserver.observe(wrapper);
 			this._tableScrollObserver.observe(table.elt);
@@ -479,15 +479,25 @@ export default class EntityIndex extends Core {
 		}
 	}
 
+	_scheduleTableScrollOverflow(tableElt: HTMLElement) {
+		if (this._tableScrollSyncFrame != null) return;
+		this._tableScrollSyncFrame = requestAnimationFrame(() => {
+			this._tableScrollSyncFrame = null;
+			if (!this._destroyed) this._syncTableScrollOverflow(tableElt);
+		});
+	}
+
 	_syncTableScrollOverflow(tableElt: HTMLElement) {
 		const wrapper = tableElt.closest<HTMLElement>("[data-role='table-scroll']");
 		if (!wrapper) return;
-		if (this.mobile) {
-			wrapper.dataset.overflowX = "false";
-			return;
+		const next = this.mobile
+			? "false"
+			: tableElt.scrollWidth > wrapper.clientWidth + 1
+				? "true"
+				: "false";
+		if (wrapper.dataset.overflowX !== next) {
+			wrapper.dataset.overflowX = next;
 		}
-		wrapper.dataset.overflowX =
-			tableElt.scrollWidth > wrapper.clientWidth + 1 ? "true" : "false";
 	}
 
 	_scheduleTableLoading(tableElt: HTMLElement) {
@@ -592,6 +602,10 @@ export default class EntityIndex extends Core {
 		}
 		this._tableScrollObserver?.disconnect();
 		this._tableScrollObserver = null;
+		if (this._tableScrollSyncFrame != null) {
+			cancelAnimationFrame(this._tableScrollSyncFrame);
+			this._tableScrollSyncFrame = null;
+		}
 		super.destroy();
 		this._setMobileControlsDropdownOpen(false);
 		this.dropdown?.destroy();

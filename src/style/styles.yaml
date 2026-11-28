@@ -363,7 +363,7 @@ editor:
       hooks: [editor-save-status]
       css: [src/style/editor.css, src/style/icons.css]
     tool:
-      classes: grid size-9 sm:size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm
+      classes: grid size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm
       intent: tool presentation within editor toolbar
       surfaces: [frontend]
     menu:

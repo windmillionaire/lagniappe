@@ -962,7 +962,7 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_admin, get
     expect(
         help_modal.get_by_role("heading", name="Converting and deleting form elements")
     ).to_be_visible()
-    expect(help_modal).to_contain_text("Values that do not fit the destination type are cleared.")
+    expect(help_modal).to_contain_text("values that cannot convert cleanly are cleared")
     help_modal.get_by_role("button", name="Close", exact=True).click()
     expect(help_modal).not_to_be_attached()
     type_select = Select(builder.condition.locator("[data-combobox-id]"))

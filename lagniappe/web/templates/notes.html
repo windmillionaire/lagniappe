@@ -95,7 +95,7 @@
       class="{{ styles.note.item[surface] }}">
     <div class="{{ styles.note.content }}">
       {% if note.body %}<p class="{{ styles.note.body }}">{{ note.body }}</p>{% endif %}
-      {% if photo %}<img src="{{ photo.url }}" class="{{ styles.note.photo[surface] }}" alt="">{% endif %}
+      {% if photo %}<img src="{{ photo.url }}" class="{{ styles.note.photo[surface] }}" alt="" loading="lazy">{% endif %}
       <div class="{{ styles.note.meta }}">
         {% if note.user %}<span class="font-semibold text-note-dark">{{ note.user.name }}</span>{% endif %}
         {% if note.created %}<span>{{ note.created|format_date }}</span>{% endif %}
