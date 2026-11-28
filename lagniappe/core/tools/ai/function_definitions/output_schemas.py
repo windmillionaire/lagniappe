@@ -90,6 +90,23 @@ OUTPUT_SCHEMAS = {
                 },
             },
         )},
+        "catalog": {
+            "type": "array",
+            "items": _object(
+                "id",
+                "title",
+                "category",
+                "url",
+                "summary",
+                properties={
+                    "id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "category": {"type": "string"},
+                    "url": {"type": "string"},
+                    "summary": {"type": "string"},
+                },
+            ),
+        },
     }),
     "preview_form_schema_update": _object(properties={"instances": ENTITY_LIST, "baseline": {"type": "string"}, "scope_fingerprint": {"type": "string"}, "has_more": {"type": "boolean"}, "next_cursor": {"type": ["string", "null"]}}),
     "search_entities": ENTITY_LIST,

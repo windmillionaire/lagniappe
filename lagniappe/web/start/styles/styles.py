@@ -15,7 +15,7 @@ STYLES = {
 	"builder": {
 		"view": "group/builder mx-auto hidden max-w-7xl flex-col gap-6 px-4 sm:px-0 lg:flex",
 		"workspace": "flex flex-row justify-center gap-8",
-		"component": "text-md flex cursor-move flex-row items-center gap-3 rounded-md bg-form-bg px-3 py-1.5 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark",
+		"component": "text-md flex cursor-move flex-row items-center gap-2.5 rounded-md bg-form-bg px-3 py-1 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark",
 		"header": {
 			"model": "flex flex-row items-center justify-between gap-4 pb-4 border-b border-base-light/50 text-base-dark",
 			"controls": "builder-header-controls flex shrink-0 flex-row items-center gap-2.5",
@@ -24,7 +24,7 @@ STYLES = {
 		"save": "builder-save-button inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md text-sm font-semibold transition-colors duration-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2",
 		"panels": {
 			"model": "group/model mb-4 flex min-h-75 flex-col gap-4 rounded-lg p-4 outline-2 outline-form-default outline-dashed",
-			"default": "mb-4 flex flex-col gap-4 rounded-lg p-4 outline-2 outline-form-default",
+			"default": "mb-4 flex flex-col gap-4 rounded-lg px-4 pt-4 pb-5 outline-2 outline-form-default",
 			"preview": "outline-2 p-6 rounded-lg flex flex-col gap-6 w-full outline-form-default bg-form-bg"
 		},
 		"name": "border-b border-dashed focus:outline-none w-80 max-w-full bg-transparent border-base-medium focus:border-form-default",
@@ -36,13 +36,13 @@ STYLES = {
 		"model": "form-element rounded-md bg-base-bg p-2 text-sm data-[selected=true]:outline-2 data-[selected=true]:outline-kind-default",
 		"generate": "flex grow flex-row items-center gap-3 rounded-md bg-kind-bg px-3 py-1.5 text-base font-semibold text-base-dark shadow-sm outline-2 outline-kind-default hover:bg-kind-light hover:outline-kind-dark",
 		"sections": {
-			"side": "basis-1/4 lg:sticky lg:top-20 self-start max-h-[calc(100vh-6rem)] overflow-y-auto group-data-[expanded=true]/builder:hidden",
+			"side": "p-1 basis-1/4 lg:sticky lg:top-20 self-start max-h-[calc(100vh-6rem)] overflow-y-auto group-data-[expanded=true]/builder:hidden",
 			"main": "basis-1/2 justify-self-center group-data-[expanded=true]/builder:basis-2/3"
 		},
 		"settings": {
 			"item": "group flex flex-row items-center justify-between gap-2",
-			"open": "min-w-0 flex-1 cursor-pointer rounded-md bg-white/50 px-2 py-1 text-left sm:text-sm transition-colors duration-100 hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default focus-visible:outline-offset-0",
-			"section": "flex flex-col gap-1 sm:text-sm p-2 rounded-md outline-2 bg-form-bg outline-form-default",
+			"open": "min-w-0 flex-1 cursor-pointer rounded-md border border-form-light bg-white px-2 py-1 text-left shadow-2xs sm:text-sm transition-colors duration-100 hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default focus-visible:outline-offset-0",
+			"section": "flex flex-col gap-1.5 sm:text-sm p-2.5 rounded-md outline-2 bg-form-bg outline-form-default",
 			"title": "sm:text-sm font-semibold flex justify-between items-center text-base-dark",
 			"toggle": {
 				"container": "action-icon-button size-5 transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50",
@@ -129,7 +129,7 @@ STYLES = {
 	"entity": {
 		"cards": "flex flex-row flex-wrap items-start sm:flex-nowrap sm:gap-4 lg:gap-8",
 		"description": "rounded-md px-4 py-3 text-sm whitespace-pre-wrap flex flex-row items-center w-full slide-right bg-kind-bg empty:hidden mt-4",
-		"tabIcon": "relative inline-grid place-items-center text-kind-default hover:text-kind-dark tab-icon outline-none",
+		"tabIcon": "relative inline-grid place-items-center text-kind-default hover:text-kind-dark tab-icon",
 		"name": {
 			"wrapper": "min-w-0",
 			"parent": "inline-block max-w-full overflow-hidden text-ellipsis align-bottom whitespace-nowrap",
@@ -171,7 +171,7 @@ STYLES = {
 			"rowActions": "table-row-actions absolute top-0 right-0 z-20 m-0 flex h-8 w-max flex-row items-center rounded-bl-md border-b border-l border-kind-bg bg-base-bg px-1",
 			"rowActionCell": "sticky right-0 z-20 w-px min-w-px max-w-px p-0 align-top overflow-visible",
 			"rowActionHeader": "w-px min-w-px max-w-px p-0",
-			"actionButton": "inline-flex size-6 items-center justify-center rounded-md leading-none text-kind-default transition-colors duration-100 hover:bg-kind-light/25 hover:text-kind-dark focus-visible:bg-kind-light/35 focus-visible:text-kind-dark focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+			"actionButton": "inline-flex size-6 items-center justify-center rounded-md leading-none text-kind-default transition-colors duration-100 hover:bg-kind-bg hover:text-kind-dark focus-visible:bg-kind-bg focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
 		},
 		"todo": {
 			"container": "max-w-full flex min-w-0 flex-col gap-2",
@@ -206,10 +206,10 @@ STYLES = {
 		"loading": "ml-auto hidden items-center justify-center text-kind-default group-data-[loading=true]/list-toggle:flex",
 		"create": "grid w-fit place-items-center flex-row items-center gap-2 rounded-md bg-white hover:bg-kind-bg px-3 py-1.5 font-semibold text-base-dark shadow-sm outline focus-visible:outline-kind-default hover:outline-kind-default outline-base-light/50 hover:outline-2 focus-visible:outline-2",
 		"component": "flex flex-col gap-4 group",
-		"form": "group/form flex flex-col gap-6 rounded-md bg-kind-bg p-4 outline-2 outline-kind-default",
+		"form": "group/form flex flex-col gap-6 rounded-md bg-kind-bg p-4 border-2 border-kind-light",
 		"generate": "home-generate-button flex w-full min-w-0 flex-row items-center justify-center gap-2 rounded-md bg-white p-2 px-3 font-semibold text-kind-default shadow-sm sm:grow data-[active=true]:bg-kind-light data-[active=true]:text-kind-dark",
-		"reportFilter": "flex min-h-9 flex-1 items-center justify-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-base-medium shadow-sm outline outline-base-light/50 data-[active=true]:bg-kind-light data-[active=true]:text-kind-dark data-[active=true]:outline-kind-default focus-visible:outline-2",
-		"reportList": "rounded-md bg-white outline-2 outline-base-light text-base-dark",
+		"reportFilter": "flex min-h-9 flex-1 items-center justify-center gap-2 rounded-md border border-base-light/50 bg-white px-3 py-1.5 text-sm font-semibold text-base-medium shadow-xs data-[active=true]:border-base-default data-[active=true]:bg-base-bg data-[active=true]:text-base-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-dark cursor-pointer",
+		"reportList": "rounded-md bg-white border border-base-light/60 text-base-dark",
 		"reportClear": "flex w-full items-center gap-2 rounded-t-md border-b border-base-light/50 bg-base-bg px-3 py-2 text-left text-sm font-semibold text-delete-default hover:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default",
 		"ingress": {
 			"details": "flex flex-col gap-1 text-sm px-3 pb-2",
@@ -270,10 +270,10 @@ STYLES = {
 			"iconContext": "index-header-icon-context"
 		},
 		"mobile": {
-			"controls": "rounded-md border border-kind-light/40 bg-kind-bg p-3 text-base flex flex-col font-semibold mt-4",
+			"controls": "rounded-md border border-kind-light bg-kind-bg p-3 text-base flex flex-col font-semibold mt-4",
 			"header": "flex flex-row items-center justify-between gap-3 border-b border-base-light/40 pb-2 mb-0.5 text-xs font-semibold uppercase tracking-wide text-base-medium",
 			"row": "flex flex-row items-center justify-between gap-3 py-1.5 group/form",
-			"status": "inline-flex items-center rounded-full border border-kind-light/70 bg-white/90 px-2 py-0.5 text-xs font-medium text-kind-dark",
+			"status": "inline-flex items-center rounded-full border border-kind-light bg-white/90 px-2 py-0.5 text-xs font-medium text-kind-dark",
 			"unchecked": "text-base-medium invisible group-data-[active=false]/toggle:visible"
 		},
 		"tools": {
@@ -304,7 +304,7 @@ STYLES = {
 		"main": "min-h-full pt-16 pb-16 text-slate-900 px-0 sm:px-6 lg:px-8 max-w-7xl mx-auto",
 		"nav": {
 			"mobile": "group/nav flex flex-row items-center justify-between gap-4 border-y border-base-light/50 bg-base-bg pr-4 py-1 text-lg",
-			"flipper": "inline-grid min-w-9 min-h-9 place-items-center focus:outline-none text-kind-default sm:hidden text-lg",
+			"flipper": "inline-grid min-w-9 min-h-9 place-items-center text-kind-default sm:hidden text-lg",
 			"group": "flex flex-row items-center",
 			"header": "min-h-8 gap-2 flex min-w-0 flex-1 flex-row items-center justify-start",
 			"title": "layout-nav-title gap-2 flex w-full flex-row items-center justify-between pl-4 py-3 sm:px-6 sm:py-5 text-lg font-semibold",
@@ -316,7 +316,7 @@ STYLES = {
 	"link": {
 		"default": "focus-visible:outline-none focus-visible:underline link-default",
 		"emphasized": "focus-visible:outline-none focus-visible:underline link-default font-semibold",
-		"title": "font-semibold focus-visible:outline-none focus-visible:underline link-title",
+		"title": "font-semibold focus-visible:underline link-title",
 		"alternate": "text-sm"
 	},
 	"list": {
@@ -362,10 +362,13 @@ STYLES = {
 	},
 	"manual": {
 		"button": "flex grow flex-row items-center justify-center gap-2 rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm",
-		"codeShell": "bg-base-dark rounded-lg my-2 w-full min-w-0 max-w-full overflow-hidden",
+		"codeShell": "bg-base-dark rounded-lg my-3.5 w-full min-w-0 max-w-full overflow-hidden",
+		"codeSingle": "flex items-center justify-between gap-2 px-3 py-2",
+		"codeInline": "text-project-light font-mono text-sm min-w-0 flex-1 overflow-x-auto whitespace-pre py-1",
 		"codeToolbar": "flex justify-end px-2 pt-2",
 		"copyButton": "min-h-9 min-w-9 rounded-md border border-base-light/50 px-2 py-1 text-xs font-semibold text-white hover:bg-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:min-h-0 sm:min-w-0",
 		"code": "text-project-light px-4 pb-4 pt-2 font-mono text-sm block w-full min-w-0 max-w-full overflow-x-auto whitespace-pre",
+		"mobilePanel": "p-1 scroll-py-1 scrollbar-thin scrollbar-thumb-base-light scrollbar-track-transparent absolute z-50 hidden max-h-[min(30rem,68vh)] min-w-64 overflow-y-auto rounded-md bg-white shadow-lg outline outline-base-light/50",
 		"content": "sm:rounded-lg sm:shadow-sm w-full sm:border bg-white sm:border-base-light/50 sm:p-6",
 		"heading": "flex items-center gap-3 text-2xl font-semibold text-base-dark mb-4",
 		"conceptTitle": "flex items-center gap-2.5 text-lg font-semibold mb-2",
@@ -390,15 +393,17 @@ STYLES = {
 		}
 	},
 	"modal": {
-		"wrapper": "fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-100",
-		"content": "bg-white rounded-lg shadow-xl max-w-4xl mx-4 max-h-[90vh] overflow-y-auto relative",
-		"header": "sticky top-0 z-50 bg-white border-b px-6 py-4 flex justify-between items-center",
+		"wrapper": "fixed inset-0 p-4 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-100",
+		"content": "bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] overflow-y-auto relative",
+		"header": "sticky top-0 z-50 bg-white border-b border-base-light/50 px-6 py-4 flex justify-between items-center",
+		"dialog": "bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden relative",
+		"dialogHeader": "shrink-0 bg-white border-b border-base-light/50 px-4 py-3.5 sm:px-6 sm:py-4 flex justify-between items-center gap-3",
+		"dialogBody": "min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6",
 		"actions": "flex flex-row gap-3"
 	},
 	"nav": {
 		"button": "action-icon-button min-w-9 min-h-9 sm:min-w-0 sm:min-h-0 transition-colors duration-100",
 		"mobileButton": "action-icon-button min-w-9 min-h-9 transition-colors duration-100 mobile",
-		"desktopButton": "action-icon-button transition-colors duration-100 desktop",
 		"bar": {
 			"wrapper": "fixed top-0 z-50 w-full bg-page-default",
 			"contents": "mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between w-full"
@@ -427,7 +432,7 @@ STYLES = {
 		},
 		"label": "flex items-center gap-2 font-semibold sm:text-sm text-base-dark"
 	},
-	"section": "outline outline-base-light rounded-md px-4 pb-4 bg-white w-full",
+	"section": "border border-kind-light rounded-md p-4 bg-white w-full",
 	"search": {
 		"allFacet": "search-all-facet font-semibold px-3 py-2 flex items-center rounded-md gap-1.5 border text-base-dark bg-white border-base-light/50 cursor-pointer",
 		"facetCount": "rounded-full bg-base-bg px-1.5 py-0.5 text-xs font-semibold tabular-nums text-base-medium",
@@ -456,16 +461,16 @@ STYLES = {
 	"table": {
 		"container": "min-w-0 overflow-hidden max-w-full rounded-md border border-kind-default bg-white",
 		"scrollWrapper": "table-scroll-wrapper w-full",
-		"default": "w-full table-auto border-collapse divide-y sm:text-sm mt-4",
-		"card": "w-full table-auto border-collapse divide-y sm:text-sm",
+		"default": "w-full table-auto border-collapse divide-y divide-base-light/60 sm:text-sm mt-4",
+		"card": "w-full table-auto border-collapse divide-y divide-base-light/60 sm:text-sm",
 		"cardWrap": "w-full min-w-0 sm:px-2 sm:pb-2",
 		"cardFrame": "min-w-0 overflow-x-auto max-w-full sm:rounded-md sm:border sm:border-kind-default sm:bg-white sm:px-2",
-		"embedded": "w-full table-auto border-collapse divide-y sm:text-sm min-w-max bg-white",
+		"embedded": "w-full table-auto border-collapse divide-y divide-base-light/60 sm:text-sm min-w-max bg-white",
 		"body": "sm:divide-y w-full sm:divide-base-light/50",
 		"thead": {
 			"default": "sticky top-16 z-30 bg-white",
 			"embedded": "bg-white",
-			"th": "group/header max-w-48 gap-2 truncate py-2.5 px-3 text-left font-medium data-[active=false]:border-b-2",
+			"th": "group/header max-w-48 gap-2 truncate py-2.5 px-3 text-left font-medium data-[active=false]:border-b data-[active=false]:border-base-light/70",
 			"actionCell": "sticky right-0 z-20 w-px min-w-px max-w-px p-0 align-top overflow-visible",
 			"actions": "absolute top-1/2 right-0 z-20 m-0 grid -translate-y-1/2 place-items-center",
 			"actionButton": "grid size-7 place-items-center rounded-md bg-white text-kind-default outline-offset-0 transition-colors duration-100 hover:text-kind-dark hover:outline-2 hover:outline-kind-default focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-kind-default",
@@ -475,7 +480,7 @@ STYLES = {
 			"default": "max-w-48 py-3.5 px-3 text-left font-medium",
 			"action": "w-px px-3 py-2.5 text-right text-lg font-medium whitespace-nowrap",
 			"compact": {
-				"th": "group/header w-36 min-w-32 max-w-44 py-2.5 px-3 text-left font-medium leading-snug whitespace-nowrap data-[active=false]:border-b-2",
+				"th": "group/header w-36 min-w-32 max-w-44 py-2.5 px-3 text-left font-medium leading-snug whitespace-nowrap data-[active=false]:border-b data-[active=false]:border-base-light/70",
 				"default": "w-36 min-w-32 max-w-44 py-3.5 px-3 text-left font-medium whitespace-nowrap"
 			}
 		},
@@ -483,7 +488,7 @@ STYLES = {
 			"title": "font-semibold align-middle group-data-[sorting=true]/header:text-kind-dark",
 			"bar": "p-3 border-t border-base-light/50 bg-kind-bg",
 			"barLabel": "text-xs font-semibold uppercase tracking-wide text-base-medium",
-			"panel": "mt-0.5 mb-2 flex flex-col gap-2 rounded-md border border-kind-light/45 bg-white/90 p-2.5 shadow-xs",
+			"panel": "mt-0.5 mb-2 flex flex-col gap-2 rounded-md border border-kind-light bg-white/90 p-2.5 shadow-xs",
 			"option": "table-sort-option inline-flex cursor-pointer items-center gap-2 rounded-md border border-base-light/60 bg-white px-3 py-1.5 text-sm font-medium text-base-dark transition-colors",
 			"icon": {
 				"container": "ml-1.5 inline-grid align-middle text-slate-400",
@@ -491,7 +496,7 @@ STYLES = {
 				"inactive": "[grid-area:1/1] invisible text-kind-default group-data-[sorting=true]/header:visible hover:text-delete-default"
 			}
 		},
-		"editStatus": "table-edit-status hidden sm:inline-flex h-7 items-center rounded-md px-2.5 text-xs font-semibold text-project-dark whitespace-nowrap",
+		"editStatus": "table-edit-status hidden sm:inline-flex items-center text-xs font-semibold text-project-dark whitespace-nowrap",
 		"loading": {
 			"cell": "py-4 text-center text-sm italic text-base-medium"
 		}
@@ -510,7 +515,7 @@ STYLES = {
 		},
 		"chip": {
 			"editable": "lp-badge task-chip-editable ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-white py-1 pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
-			"form": "lp-badge task-chip-form ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-kind-bg/70 py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
+			"form": "lp-badge task-chip-form ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-kind-bg py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
 			"add": "task-chip-add inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-kind-light bg-base-bg/60 py-[3px] pl-2 pr-2.5 text-sm/6 font-medium whitespace-nowrap text-kind-default opacity-75 transition-all hover:border-solid hover:bg-kind-bg hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
 			"drawer": "mx-4 mb-4 pt-3.5 border-t border-base-light/50 flex flex-col gap-3 sm:mx-6"
 		},
@@ -548,14 +553,14 @@ STYLES = {
 	},
 	"upload": {
 		"options": "outline rounded-md px-4 pb-4 flex flex-col gap-4 bg-white outline-base-light",
-		"processing": "pt-4 border-t flex flex-col gap-2 bg-white",
-		"context": "pt-4 border-t flex flex-col gap-2 outline-base-light bg-white",
+		"processing": "pt-4 border-t border-base-light/50 flex flex-col gap-2 bg-white",
+		"context": "pt-4 border-t border-base-light/50 flex flex-col gap-2 outline-base-light bg-white",
 		"contextRow": "flex flex-col sm:flex-row gap-3",
 		"header": "text-lg font-bold pt-2 pb-1 text-kind-default",
-		"dropzone": "relative flex min-h-24 w-full cursor-pointer select-none flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic transition-colors hover:border-kind-default/70 hover:bg-kind-bg/30",
+		"dropzone": "relative flex min-h-24 w-full cursor-pointer select-none flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic transition-colors hover:border-kind-default hover:bg-kind-bg",
 		"chip": "not-italic inline-flex cursor-pointer items-center gap-1 rounded-md border border-base-light/60 bg-white/90 px-2.5 py-1 text-xs font-semibold text-base-default shadow-xs backdrop-blur-xs transition-colors hover:border-kind-default hover:bg-kind-bg hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default",
 		"image": {
-			"container": "relative aspect-square cursor-pointer select-none rounded-lg p-4 outline-2 outline-base-light outline-dashed transition-colors hover:outline-kind-default hover:bg-kind-bg/30",
+			"container": "relative aspect-square cursor-pointer select-none rounded-lg p-4 outline-2 outline-base-light outline-dashed transition-colors hover:outline-kind-default hover:bg-kind-bg",
 			"text": "absolute top-0 right-0 w-full h-full flex flex-col items-center justify-center",
 			"icon": "text-4xl mb-4 text-kind-default text-center"
 		}
@@ -570,7 +575,7 @@ STYLES = {
 			"input": "form-input block w-full resize-none overflow-hidden rounded-md px-4 py-3 text-sm disabled:opacity-60",
 			"actions": "flex flex-row items-center justify-between gap-2",
 			"buttons": "ml-auto flex flex-row items-center gap-1.5",
-			"remove": "cursor-pointer text-xs font-medium text-base-medium transition-colors hover:text-delete-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default disabled:pointer-events-none disabled:opacity-50",
+			"remove": "cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-base-medium transition-colors hover:bg-base-bg hover:text-delete-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default disabled:pointer-events-none disabled:opacity-50",
 			"cancel": "cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-base-dark transition-colors hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50",
 			"save": "inline-flex cursor-pointer items-center justify-center rounded bg-kind-default px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
 		},

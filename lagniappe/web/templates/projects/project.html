@@ -11,8 +11,7 @@
   <nav class="{{ styles.layout.view.title }}" data-nav="view">
     <div>
       <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
-        <span data-role="title">{{- project.name -}}</span>
-        {% call menus.title("Project actions") %}
+        <span data-role="title">{{- project.name -}}</span>{%- call menus.title("Project actions") -%}
           {% if can_edit_project %}
             {{ menus.project_action("Rename", "edit", "rename", "project") }}
             {{ menus.project_action("Edit description" if project.description else "Add description", "textarea", "description", "project", "description-action-label") }}
@@ -74,6 +73,7 @@
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
       <button type="button"
               data-role="flipper"
+              aria-expanded="false"
               aria-label="Toggle tabs"
               title="Toggle tabs"
               class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
@@ -92,7 +92,7 @@
        data-tab="true"
        data-default="ModelTaskList"
        data-kind="model-task"
-       class="{{ styles.card.secondary }} sm:group-data-[tasks-expanded=true]/view:hidden">
+       class="{{ styles.card.secondary }} max-sm:mx-3 max-sm:my-3 max-sm:rounded-lg max-sm:border max-sm:border-base-light/50 max-sm:overflow-hidden sm:group-data-[tasks-expanded=true]/view:hidden">
     <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="model-tasks">
       <div data-role="header" class="{{ styles.layout.nav.header }}">
         <span class="text-default-dark" data-role="title">Model Tasks</span>

@@ -58,6 +58,7 @@ export class CreateForm extends FormWidget {
 			this,
 			{
 				id: "form-type",
+				label: "Form Type",
 				required: true,
 				layout: "row",
 				options: [

@@ -1,9 +1,10 @@
-{% from "manual/macros.html" import heading, subheading, card, callout, code, step, link, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, subheading, card, callout, code, step, link, nav_buttons %}
 <div class="space-y-6">
+  {{ chapter_header("Personalization", icon="personalization", kind="project") }}
   {% call card() %}
     <p class="text-base-medium">
-      After installation, most personalization happens from the Administrator
-      <strong>Admin</strong> page in <strong>Settings</strong>: site images,
+      After installation, most personalization happens under
+      <strong>Navigation &rarr; Admin &rarr; Site Settings</strong>: site images,
       public-page discovery, deployment preferences, AI models, and
       links out to the service-provider dashboards. A custom domain still uses
       the setup script because it has to coordinate App Engine, DNS, and auth
@@ -13,7 +14,8 @@
   {{ heading("Your Preferences", icon="user", kind="user") }}
   {% call card() %}
     <p class="text-base-medium">
-      Open <strong>My Page / User Settings</strong> for your account preferences.
+      Open <strong>Navigation &rarr; Account Settings</strong> (your personal
+      <strong>My Page &rarr; Settings</strong> tab) for your account preferences.
       Managed users can turn notification email off, receive it after five
       minutes, or choose a daily digest at 8:00 AM in their timezone. In-app
       notifications remain available whichever email option you choose.

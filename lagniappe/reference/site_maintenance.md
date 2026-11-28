@@ -1,26 +1,31 @@
 ---
 title: Maintenance
+category: site_administration
+keywords:
+  - maintenance
+  - apply updates
+  - refresh cache
+  - rebuild search index
+  - site updates are current
+  - cache refreshed
 related:
-- site_configuration
-- site_deployment
-- search
+  - site_configuration
+  - site_deployment
+  - search
+  - backups_archives
 ---
-Maintenance applies site updates and rebuilds the cache. Each action shows its progress and results in the Maintenance panel.
+Apply required application data migrations and rebuild derived search cache from stored records under **Admin → Site Settings → Maintenance**.
 
-## Apply Updates
+Every action displays live status and detailed results directly in the Maintenance panel.
 
-**Apply Updates** runs the data updates required by the installed version. The button shows **Applying Site Updates** while they run. The panel shows **Site updates are current** when they finish. **Refresh Cache** stays disabled until these updates are complete.
+## Applying site updates
 
-If the panel shows **Site updates need attention**, the list below identifies the failed update and its error. It also includes links to affected records when available. **Apply Updates** retries the failed update.
+- **Apply Updates** runs data migrations needed for the installed code version (the button reads **Applying Site Updates** while active, then reports **Site updates are current**).
+- **Refresh Cache** stays disabled until pending site updates finish.
+- If **Site updates need attention** appears, inspect the listed failure details and direct links to affected records, fix the underlying issue if needed, and run **Apply Updates** again to retry.
 
-## Refresh Cache
+## Refreshing cache
 
-**Refresh Cache** rebuilds derived server data from stored records and packaged help. Use it when an upgrade or lost Redis state requires reconstruction, rather than as routine housekeeping.
-
-The button shows **Refreshing Cache** while the rebuild runs, then **Cache Refreshed**. Searches and lists may be incomplete during the rebuild. If the panel says **Cache refreshed with errors**, it lists the skipped records and their errors below the record count.
-
-Help articles update automatically when a new application version changes them or the cache needs rebuilding.
-
-## Configuration
-
-The Owner can open Configuration for a redacted preview and download the complete recovery settings. That download contains secrets. Store it privately and use it only for the intended setup, recovery, or migration workflow.
+- **Refresh Cache** reconstructs derived server cache and packaged Help search entries from stored records—use it after an upgrade or Redis state loss rather than as routine maintenance.
+- While running, the button shows **Refreshing Cache** and finishes with **Cache Refreshed** (searches and filtered tables may temporarily return partial results while rebuilding). If **Cache refreshed with errors** appears, review the skipped records and errors listed beneath the count.
+- Packaged help articles update automatically whenever a new version changes them or the cache rebuilds. The Owner can also inspect redacted settings or download recovery configuration from [Configuration and Recovery Settings](/help/site_configuration).

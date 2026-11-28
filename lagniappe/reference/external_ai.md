@@ -1,22 +1,35 @@
 ---
 title: External AI Connections
+category: ai_and_automation
+keywords:
+  - external ai
+  - mcp
+  - rest api
+  - client skill
+  - claude
+  - chatgpt
+  - oauth
+  - manage ai connections
+  - external agent api
+  - automatic plan execution
+  - answer question
 related:
-- ai_tools
-- permissions
-- user_settings
+  - ai_tools
+  - permissions
+  - user_settings
+  - account_security
 ---
-External AI connections let a compatible assistant search your Lagniappe workspace and prepare reviewed proposals using your own AI client. The installation must enable external access, and you need a managed, non-public account.
+Connect compatible external AI assistants via MCP or the REST API to search your workspace, answer questions, and draft reviewable plans within your permissions.
 
-## Connect an assistant
+The installation must enable external AI access, and you must sign in with a managed, non-public account. When enabled for your account, your server's **Connection name**, **MCP server**, and **Skill URL** appear automatically below this article.
 
-For **MCP**, add the installation's MCP server URL to your client and follow the Lagniappe sign-in prompt. The **AI connections** screen shows the account's email address. Choose **Allow** to connect that account, or **Cancel** if it is the wrong one. A local Lagniappe package is not required.
+## Connecting an assistant
 
-For an HTTP-capable assistant, create a key under **My Page / User Settings / External agent API**. The installation's client skill is available at `/api/v1/client-skill.md` using that key. Store credentials in the client's secret settings, rather than in shared prompts or files.
+- **Remote MCP**: Add this site's MCP server URL to your assistant and follow the sign-in prompt. On the **Manage AI connections** screen (**Navigation → Account Settings** / **My Page → Settings**), verify the displayed account email and choose **Allow** (or **Cancel** if it is the wrong account). No local package installation is required.
+- **REST API clients**: Generate a personal token under **External agent API** in **Account Settings** and point HTTP-capable tools to `/api/v1/client-skill.md`. Always store tokens in secret configuration rather than shared prompts or repository files.
 
-Connection addresses appear below this help when your account can use them. The manual's AI chapter has setup steps for individual clients. **AI connections** shows your signed-in email and which clients are connected.
+## Answering questions vs. running Plans
 
-## Questions and proposals
-
-Ordinary questions can be answered directly without creating a saved Plan. A Plan is needed when you request a saved answer or proposed workspace changes. By default, review and execute those changes in Lagniappe; when an Administrator enables automatic plan execution and you opt in under **My Page / User Settings**, safe plans can run automatically while form schema changes, deletes, review items, and flagged issues still pause for browser review.
-
-External access is independent of your None/Ask/Create tier for the installation's configured provider. Record permissions still apply. Revoke keys or AI connections through their account controls when a client no longer needs access.
+- Ordinary questions and task lookups run directly through read-only tools without creating a saved Plan.
+- Requests for saved answers or workspace updates start a Plan. By default, review and execute proposals in Lagniappe; when both the site and your **Automatic plan execution** user setting allow it, safe plans can run automatically while form schema updates, deletes, review items, and flagged issues still pause for browser review.
+- External AI access works independently of your site **None / Ask / Create** provider tier because external clients use their own AI provider, while workspace permissions remain strictly enforced. Revoke keys or OAuth connections in **Account Settings** anytime.

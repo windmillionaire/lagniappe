@@ -1,5 +1,6 @@
-{% from "manual/macros.html" import heading, subheading, card, callout, concept, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, subheading, card, callout, concept, nav_buttons %}
 <div class="space-y-6">
+  {{ chapter_header("Forms", icon="form", kind="form") }}
   {% call card() %}
     <p class="text-base-medium text-lg leading-relaxed mb-3">
       Forms are the schema layer in Lagniappe. They define what fields a page or
@@ -43,10 +44,13 @@
   {{ heading("Building Forms") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
-      Forms can be built by hand in the form builder or generated from a
-      description with AI. AI is great for getting a first draft on the page;
-      it is worth a quick pass over field types, labels, required fields, and
-      permissions before using the form for important data.
+      Forms can be built by hand in the desktop form builder or generated from a
+      description via <strong>Form settings → Generate</strong> when AI is available.
+      You can rename a form inline, step through changes with <strong>Undo</strong>
+      and <strong>Redo</strong>, test rules safely with <strong>Preview</strong>, and
+      follow the <strong>Saved</strong> / <strong>Save</strong> indicator in the builder header.
+      AI is great for getting a first draft on the page; it is worth a quick pass over
+      field types, labels, required fields, and permissions before using the form for important data.
     </p>
     {% call callout("tip", False) %}
       A reused form affects every page or task attached to it. Renaming a

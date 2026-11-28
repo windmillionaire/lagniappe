@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 import json
+from pathlib import Path
 import re
 from types import SimpleNamespace
 
@@ -35,10 +36,13 @@ def test_topics_are_canonical_and_portable():
     assert 'form_creation' not in corpus
     assert {'navigation', 'search', 'filters', 'documents', 'offline',
             'messages_notifications', 'task_scheduling', 'task_history',
-            'ai_email', 'external_ai'} <= corpus.keys()
+            'ai_email', 'external_ai', 'account_security', 'analytics',
+            'backups_archives', 'notes', 'tables'} <= corpus.keys()
     for topic in corpus.values():
         assert topic.id not in topic.related
         assert all(related in corpus for related in topic.related)
+        assert topic.category in reference.VALID_HELP_CATEGORIES
+        assert topic.keywords and all(kw.strip() for kw in topic.keywords)
         assert topic.summary and '\n' not in topic.summary
         assert not re.search(r'<[^>]+>', topic.text)
         assert '{{' not in topic.markdown
@@ -46,6 +50,22 @@ def test_topics_are_canonical_and_portable():
         assert json.loads(json.dumps(topic.as_dict()))['markdown'] == topic.markdown
         assert 'aliases' not in topic.as_dict()
     assert reference.get_topic('create_form') is corpus['create_form']
+    catalog = reference.topic_catalog()
+    assert {entry['id'] for entry in catalog} == set(corpus)
+    assert all(entry['category'] in reference.VALID_HELP_CATEGORIES for entry in catalog)
+    grouped_ids = {topic.id for _, _, _, items in reference.grouped_topics() for topic in items}
+    assert grouped_ids == set(corpus)
+    template_root = Path(reference.TOPIC_DIRECTORY).parent / 'web' / 'templates'
+    help_attr = re.compile(r'(?:data-help|lp-help)="([^"]+)"')
+    macro_help = re.compile(r'controls\.help\(\s*["\']([a-z0-9_]+)["\']')
+    for template in template_root.rglob('*.html'):
+        source = template.read_text(encoding='utf-8')
+        for match in help_attr.findall(source):
+            if match.startswith('{{'):
+                continue
+            assert match in corpus, f'Broken help trigger {match!r} in {template}'
+        for match in macro_help.findall(source):
+            assert match in corpus, f'Broken controls.help({match!r}) in {template}'
 
 
 def test_help_version_changes_with_source_without_rendering(monkeypatch):
@@ -68,6 +88,8 @@ def test_help_version_changes_with_source_without_rendering(monkeypatch):
     b'---\ntitle: One\naliases: [two]\n---\nSummary.',
     b'---\ntitle: One\nrelated: [absent]\n---\nSummary.',
     b'---\ntitle: One\nrelated: [one]\n---\nSummary.',
+    b'---\ntitle: One\ncategory: nonexistent\n---\nSummary.',
+    b'---\ntitle: One\nkeywords: [dup, dup]\n---\nSummary.',
     b'---\ntitle: One\nmanual_section: absent\n---\nSummary.',
     b'---\ntitle: One\n---\n# Heading first',
     b'---\ntitle: One\n---\n{{ CONFIG.SECRET }}',
@@ -169,7 +191,11 @@ class MemoryRedis:
         if not self.exists:
             raise ResponseError('unknown index name')
         definition = [b'prefixes', [HELP_PREFIX.encode()] if self.upgraded else [b'page:']]
-        attributes = [[b'attribute', b'help_version', b'type', b'TAG']] if self.upgraded else []
+        attributes = (
+            [[b'attribute', b'help_version', b'type', b'TAG'], [b'attribute', b'keywords', b'type', b'TEXT']]
+            if self.upgraded
+            else [[b'attribute', b'help_version', b'type', b'TAG']]
+        )
         if self.metadata_maps:
             definition = dict(zip(definition[::2], definition[1::2], strict=True))
             attributes = [dict(zip(row[::2], row[1::2], strict=True)) for row in attributes]
@@ -183,6 +209,7 @@ class MemoryRedis:
     def create_index(self, schema, definition=None):
         assert HELP_PREFIX in definition.args
         assert any(field.name == 'help_version' for field in schema)
+        assert any(field.name == 'keywords' for field in schema)
         self.events.append(('create',))
         self.exists = True
         self.upgraded = True
@@ -240,6 +267,7 @@ def test_population_is_versioned_atomic_and_skips_warm_start(memory_cache, monke
     assert row['topic_id'] == 'create_form' and row['kind'] == 'help'
     assert row['search_score'] == .60
     assert row['desc'] == reference.get_topic('create_form').summary
+    assert row['keywords'] == ' '.join(reference.get_topic('create_form').keywords)
     assert not {'details_key', 'hash', 'parent_key', 'requires'} & row.keys()
     assert memory_cache.events[-2] == ('ready', Keys.HELP_READY.value.format(version))
     before = list(memory_cache.events)
@@ -328,26 +356,55 @@ def test_help_tool_is_bounded_source_backed_and_shared(monkeypatch):
     from lagniappe.core.tools.ai.observability import KNOWN_TOOL_NAMES
     user = SimpleNamespace(is_authenticated=False)
     calls = []
-    monkeypatch.setattr(get_help.cache, 'search', lambda *a, **kw: calls.append((a, kw)) or ([{'id': 'task_history'}], 1))
+    monkeypatch.setattr(get_help.cache, 'help_search', lambda value, **kw: calls.append((value, kw)) or ([{'id': 'task_history'}], 1))
     direct, parts = functions.execute_registered_tool('get_help', {'topic_id': 'task_history'}, user, external=True)
     assert not calls and not parts
     assert direct['topics'][0]['markdown'] == reference.get_topic('task_history').markdown
     found, _ = functions.execute_registered_tool('get_help', {'query': 'task history'}, user)
     assert found == direct
-    assert calls[0][0][1] == []
-    assert calls[0][1] == {'kinds': ['help'], 'limit': 3, 'include_help': True}
+    assert calls == [('task history', {'limit': 3})]
+    listed, _ = functions.execute_registered_tool('get_help', {'list_topics': True}, user, external=True)
+    assert listed['topics'] == []
+    assert {item['id'] for item in listed['catalog']} == set(reference.topics())
     catalog = functions.tool_catalog(names=['get_help'], transport='rest')[0]
     assert catalog['result_paths']['primary_collection'] == '$.topics'
     assert catalog['output_schema']['properties']['topics']['maxItems'] == 3
+    assert 'catalog' in catalog['output_schema']['properties']
     assert 'get_help' in READ_ONLY_CONTEXT_TOOLS and 'get_help' in KNOWN_TOOL_NAMES
 
 
 def test_help_tool_rejects_invalid_requests_and_reports_search_failure(monkeypatch):
     from lagniappe.core.tools.ai.function_definitions import get_help
-    for args in ({}, {'topic_id': 'form_creation'}, {'topic_id': 'tasks', 'query': 'tasks'}, {'query': []}, {'query': ' '}, {'query': 'x' * 501}, {'query': 'email', 'aliases': ['mail']}):
+    for args in (
+        {},
+        {'topic_id': 'form_creation'},
+        {'topic_id': 'tasks', 'query': 'tasks'},
+        {'list_topics': False},
+        {'list_topics': True, 'query': 'tasks'},
+        {'query': []},
+        {'query': ' '},
+        {'query': 'x' * 501},
+        {'query': 'email', 'aliases': ['mail']},
+    ):
         assert 'error' in get_help.execute_get_help(args, None)
     def unavailable(*_a, **_kw):
         raise ConnectionError('offline')
-    monkeypatch.setattr(get_help.cache, 'search', unavailable)
+    monkeypatch.setattr(get_help.cache, 'help_search', unavailable)
     assert 'temporarily unavailable' in get_help.execute_get_help({'query': 'email'}, None)['error']
     assert get_help.execute_get_help({'topic_id': 'ai_email'}, None)['topics']
+
+
+def test_help_search_strips_conversational_stopwords_and_relaxes_to_or(monkeypatch):
+    captured = []
+    monkeypatch.setattr(query, 'ensure_help', lambda: 'version')
+    monkeypatch.setattr(query.cache, 'search', lambda q: captured.append(q._query_string) or SimpleNamespace(docs=[], total=0))
+    assert query.help_search('the and !', limit=3) == ([], 0)
+    assert captured == []
+
+    assert query.help_search('how do I undo a completed task?', limit=3) == ([], 0)
+    assert len(captured) == 2
+    strict_sql, relaxed_sql = captured
+    assert '(@keywords:undo | @keywords:undo*)' in strict_sql
+    assert '@name:how' not in strict_sql and '@name:do' not in strict_sql
+    assert ' | ((@name:task | @name:task*)' in relaxed_sql
+    assert '((@kind:{ help } @help_version:{ version })) => { $weight: 0; }' in relaxed_sql

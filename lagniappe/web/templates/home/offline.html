@@ -1,8 +1,17 @@
 {% extends "layouts/stripped.html" %}
 
+{% block title %}
+  Page Not Available
+{% endblock title %}
+
 {% block content %}
-  <div class="text-center py-40">
-    <h1 class="text-2xl font-bold text-base-dark pb-4">Page Not Available</h1>
-    <p class="text-base-default">This page hasn't been cached yet. Connect to the network and try again.</p>
+  <div class="max-w-2xl mx-4 sm:mx-auto my-12 sm:my-24 rounded-lg border border-base-light/50 bg-white px-6 py-10 sm:p-12 text-center shadow-xs">
+    <h1 class="text-2xl font-bold text-base-dark pb-3">Page Not Available</h1>
+    <p class="text-base-medium leading-relaxed">This page hasn't been cached yet. Connect to the network and try again.</p>
+    <div class="mt-6">
+      <a data-kind="page"
+         class="action-button inline-flex min-h-9 items-center rounded-md bg-page-default px-4 py-1.5 text-sm font-semibold text-white hover:bg-page-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default"
+         href="{{ url_for('home.home_page') }}">Go to Home</a>
+    </div>
   </div>
 {% endblock content %}

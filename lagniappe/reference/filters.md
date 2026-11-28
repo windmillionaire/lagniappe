@@ -1,24 +1,33 @@
 ---
 title: Category and Project Filters
+category: pages_and_forms
+keywords:
+  - filters
+  - filter bar
+  - save filter
+  - conditions
+  - comparator
+  - clear filter
+  - structured query
 related:
-- search
-- create_category
-- create_project
-- form_settings
+  - search
+  - tables
+  - create_category
+  - create_project
+  - form_settings
 ---
-Filters select category pages or project tasks using structured conditions. Use them for questions such as “open work assigned to this person” or “records with this field value.”
+Slice pages in a Category or tasks in a Project using live structured conditions that update results automatically as you build them.
 
-## Build a filter
+Use the filter bar inside a Category or Project when you want exact questions answered—such as open tasks assigned to someone, due dates in a range, or records matching specific form values.
 
-1. Open the category or project and its filter controls.
-2. Add conditions using the available record fields and form fields.
-3. Choose a comparator and value appropriate to each field, such as a date range, selected option, or text match.
-4. Choose **Run** to display matching records. Use **Save** to keep a filter you want to reuse.
+## Building and saving filters
 
-Conditions combine to narrow the result: records must satisfy the filter's conditions. Category form fields come from the category's form context; project task filters use the available task and model-task form context.
+1. Open the Category or Project and click **+ Filter** (or open saved presets from the **Filters** dropdown).
+2. Pick a record field or form field, choose a comparator, and enter or select a value—each rule appears as a removable chip, and matching rows update **automatically** alongside the current match count.
+3. Remove individual chips, click **Clear** to reset, or click **Save filter** to keep useful filter combinations for quick reuse.
 
-Choose displayed columns separately from the conditions that select records. Hiding a column does not remove a condition or change who can access its underlying data.
+## How fields, columns, and permissions interact
 
-Newly saved values can take a moment to reach search and filter results. AI can also run read-only structured filters within the same permission boundaries.
-
-Filters show only records in the current category or project that you have permission to view. If nothing matches, change or remove a condition and choose **Run** again.
+- Category filters draw from the category's form context, while project filters include task fields and attached model-task forms. Multiple conditions narrow results together.
+- Column choices (**Choose visible columns** / **Table controls**) are separate from filter rules: hiding a column does not drop a filter condition or alter who can read underlying data.
+- Results only include items you are permitted to view. Newly saved record values can take a moment to show up in cached filters, and AI tools can run equivalent read-only structured queries within your permissions.

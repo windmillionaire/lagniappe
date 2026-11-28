@@ -1,24 +1,35 @@
 ---
 title: Task Due Dates and Schedules
+category: tasks_and_collaboration
+keywords:
+  - due date
+  - schedule
+  - recurrence
+  - repeating task
+  - after completion
+  - on a schedule
+  - periodically
+  - snooze
+  - change due date
+  - calendar rule
 related:
-- tasks
-- personal_task
-- task_history
+  - tasks
+  - personal_task
+  - task_history
 ---
-A task can have a one-time due date or a repeating schedule. Dates appear in your timezone.
+Set one-time due dates or repeating schedules on any task—all dates and reopenings follow your timezone.
 
-## Repeating work
+Open a task's **Schedule** detail chip (or pick **Today**, **Tomorrow**, **Next week**, or **Clear** quick due-date shortcuts) to configure timing.
 
-- **Recurring** uses a numeric interval in days, weeks, months, or years.
-- **Scheduled** follows a calendar rule, such as selected weekdays or a particular day in a month or year.
-- **Periodic** lets you describe how often the task repeats. AI turns that description into a repeating schedule.
+## Repeating schedule modes
 
-After saving, the task's **Due** control shows its date and a description beginning with “repeats.” Open that control to change the date or repeating rule.
+- **Doesn't repeat**: One-time due date with no automatic reopening.
+- **After completion**: Sets the next due date a chosen number of **Days**, **Weeks**, **Months**, or **Years** after you complete the task.
+- **On a schedule**: Follows calendar patterns (**Daily**, **Weekly**, **Monthly**, or **Yearly**—Monthly and Yearly phrases are interpreted by AI when you save). Calendar rules track real dates: the 31st skips shorter months, and Feb 29 waits for a leap year, whereas interval rules preserve end-of-month clamping.
+- **Periodically**: Enter a **Start Date** and describe **How often does it repeat?** in plain English—AI turns your description into a repeating schedule when you save.
 
-Calendar rules use real calendar positions: a monthly rule for the 31st skips months without that date, and February 29 advances to a leap year. Month/year intervals instead preserve interval behavior, including end-of-month adjustment.
+After saving, the task's schedule chip shows its due date and a summary beginning with **repeats**; completing scheduled work queues automatic reopening (the task may briefly stay marked complete until the reopen job runs). Clearing the schedule or manually reopening cancels any pending automatic reopen.
 
-Completing scheduled work calculates its next due date and arranges automatic reopening. The task can remain temporarily marked complete until that reopening occurs. Clearing its schedule or manually reopening it cancels the previous pending reopening.
+## Postponing vs. changing schedules
 
-## Postpone or change a date
-
-Use the offered postponement controls for a quick move, or edit the due date directly. Changing a due date does not by itself replace the recurrence rule. Reopened work starts with fresh answers; earlier completions remain in history.
+Use quick **Change due date** / postponement controls on Home or Active Tasks to shift an upcoming date without rewriting its underlying recurrence rule. Every reopened run starts with a clean submission while preserving past completions in [Task Completion and History](/help/task_history).

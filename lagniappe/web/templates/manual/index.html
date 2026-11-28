@@ -15,7 +15,7 @@
 {% endmacro %}
 
 {% macro nav_column(sections) %}
-  <nav class="hidden sm:block">
+  <nav aria-label="Manual sections" class="hidden sm:block">
     <ul class="space-y-3">
       {% for section in sections %}
         <li>
@@ -34,16 +34,18 @@
 {% endmacro %}
 
 {% macro mobile_nav(sections) %}
+  {% set active_name = (sections | selectattr('key', 'equalto', active_section) | map(attribute='name') | first) or 'Sections' %}
   <div class="sm:hidden flex flex-col mb-4">
     <button type="button"
             id="manual-nav-button"
             data-sections='{{ sections | tojson }}'
+            aria-label="Manual section"
             class="mt-4 flex flex-row items-center rounded-md px-3 py-1.5 font-semibold shadow-sm outline gap-2 w-full focus-visible:outline-2 hover:outline-2 bg-white hover:bg-page-bg outline-base-light text-base-dark focus-visible:outline-page-default hover:outline-page-default justify-between">
-      <span class="flex items-center">
-        {{ render_icon("columns", "mr-2") }}
-        Navigate to section...
+      <span class="flex min-w-0 items-center">
+        {{ render_icon("columns", "mr-2 shrink-0") }}
+        <span data-role="manual-nav-label" class="truncate">{{ active_name }}</span>
       </span>
-      {{ render_icon("menu") }}
+      {{ render_icon("menu", "shrink-0") }}
     </button>
   </div>
 {% endmacro %}
@@ -58,7 +60,7 @@
     <div class="flex flex-col sm:flex-row max-w-7xl mx-auto sm:mt-6"
          lp-component
          data-init="initManual">
-      <div class="hidden sm:block sm:w-64 shrink-0">{{ nav_column(sections) }}</div>
+      <div class="hidden sm:block sm:w-64 shrink-0 sm:sticky sm:top-20 sm:self-start sm:max-h-[calc(100vh-6rem)] sm:overflow-y-auto sm:p-1 sm:-m-1">{{ nav_column(sections) }}</div>
       <div class="flex-1 min-w-0 sm:ml-6">
         <div data-role="manual-content" class="{{ styles.manual.content }}">{% include content_template %}</div>
       </div>

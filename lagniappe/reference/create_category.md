@@ -1,19 +1,33 @@
 ---
 title: Creating Categories
+category: pages_and_forms
+keywords:
+  - category
+  - create category
+  - category actions
+  - default form
+  - rename category
+  - edit table inline
+  - group pages
 related:
-- create_page
-- filters
-- permissions
+  - create_page
+  - filters
+  - tables
+  - permissions
 ---
-Categories group related pages and can supply a default form for new pages. A page can belong to several categories, allowing the same record to appear in different collections.
+Categories organize related pages into shared collections with optional default forms, saved filters, and editable index tables.
 
-## Create a category
+A single page can belong to multiple categories so you can group records across different views without duplicating them.
 
-1. Open the category creation control on Home or the Category Index.
-2. Enter a name and optional description in manual mode, or describe the category for AI generation when available.
-3. Choose a default page form if new pages should start with shared fields.
-4. Create the category, then add pages or link existing pages to it.
+## Creating and configuring a category
 
-A category's default form is a starting point; an individual page can use a different form. Form-based filters are most useful when the category's pages use its default form.
+1. Open the category creation control on **Home** (**Categories → +**) or from Category tools.
+2. Enter a name and optional description manually, or describe the category for AI generation when available.
+3. Choose a **Default Form** if new pages in this category should start with shared structured fields.
+4. Create the category, then add new pages (`+` **New Page**) or link existing pages to it from their **Info** tab.
 
-Category permissions control who can view or maintain its pages. Editing an existing category allows page creation within it; creating categories is a separate permission. Page and form restrictions can further narrow access to individual records.
+## Managing an open category
+
+- **Category actions** menu (click the category title): **Rename**, **Add description** / **Edit description**, **Set default form** / **Change default form**, **Edit table inline** (desktop), **Star**, or **Delete**.
+- **Access and forms**: A category's default form is a starting point—individual pages can still switch forms, though form-based filters work best when pages share the category default.
+- **Permissions**: Editing a category lets users create pages inside it; creating new categories requires its own permission, and individual page or form restrictions under **Settings → Restrict Access** still narrow who sees specific records.

@@ -6,9 +6,9 @@ export const STARTUP_BUDGETS = Object.freeze({
 	shell: 72 * KIB,
 	// Shared UI resources and choice fields exchange modest extra bytes for fewer
 	// requests. The independent heavy-service exclusions below still apply.
-	core: 148 * KIB,
+	core: 150 * KIB,
 	page: 160 * KIB,
-	builder: 332 * KIB,
+	builder: 340 * KIB,
 });
 
 export const SHELL_VIEW_ENTRIES = Object.freeze([

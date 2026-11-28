@@ -1,25 +1,33 @@
 ---
 title: Documents, Saving, and Collaboration
+category: pages_and_forms
+keywords:
+  - documents
+  - collaborative editor
+  - auto save
+  - autosave
+  - named versions
+  - mention
+  - presence
+  - expand document
+  - conflict
 related:
-- offline
-- document_settings
-- messages_notifications
-- form_builder
+  - offline
+  - document_settings
+  - messages_notifications
+  - form_builder
 ---
-Page and Project documents let you write and format text together. Document edits save automatically. In forms, use **Save** or **Update** to save your changes.
+Page and Project documents provide a collaborative rich-text writing space whose edits save automatically, unlike structured forms which require Save or Update.
 
-## Editing together
+Open the **Document** tab on any page or project (on Projects, desktop users can also toggle **Expand** to widen the writing area).
 
-Changes save automatically while you work, including when you reload or follow a link. Other people's edits briefly appear with their name and a color so you can see who changed what. People can view or edit the document if they have those permissions on its page or project.
+## Editing together and mentioning teammates
 
-Type **@** and choose a user to mention them. Saving the mention notifies them in the app, and email is sent automatically according to their notification settings. Mentioning someone does not grant them access to the document.
+- **Automatic saving**: Edits in a document save continuously as you type, including when you follow links or reload. While collaborating live, teammates' edits briefly highlight with their name and color.
+- **Offline safety**: Changes made in an open document while offline stay stored in your browser and synchronize cleanly once you reconnect—see [Working Offline and Reconnecting](/help/offline).
+- **`@` mentions**: Type **@** and pick a user to mention them. Mentioning notifies them in-app (and emails them according to [Messages and Notifications](/help/messages_notifications)), but never grants access to a private page or project.
+- **Form conflict protection**: In structured forms, if someone else saves while you are editing the same form, Lagniappe asks you to review conflicting edits before saving yours.
 
-Offline document edits stay in your browser and synchronize when you reconnect.
+## Named versions and public publishing
 
-When someone saves a form, other people viewing it see the changes. If you are editing the same form, Lagniappe asks you to review any conflicting changes before saving yours.
-
-## Named versions
-
-Create a named version to keep a copy you can revisit or restore later.
-
-A page document can be published through Public Page settings. Project documents and the page's other private content do not become public merely because you share a page document.
+Create a **Named version** whenever you want a labeled snapshot you can revisit or restore later. On a Page, the **Publishing** tab action shares that page's document publicly; Project documents and private page fields, tasks, notes, and files remain private—see [Document Settings](/help/document_settings).

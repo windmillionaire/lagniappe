@@ -1,20 +1,29 @@
 ---
 title: Site Settings
+category: site_administration
+keywords:
+  - site settings
+  - admin
+  - installation settings
+  - owner controls
+  - administrator panel
 related:
-- site_maintenance
-- site_administrators
-- site_ai_models
-- site_deployment
-- site_public_pages
-- site_image
-- site_service_providers
+  - site_maintenance
+  - site_administrators
+  - site_ai_models
+  - site_deployment
+  - site_public_pages
+  - site_image
+  - site_service_providers
+  - backups_archives
+  - analytics
 ---
-**Admin** in the Home directory opens site settings for this Lagniappe installation. Administrators use it to maintain the application, adjust supported settings, and inspect links to its service providers.
+Open **Navigation → Admin** to manage site-wide settings, run data imports, review maintenance and backups, and inspect links to outside cloud services.
 
-The sections include maintenance, AI models, deployment preferences, public-page discovery, site images, and service-provider links. Each section's help explains when a saved choice takes effect.
+Admin organizes operator tools into **Site Settings**, **Import Data**, and **Backups & Archives**, alongside **Navigation → Analytics** for usage and AI observability.
 
-Some settings apply to the running app, while deployment preferences and generated icons require a setup update and deployment. Saving a form is not a general instruction to redeploy every setting.
+## What Site Settings covers and when changes apply
 
-Only the Owner can manage the Administrator roster, open installation-access controls, or download secret-bearing Configuration. Ordinary users may read general administrator help through search, but the help articles do not expose installation secrets or grant access to Admin.
-
-After an upgrade, open **Maintenance**. If it shows **Site updates are ready**, choose **Apply Updates**. **Refresh Cache** stays disabled until those updates finish. The Owner can download a recovery-settings backup from **Configuration** before setup changes or a move to another machine.
+- **Live settings vs. setup deployments**: Choices under **AI Models**, **Public Pages**, **Administrators**, **Maintenance**, and **Service Provider Links** apply directly to or inspect the running app. Changes under **Deployment Settings** and **Site Image** save preferences first and require `./setup.sh update` plus a deploy to apply to served infrastructure (saving a form never redeploys the whole instance automatically).
+- **Owner-only boundaries**: Only the configured primary **Owner** can manage the Administrator roster, access **Installation Access**, or open secret-bearing **Configuration**. General administrator help articles are readable by signed-in users through Search without exposing secrets or granting Admin access.
+- **After upgrading**: Visit **Site Settings → Maintenance**—if **Site updates are ready**, run **Apply Updates** first (`Refresh Cache` stays disabled until updates complete). Before making machine changes or migrations, download recovery configuration from [Configuration and Recovery Settings](/help/site_configuration) and check [Backups and Archives](/help/backups_archives).

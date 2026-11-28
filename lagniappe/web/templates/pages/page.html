@@ -47,8 +47,7 @@
       {%- endif -%}
       <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
         {#- Prevent indentation from becoming leading inline title space. -#}
-        <span data-role="title">{{- page.name -}}</span>
-        {% call menus.title("Page actions") %}
+        <span data-role="title">{{- page.name -}}</span>{%- call menus.title("Page actions") -%}
           {% if can_rename_page %}{{ menus.page_action("Rename", "edit", "rename", "page") }}{% endif %}
           {% if can_edit_page %}
             {{ menus.page_action("Edit description" if page.description else "Add description", "textarea", "description", "page", "description-action-label") }}
@@ -167,6 +166,7 @@
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
       <button type="button"
               data-role="flipper"
+              aria-expanded="false"
               aria-label="Toggle tabs"
               title="Toggle tabs"
               class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>

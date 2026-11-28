@@ -21,6 +21,7 @@ interface ManualSection {
 export default class Manual extends ShellView {
 	declare endpoints: typeof ENDPOINTS.manual;
 	declare sections: Map<string, ManualSection>;
+	declare activeSection: string;
 	declare mobileDropdown?: Dropdown | null;
 	declare _mobileDropdownPromise?: Promise<Dropdown | null> | null;
 	declare _manualClick?: (event: MouseEvent) => void;
@@ -38,6 +39,13 @@ export default class Manual extends ShellView {
 				?.sections;
 		const sections: ManualSection[] = JSON.parse(sectionData || "[]");
 		this.sections = new Map(sections.map((section) => [section.key, section]));
+		this.activeSection =
+			this.elt.querySelector<HTMLButtonElement>(
+				"[data-section][data-active='true']",
+			)?.dataset.section ||
+			this._sectionFromPath(window.location?.pathname ?? "") ||
+			sections[0]?.key ||
+			"overview";
 
 		this._manualClick = (e) => {
 			const target = e.target as Element | null;
@@ -57,14 +65,19 @@ export default class Manual extends ShellView {
 			const button = target?.closest?.<HTMLButtonElement>("[data-section]");
 			if (button?.dataset.section) {
 				e.preventDefault();
-				this.fetchSection(button.dataset.section, true);
+				void this.fetchSection(button.dataset.section, true);
 			}
 		};
 		this.elt.addEventListener("click", this._manualClick);
 
 		this._onPopState = (e) => {
 			const state: { manualSection?: string } | null = e.state;
-			if (state?.manualSection) this.fetchSection(state.manualSection, false);
+			const key =
+				state?.manualSection ||
+				this._sectionFromPath(window.location?.pathname ?? "");
+			if (key && key !== this.activeSection) {
+				void this.fetchSection(key, false);
+			}
 		};
 		window.addEventListener("popstate", this._onPopState);
 
@@ -75,6 +88,14 @@ export default class Manual extends ShellView {
 		this.elt.addEventListener("mobile-resize", this._manualMobileResize);
 		if (this.mobile) await this._ensureMobileDropdown();
 		return this;
+	}
+
+	_sectionFromPath(pathname: string): string | null {
+		const trimmed = pathname.replace(/\/+$/, "");
+		if (trimmed === "/manual") return "overview";
+		if (!trimmed.startsWith("/manual/")) return null;
+		const candidate = trimmed.slice("/manual/".length);
+		return this.sections.has(candidate) ? candidate : null;
 	}
 
 	_updateMetadata(key: string) {
@@ -99,16 +120,25 @@ export default class Manual extends ShellView {
 			this.elt.querySelector<HTMLButtonElement>("#manual-nav-button");
 		if (!mobileNavButton) return null;
 
-		this._mobileDropdownPromise = import("../elements/combobox/dropdown.ts")
-			.then(({ Dropdown }) => {
+		this._mobileDropdownPromise = Promise.all([
+			import("../elements/combobox/dropdown.ts"),
+			import("../generated/styles.mjs"),
+		])
+			.then(([{ Dropdown }, { STYLES }]) => {
 				if (this._destroyed || !this.mobile) return null;
 				const menu = {
-					items: Array.from(this.sections.values()).map((section) => ({
-						name: section.name,
-						icon: section.icon,
-						kind: section.kind,
-						onClick: () => this.fetchSection(section.key, true),
-					})),
+					matchReferenceWidth: true,
+					styles: { panel: STYLES.manual.mobilePanel },
+					loadOptions: () =>
+						Array.from(this.sections.values()).map((section) => ({
+							name: section.name,
+							icon: section.icon,
+							kind: section.kind,
+							active: section.key === this.activeSection,
+							onClick: () => {
+								void this.fetchSection(section.key, true);
+							},
+						})),
 				};
 				this.mobileDropdown = new Dropdown(mobileNavButton).init(menu);
 				return this.mobileDropdown;
@@ -136,33 +166,43 @@ export default class Manual extends ShellView {
 		if (this.loading) return;
 		this.loading = true;
 
-		const response = await request.get(this.endpoints.section(key));
-		if (response?.html) {
-			const target = this.elt.querySelector("[data-role='manual-content']");
-			const newTarget = response.html.querySelector("body");
-			await withTransition(
-				() => {
-					if (newTarget) target?.replaceChildren(...newTarget.childNodes);
-					this.elt
-						.querySelectorAll<HTMLButtonElement>("[data-section]")
-						.forEach((button) => {
-							const active = button.dataset.section === key;
-							button.dataset.active = active ? "true" : "false";
-							if (active) button.setAttribute("aria-current", "page");
-							else button.removeAttribute("aria-current");
-						});
-					const metadata = this._updateMetadata(key);
-					if (pushState) {
-						const url = metadata?.path || `/manual/${key}`;
-						history.pushState({ manualSection: key }, "", url);
-					}
-				},
-				{ label: "manual:change-section" },
-			);
+		try {
+			const response = await request.get(this.endpoints.section(key));
+			if (response?.html) {
+				const target = this.elt.querySelector("[data-role='manual-content']");
+				const newTarget = response.html.querySelector("body");
+				await withTransition(
+					() => {
+						if (newTarget) target?.replaceChildren(...newTarget.childNodes);
+						this.activeSection = key;
+						this.elt
+							.querySelectorAll<HTMLButtonElement>("[data-section]")
+							.forEach((button) => {
+								const active = button.dataset.section === key;
+								button.dataset.active = active ? "true" : "false";
+								if (active) button.setAttribute("aria-current", "page");
+								else button.removeAttribute("aria-current");
+							});
+						const navLabel = this.elt.querySelector<HTMLElement>(
+							"[data-role='manual-nav-label']",
+						);
+						const sectionName = this.sections.get(key)?.name;
+						if (navLabel && sectionName) {
+							navLabel.textContent = sectionName;
+						}
+						const metadata = this._updateMetadata(key);
+						if (pushState) {
+							const url = metadata?.path || `/manual/${key}`;
+							history.pushState({ manualSection: key }, "", url);
+						}
+					},
+					{ label: "manual:change-section" },
+				);
+				window.scrollTo({ top: 0, behavior: "auto" });
+			}
+		} finally {
+			this.loading = false;
 		}
-
-		this.loading = false;
-		window.scrollTo({ top: 0, behavior: "auto" });
 	}
 
 	destroy() {

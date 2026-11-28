@@ -112,6 +112,7 @@ class AdminPage(SiteResource):
     SITE_SETTINGS_FORM = "[data-widget='SiteSettings']"
     SITE_IMPORT_TOGGLE = "#tabs button[lp-show='ingress:active']"
     IMPORT_UPLOAD_TOGGLE = "#tabs [data-nav='tabs'] button[lp-show='ingress:IngressFileUpload']"
+    IMPORT_EMPTY_UPLOAD_TOGGLE = "#ingress [data-role='empty'] button[lp-show='ingress:IngressFileUpload']"
     IMPORT_LIST = "#ingress ul[data-widget='IngressList']"
     INGRESS_UPLOAD_FORM = "form[data-widget='IngressFileUpload']"
 
@@ -123,7 +124,12 @@ class AdminPage(SiteResource):
         self.open_import_tab()
         form = self.user.locate(self.INGRESS_UPLOAD_FORM)
         if not form.is_visible():
-            toggle = self.user.locate(self.IMPORT_UPLOAD_TOGGLE)
+            header_toggle = self.user.locate(self.IMPORT_UPLOAD_TOGGLE)
+            toggle = (
+                header_toggle
+                if header_toggle.is_visible()
+                else self.user.locate(self.IMPORT_EMPTY_UPLOAD_TOGGLE)
+            )
             expect(toggle).to_be_visible()
             toggle.click()
         expect(form).to_be_visible()

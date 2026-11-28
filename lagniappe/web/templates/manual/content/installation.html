@@ -1,5 +1,6 @@
-{% from "manual/macros.html" import heading, subheading, card, callout, code, step, link, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, subheading, card, callout, code, step, link, nav_buttons %}
 <div class="space-y-6">
+  {{ chapter_header("Installation", icon="installation", kind="task") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
       Lagniappe installs into your own Google Cloud project. The setup script
@@ -892,7 +893,11 @@
     {{ code('$lagniappePath = Join-Path $env:USERPROFILE "Lagniappe"\ngit clone <lagniappe-source> $lagniappePath\nSet-Location $lagniappePath\nNew-Item -ItemType Directory -Force config/files\n# Save the owner download as:\n# config/files/lagniappe_settings.yaml\n.\\setup.cmd') }}
     <p class="text-base-medium mt-3">
       Setup recognizes the downloaded settings file and uses it to rebuild the
-      app without deleting or replacing its cloud data.
+      app without deleting or replacing its cloud data. For full workspace
+      backups and portable archives, check
+      <strong>Navigation &rarr; Admin &rarr; Backups &amp; Archives</strong> or
+      run <code>./setup.sh backup create</code> and <code>./setup.sh archive</code>
+      from your checkout (restores run from the CLI via <code>./setup.sh restore</code>).
     </p>
   {% endcall %}
   {{ heading("Check or Repair Setup") }}

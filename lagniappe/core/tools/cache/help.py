@@ -40,9 +40,8 @@ def _supports_help() -> bool:
     raw_definition = info["index_definition"]
     definition = raw_definition if isinstance(raw_definition, dict) else dict(zip(raw_definition[::2], raw_definition[1::2], strict=False))
     attributes = [row if isinstance(row, dict) else dict(zip(row[::2], row[1::2], strict=False)) for row in info["attributes"]]
-    return HELP_PREFIX in definition.get("prefixes", []) and any(
-        field.get("attribute") == "help_version" for field in attributes
-    )
+    indexed_attributes = {field.get("attribute") for field in attributes}
+    return HELP_PREFIX in definition.get("prefixes", []) and {"help_version", "keywords"} <= indexed_attributes
 
 
 def ensure_help_index() -> None:
@@ -95,7 +94,8 @@ def ensure_help() -> str:
             for topic in corpus.values():
                 pipe.hset(f"{HELP_PREFIX}{version}:{topic.id}", mapping={
                     "kind": "help", "topic_id": topic.id, "help_version": version,
-                    "name": topic.title, "desc": topic.summary, "doc": topic.text,
+                    "name": topic.title, "keywords": " ".join(topic.keywords),
+                    "desc": topic.summary, "doc": topic.text,
                     SEARCH_SCORE_FIELD: HELP_SCORE,
                 })
             pipe.execute()

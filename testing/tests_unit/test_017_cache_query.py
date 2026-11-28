@@ -934,6 +934,7 @@ def test_search_index_indexes_empty_requires_tags():
     }
     assert text_weights == {
         "name": 4,
+        "keywords": 2,
         "desc": 1,
         "doc": 0.5,
         "values": 0.25,

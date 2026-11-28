@@ -1,21 +1,37 @@
 ---
 title: Form Components
+category: pages_and_forms
+keywords:
+  - form components
+  - fields
+  - input
+  - text
+  - checkbox
+  - radio
+  - select
+  - link
+  - table
+  - location
+  - bookmark
+  - signature
+  - todo
+  - status
 related:
-- form_builder
-- form_settings
-- form_element_changes
+  - form_builder
+  - form_settings
+  - form_element_changes
 ---
-Components are the fields and explanatory elements available in the Form Builder. Drag one into the form, then select it to configure its label and behavior. Available components depend on whether the form belongs to pages or tasks.
+Components are the field types and content blocks you drag into the Form Builder to collect answers or display helpful guidance.
 
-## Choosing a field
+Available components vary slightly depending on whether you are editing a Page Form or a Task Form.
 
-- **Input** holds a short value such as text, a number, date, time, email, or phone number.
-- **Text** holds longer notes and explanations.
-- **Checkbox**, **Radio**, and **Select** collect yes/no, single-choice, or configured multiple-choice answers.
-- **Link** connects to a workspace record or an external URL.
-- **Table** collects repeated rows with their own columns.
-- **Location** records a place; **Bookmark** can retrieve webpage details where supported.
-- **Signature** supports sign-off; **Todo** collects checklist items where available.
-- **Document** provides rich explanatory content, and **Status** can show messages based on missing or completed information.
+## Available fields and blocks
 
-Prefer the smallest field that represents the information reliably. A numeric input is more useful for numeric filtering than a text field containing a number and commentary. Use the builder's **Preview** to enter sample answers and try adding table rows before saving the form.
+- **Input** and **Text**: **Input** captures compact values (short text, numbers, dates, times, emails, phone numbers); **Text** captures multi-line notes and explanations.
+- **Checkbox**, **Radio**, and **Select**: Gather yes/no toggles, single-choice selections, or single/multi-choice dropdown lists.
+- **Link** and **Table**: **Link** references a workspace record or external URL; **Table** collects repeatable structured rows with custom columns.
+- **Location** and **Bookmark**: Record places or save webpage link previews where supported.
+- **Signature** and **Todo**: Capture sign-off signatures or in-form checklist items where available.
+- **Document** and **Status**: Embed formatted explanations (**Document**) or highlight alerts based on missing or completed answers (**Status**).
+
+Choose the most specific field for the data you want back—a numeric **Input** is far easier to filter and sort reliably than free-form text containing numbers and commentary. Test fields and table rows in **Preview** before saving. See [Form Component Settings](/help/form_settings) to configure each component.

@@ -93,11 +93,12 @@
             {{ render_icon("down", styles.home.expandIndicator) }}
           </button>
           {% if current_user.access(AI.ASK) %}
+            {% set ai_create_label = "Create a Plan" if current_user.access(AI.CREATE) else "Ask AI" %}
             <button type="button"
                     lp-show="tools:CreateToolReport"
                     data-toggle="true"
-                    aria-label="Create a Plan"
-                    title="Create a Plan"
+                    aria-label="{{ ai_create_label }}"
+                    title="{{ ai_create_label }}"
                     class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
           {% endif %}
         </div>

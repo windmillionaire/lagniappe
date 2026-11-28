@@ -94,7 +94,7 @@ export class MessageComposer {
 					<h2 id="message-composer-title" class="text-xl font-bold text-base-dark">New message</h2>
 					<button type="button" lp-control="close" class="${STYLES.button.close}">Close</button>
 				</div>
-				<form data-role="message-compose-form" data-kind="user" class="space-y-4 p-6">
+				<form data-role="message-compose-form" data-kind="user" class="space-y-4 p-5 sm:p-6 pb-6">
 					<label class="block text-sm font-medium">To
 						<input type="search" name="recipient" data-index="user" data-permission="message"
 							data-kind="user"

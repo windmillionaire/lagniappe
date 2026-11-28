@@ -1,20 +1,32 @@
 ---
 title: AI Email
+category: ai_and_automation
+keywords:
+  - ai email
+  - email submissions
+  - inbound email
+  - send plan by email
+  - attachments
+  - email reply
+  - evidence
 related:
-- ai_tools
-- user_settings
-- upload_file
+  - ai_tools
+  - user_settings
+  - upload_file
+  - external_ai
 ---
-AI email sends a request and attachments to Lagniappe's unified AI address. Use the email address registered on your Lagniappe account. The installation must enable AI email; its actual receiving address is shown to signed-in readers when configured.
+Send a question or file attachments by email to Lagniappe's unified AI address to start a Plan from your inbox.
 
-## Send a request
+Your message must come from the email address registered on your Lagniappe account, and AI email must be enabled on the installation. When configured, Home's **Plans & Reports** card shows an **Email submissions** copy control, and this site's receiving address is displayed to signed-in readers below this article.
 
-Write a question or describe the changes you want, attach supporting files if needed, and send to the single AI address. A message needs a subject, body, or attachment. Files without instructions request organization; identify evidence-only files when they should support an answer without being filed.
+## Sending a request
 
-Questions and proposed changes use the same planner as Create a Plan on Home. Ask access permits answers; Create is required for proposals. Ordinary workspace permissions still apply. Up to 20 files are accepted, with a 30 MiB per-file limit and 50 MiB total attachment limit.
+- Include a subject, body, or attachment. Files sent without instructions ask the planner to organize them; explicitly say when files are evidence-only and should support an answer without being filed.
+- Email requests use the same planner as **Create a Plan** on Home: **Ask** access permits questions and answers, while **Create** access is required to prepare proposals. Ordinary workspace permissions apply throughout.
+- Up to **20 files** are accepted per message, within a **30 MiB** per-file limit and a **50 MiB** total attachment limit.
 
-## Review the result
+## Reviewing and replying to results
 
-An acceptance receipt confirms intake. Open the saved plan to read the answer and review proposed actions. Sign in and choose **Execute Proposal** to apply changes; sending email does not execute them.
-
-Pre-handoff ingestion failures receive a failure receipt. After the normal plan job starts, results and failures follow your ordinary notification-email preference without a duplicate email result. Replying with new instructions above the email's reply marker starts a new request, rather than editing the existing plan.
+- An acceptance receipt confirms intake. Open the saved plan in Lagniappe to read the answer, inspect proposed actions, and choose **Execute Proposal** when ready (sending email never executes mutations automatically unless you have enabled automatic execution for safe plans).
+- Pre-handoff ingestion failures return a failure receipt; once the plan job starts, completion and errors follow your normal notification-email settings without sending duplicate result emails.
+- Replying to an email with new instructions above its reply marker creates a **new** request rather than revising the existing plan.

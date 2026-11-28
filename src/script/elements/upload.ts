@@ -266,7 +266,7 @@ const menuButton = (overlay = false) => {
 
 const contextDescription = (settings: ContextDescriptionSettings = {}) => {
 	const description = document.createElement("textarea");
-	description.className = `${STYLES.textarea} grow h-24 placeholder:text-center`;
+	description.className = `${STYLES.textarea} grow h-24`;
 	description.name = settings.name || "autofill-description";
 	if (settings.placeholder) description.placeholder = settings.placeholder;
 	if (settings.rows) description.rows = settings.rows;

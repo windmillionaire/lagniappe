@@ -15,8 +15,42 @@ from lagniappe.core.definitions.manual import VALID_MANUAL_SECTIONS
 from lagniappe.core.tools.files.html import SafeHTML, render_markdown, sanitize_html, strip_tags
 
 TOPIC_DIRECTORY = Path(__file__).parent
-PROJECTION_VERSION = "1"
+PROJECTION_VERSION = "2"
 TOPIC_ID = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z")
+
+HELP_CATEGORIES: tuple[tuple[str, str, str], ...] = (
+    (
+        "getting_started",
+        "Getting Started & Workspace",
+        "Moving around the workspace, personal pages, notes, and finding what you need.",
+    ),
+    (
+        "pages_and_forms",
+        "Pages, Forms & Projects",
+        "Organizing information with categories, projects, forms, tables, documents, and files.",
+    ),
+    (
+        "tasks_and_collaboration",
+        "Tasks & Activity",
+        "Managing repeatable work, schedules, submission history, and direct messages.",
+    ),
+    (
+        "permissions_and_users",
+        "Users, Permissions & Settings",
+        "Accounts, passwords and security, groups, restrictions, and public access.",
+    ),
+    (
+        "ai_and_automation",
+        "AI Assistant & Connections",
+        "On-site planning and answers, email submissions, and external AI integrations.",
+    ),
+    (
+        "site_administration",
+        "Site Administration",
+        "Owner configuration for site access, AI models, analytics, public discovery, backups, and operations.",
+    ),
+)
+VALID_HELP_CATEGORIES = frozenset(category_id for category_id, _, _ in HELP_CATEGORIES)
 
 
 class TopicRecord(TypedDict):
@@ -29,6 +63,14 @@ class TopicRecord(TypedDict):
     context: NotRequired[dict[str, str]]
 
 
+class TopicCatalogEntry(TypedDict):
+    id: str
+    title: str
+    category: str
+    url: str
+    summary: str
+
+
 @dataclass(frozen=True)
 class Topic:
     """One immutable article; installation-specific context is kept separate."""
@@ -39,6 +81,8 @@ class Topic:
     summary: str
     text: str
     related: tuple[str, ...]
+    category: str = "getting_started"
+    keywords: tuple[str, ...] = ()
 
     @property
     def url(self) -> str:
@@ -77,10 +121,12 @@ def topics() -> MappingProxyType[str, Topic]:
         if len(parts) != 3 or parts[0]:
             raise ValueError(f"Missing help metadata: {topic_id}")
         metadata = yaml.safe_load(parts[1])
-        if not isinstance(metadata, dict) or set(metadata) - {"title", "related"}:
+        if not isinstance(metadata, dict) or set(metadata) - {"title", "related", "category", "keywords"}:
             raise ValueError(f"Invalid help metadata: {topic_id}")
         title = metadata.get("title")
         related = metadata.get("related", [])
+        category = metadata.get("category", "getting_started")
+        keywords = metadata.get("keywords", [])
         body = parts[2].strip()
         if not isinstance(title, str) or not title.strip():
             raise ValueError(f"Missing help title: {topic_id}")
@@ -88,6 +134,13 @@ def topics() -> MappingProxyType[str, Topic]:
             raise ValueError(f"Invalid related topics: {topic_id}")
         if len(set(related)) != len(related) or topic_id in related:
             raise ValueError(f"Duplicate or self-related help topic: {topic_id}")
+        if not isinstance(category, str) or category not in VALID_HELP_CATEGORIES:
+            raise ValueError(f"Invalid help category: {topic_id}")
+        if not isinstance(keywords, list) or any(not isinstance(item, str) or not item.strip() for item in keywords):
+            raise ValueError(f"Invalid help keywords: {topic_id}")
+        normalized_keywords = tuple(item.strip() for item in keywords)
+        if len(set(normalized_keywords)) != len(normalized_keywords):
+            raise ValueError(f"Duplicate help keywords: {topic_id}")
         if not body or "{{" in body or "{%" in body:
             raise ValueError(f"Help must be static Markdown: {topic_id}")
         html = render_markdown(body)
@@ -95,8 +148,14 @@ def topics() -> MappingProxyType[str, Topic]:
         if soup.find("h1") or not soup.contents or not isinstance(soup.contents[0], Tag) or soup.contents[0].name != "p":
             raise ValueError(f"Help must start with a summary paragraph and use level-two headings: {topic_id}")
         loaded[topic_id] = Topic(
-            topic_id, title.strip(), body, strip_tags(str(soup.contents[0])),
-            strip_tags(html), tuple(related),
+            topic_id,
+            title.strip(),
+            body,
+            strip_tags(str(soup.contents[0])),
+            strip_tags(html),
+            tuple(related),
+            category=category,
+            keywords=normalized_keywords,
         )
     if not loaded:
         raise ValueError("No help topics were packaged.")
@@ -120,6 +179,35 @@ def get_topic(topic_id: str) -> Topic:
     if not isinstance(topic_id, str) or not TOPIC_ID.fullmatch(topic_id):
         raise KeyError(topic_id)
     return topics()[topic_id]
+
+
+def grouped_topics() -> list[tuple[str, str, str, list[Topic]]]:
+    """Return help topics grouped by canonical category for the help index."""
+    by_category: dict[str, list[Topic]] = {category_id: [] for category_id, _, _ in HELP_CATEGORIES}
+    for topic in topics().values():
+        by_category[topic.category].append(topic)
+    return [
+        (category_id, title, description, sorted(items, key=lambda topic: topic.title.casefold()))
+        for category_id, title, description in HELP_CATEGORIES
+        if (items := by_category[category_id])
+    ]
+
+
+def topic_catalog() -> list[TopicCatalogEntry]:
+    """Return a compact, category-ordered directory of help topics for discovery."""
+    entries: list[TopicCatalogEntry] = []
+    for category_id, _title, _description, items in grouped_topics():
+        for topic in items:
+            entries.append(
+                {
+                    "id": topic.id,
+                    "title": topic.title,
+                    "category": category_id,
+                    "url": topic.url,
+                    "summary": topic.summary,
+                }
+            )
+    return entries
 
 
 @lru_cache(maxsize=256)

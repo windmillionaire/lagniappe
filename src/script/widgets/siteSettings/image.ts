@@ -8,6 +8,22 @@ import { SiteSetting, type SiteSettingAttributes } from "./base.ts";
 
 const SPLASH_PREFIX = "splash-";
 
+class SiteImageUpload extends BaseUpload {
+	onFileAttached() {
+		const button = this.form?.submitButton;
+		if (button) button.disabled = false;
+	}
+
+	reset() {
+		super.reset();
+		const button = this.form?.submitButton;
+		if (button) {
+			button.dataset.visible = "true";
+			button.disabled = true;
+		}
+	}
+}
+
 type ImageEndpoints = ReturnType<typeof ENDPOINTS.SiteImage>;
 type SiteImageFiles = Record<string, string>;
 
@@ -58,7 +74,7 @@ export class SiteImage extends SiteSetting<ImageEndpoints> {
 			text: "Drop image here, click to upload, or tap to choose camera/files",
 		});
 
-		const upload = new BaseUpload({
+		const upload = new SiteImageUpload({
 			target: uploadForm,
 			dropzone,
 			submitButton: uploadForm.querySelector("button[type='submit']"),
@@ -76,6 +92,9 @@ export class SiteImage extends SiteSetting<ImageEndpoints> {
 		this.upload = upload;
 		upload.uploadMenu = new UploadMenu(upload);
 		await upload.init();
+		if (upload.form?.submitButton) {
+			upload.form.submitButton.disabled = !upload.fileAttached;
+		}
 		this.destroyables.push(upload);
 
 		uploadForm.addEventListener("submit", this._uploadImage);

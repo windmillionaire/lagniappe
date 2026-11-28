@@ -201,6 +201,10 @@ export class NavElement {
 
 		if ("flipped" in this._navContainer.dataset) {
 			this._navContainer.dataset.flipped = "false";
+			const flipper = this._navContainer.querySelector<HTMLButtonElement>(
+				"[data-role='flipper']",
+			);
+			if (flipper) flipper.setAttribute("aria-expanded", "false");
 		}
 
 		Object.entries(this.widgetControls).forEach(([option, element]) => {

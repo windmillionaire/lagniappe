@@ -1,21 +1,31 @@
 ---
 title: Creating User Groups
+category: permissions_and_users
+keywords:
+  - create user group
+  - new group
+  - role permissions
+  - group grants
+  - team access
 related:
-- user_groups
-- permissions
-- user_settings
+  - user_groups
+  - permissions
+  - user_settings
+  - restrictions
 ---
-A user group gives a named set of permissions to its members. Use groups for recurring roles such as Editors, Staff, Clients, or Reviewers.
+A user group packages a reusable set of permissions under one role name—ideal for groups like Editors, Staff, Clients, or Reviewers.
 
-## Create and assign a group
+Because group membership automatically reflects later edits, designing clean roles makes onboarding and offboarding teammates much simpler than managing every permission per person.
 
-1. Open **New Group** in User Groups.
-2. Enter a recognizable role name and create the group.
-3. In the permissions panel that opens, choose the resources and actions members need.
-4. Add users from account creation or User Settings.
+## Steps to create and assign a group
 
-A group name does not itself confer privileges: a group named “Administrators” is still an ordinary group. The Owner assigns the application Administrator role separately.
+1. Open **Navigation → Users → User Groups** and choose **New Group** (`+`).
+2. Enter a clear, recognizable name and create the group.
+3. In the permissions panel that opens, choose the resource types or specific categories and projects members should view, edit, create, delete, assign, or publish.
+4. Assign people to the group when creating their account or anytime under their [User Settings](/help/user_settings).
 
-Membership in several groups combines their grants. For example, a view grant from one group and an edit grant from another result in edit access. Page and form restrictions are additional requirements; a broad grant does not bypass them for ordinary users.
+## Things to keep in mind
 
-Use specific category or project grants when a role only needs part of the workspace. Keep the group structure understandable so that later membership changes have predictable effects.
+- A group's name never escalates privileges on its own—an ordinary group named `"Administrators"` has no special powers; the Owner manages true Administrator status separately.
+- Memberships combine using the strongest applicable grant across all a user's groups (for example, View in one group plus Edit in another equals Edit), while page and form [Restrictions](/help/restrictions) act as extra checks that broad grants do not bypass for ordinary users.
+- Favor targeted category or project grants for focused roles so future membership changes stay predictable.

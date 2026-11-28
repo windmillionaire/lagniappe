@@ -176,14 +176,14 @@ def test_public_manual_metadata_and_urls_are_canonical(monkeypatch):
         "path": "/manual/",
         "canonical_url": "https://site.test/manual/",
         "title": "Overview — Demo Manual",
-        "description": "Read the Overview section of the Demo manual.",
+        "description": "Learn how Demo organizes knowledge, checklists, forms, projects, and AI tools in one collaborative workspace.",
         "robots": "index, follow",
     }
     assert forms == {
         "path": "/manual/forms",
         "canonical_url": "https://site.test/manual/forms",
         "title": "Forms — Demo Manual",
-        "description": "Read the Forms section of the Demo manual.",
+        "description": "Design reusable structured forms with sections, field validation, conditional rules, and attached AI summaries.",
         "robots": "noindex, follow",
     }
 

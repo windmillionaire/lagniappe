@@ -15,16 +15,17 @@
     {% else %}
       <span data-role="title">Active Tasks</span>
     {% endif %}
-    <div data-role="actions">
+    <div data-role="actions" class="sm:pr-3">
       <button type="button"
               class="{{ styles.nav.mobileButton }}"
+              data-kind="default"
               lp-show="table:MobileTableControls"
               data-toggle="true"
               aria-label="Table controls"
               title="Table controls">{{ render_icon("column") }}</button>
       {% if Resource.TASKS.allowed(Action.EDIT) %}
         <button type="button"
-                class="{{ styles.nav.desktopButton }}"
+                class="{{ styles.nav.button }}"
                 lp-show="table:TableEditor"
                 data-toggle="true"
                 aria-label="Edit table"

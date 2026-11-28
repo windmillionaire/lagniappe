@@ -1,20 +1,31 @@
 ---
 title: AI Models
+category: site_administration
+keywords:
+  - ai models
+  - primary model
+  - utility model
+  - image model
+  - model selection
+  - gemini
 related:
-- ai_tools
-- site_settings
-- user_settings
+  - ai_tools
+  - site_settings
+  - user_settings
+  - analytics
 ---
-AI Models selects the models Lagniappe uses for primary generation, utility work, and images. Authorized administrators can save these choices in Admin.
+Choose which models handle primary reasoning, lightweight parsing and summaries, and image generation across Lagniappe from **Admin → Site Settings → AI Models**.
+
+Authorized administrators can adjust model choices anytime without running a setup update or redeploying.
 
 ## Model roles
 
-- **Primary** handles plans, answers, schema and page generation, autofill, and other substantial text work.
-- **Utility** handles smaller tasks such as supported parsing and summaries.
-- **Image** handles generated visuals where the feature is available.
+- **Primary**: Powers AI Plans, workspace answers, form and page generation, autofill, and heavier reasoning workflows.
+- **Utility**: Handles focused, lighter tasks such as supported parsing and file summaries.
+- **Image**: Generates cover images or visuals where image generation is enabled.
 
-Saving model settings applies to the next generation request; it does not require a setup update or redeployment. A generation already underway retains the model settings selected for that run.
+## Applying and testing changes
 
-If a saved model is absent from the discovered catalog, it can remain visible as the current custom choice. A catalog entry alone does not establish that a model is available to your cloud project or suitable for every workflow.
-
-Use the model information and pricing links to compare choices. After saving a model, try the feature you changed it for: ask a question for Primary, summarize a file for Utility, or generate a page image for Image. Model selection does not change a user's None/Ask/Create access or their record permissions.
+- **Takes effect immediately**: New requests pick up saved model selections right away; any generation already in progress finishes on the model it started with.
+- **Custom and available models**: If a previously saved model drops out of the discovered catalog, it can remain shown as a custom value. A model appearing in a catalog list does not by itself guarantee project quota or workflow compatibility—compare documentation and pricing links, then verify directly (ask a question for Primary, summarize a file for Utility, or generate a cover image for Image).
+- Model settings never change any user's **None / Ask / Create** tier or workspace permissions.

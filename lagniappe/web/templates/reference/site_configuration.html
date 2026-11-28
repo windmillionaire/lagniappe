@@ -1,10 +1,7 @@
 {% from "reference/macros.html" import modal %}
 {% from "help/macros.html" import body %}
-{% call modal("Configuration") %}
+{% call modal("Configuration", action_href=url_for('reference.download_settings'), action_label="Download Settings File", action_kind="page") %}
   {{ body(help_topic("site_configuration"), embedded=True) }}
   <div class="bg-base-dark text-project-light p-4 rounded-lg font-mono text-xs overflow-x-auto"
        data-role="environment-variables"><pre><code>{{ environment_variables }}</code></pre></div>
-  <a href="{{ url_for('reference.download_settings') }}"
-     data-kind="page"
-     class="{{ styles.button.submit }}">Download Settings File</a>
 {% endcall %}

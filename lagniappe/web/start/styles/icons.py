@@ -322,10 +322,6 @@ ICONS = {
 		"glyph": "add",
 		"fill": 1
 	},
-	"indexTools": {
-		"glyph": "build_circle",
-		"fill": 1
-	},
 	"insert": {
 		"glyph": "add",
 		"fill": 1

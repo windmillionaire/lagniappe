@@ -1,8 +1,9 @@
 {% extends "layouts/base.html" %}
 {% set view_entry = "analytics" %}
+{% import 'controls.html' as controls %}
 
-{% macro stat(label, value, kind="page") %}
-  <div class="rounded-md border border-base-light/50 bg-base-bg px-4 py-3 shadow-sm"
+{% macro stat(label, value, kind="page", extra_class="") %}
+  <div class="rounded-md border border-base-light/50 bg-base-bg px-4 py-3 shadow-sm {{ extra_class }}"
        data-role="analytics-stat"
        data-kind="{{ kind }}">
     <div class="text-sm font-semibold text-base-medium">{{ label }}</div>
@@ -11,11 +12,11 @@
 {% endmacro %}
 
 {% macro period_nav() %}
-  <nav class="{{ styles.attributes.container }}"
+  <nav class="flex flex-nowrap items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:gap-2 sm:overflow-visible"
        aria-label="Analytics period">
     {% for value, label in periods.items() %}
       <a href="{{ url_for('analytics.index', period=value) }}"
-         class="{{ styles.attributes.button }}"
+         class="{{ styles.attributes.button }} shrink-0 whitespace-nowrap text-xs sm:text-sm"
          data-role="attribute"
          data-kind="{{ 'success' if value == period else 'page' }}"
          data-selected="{{ (value == period)|yesno }}"
@@ -28,7 +29,7 @@
   <details class="group rounded-md border border-base-light/50 px-3 py-2"
            data-role="analytics-retention"
            data-dataset="{{ dataset }}">
-    <summary class="{{ styles.disclosure.summary }} font-semibold text-base-dark"
+    <summary class="{{ styles.disclosure.summary }} rounded-sm font-semibold text-base-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-dark"
              data-role="analytics-retention-toggle">
       <span>{{ label }}</span>
       {{ render_icon("down", styles.disclosure.chevron) }}
@@ -41,8 +42,8 @@
       <div class="{{ styles.attributes.container }}">
         {% for value, option in retention_options.items() %}
           <button type="button"
-                  class="{{ 'font-semibold pl-2 pr-3 py-2 flex items-center rounded-md gap-1 border border-delete-default bg-delete-bg text-delete-dark hover:bg-delete-default hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default transition-colors cursor-pointer' if value == 'all' else styles.attributes.button }}"
-                  data-kind="{{ 'delete' if value == 'all' else 'page' }}"
+                  class="{{ 'font-semibold px-3 py-2 flex w-full sm:w-auto items-center justify-center rounded-md gap-1 border border-delete-default bg-delete-bg text-delete-dark hover:bg-delete-default hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default transition-colors cursor-pointer' if value == 'all' else 'font-semibold px-3 py-2 flex w-full sm:w-auto items-center justify-center rounded-md gap-1 border border-delete-light bg-white text-delete-dark hover:bg-delete-bg hover:border-delete-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default transition-colors cursor-pointer' }}"
+                  data-kind="delete"
                   data-role="analytics-clear"
                   data-retention="{{ value }}"
                   data-route="{{ url_for(endpoint, retention=value) }}">
@@ -346,10 +347,8 @@
                    data-kind="{{ group.kind }}"
                    data-route="{{ url_for('analytics.events', prefix=group.prefix, period=period) }}">
             <summary class="{{ styles.disclosure.summary }} px-3 py-2 font-semibold text-base-dark">
-              <span>
-                {{ group.label }}
-                <span class="ml-2 tabular-nums text-kind-default">{{ "{:,}".format(group.count) if group.count is number else group.count }}</span>
-              </span>
+              <span>{{ group.label }}</span>
+              <span class="ml-auto mr-1 tabular-nums text-kind-default">{{ "{:,}".format(group.count) if group.count is number else group.count }}</span>
               {{ render_icon("down", styles.disclosure.chevron) }}
             </summary>
             <div data-role="analytics-events"
@@ -378,20 +377,21 @@
        class="{{ styles.layout.contentView }} flex flex-col gap-6 py-4 sm:py-6 lg:py-8">
     <nav class="{{ styles.layout.view.title }}" data-role="page-header">
       <span data-role="title">Analytics</span>
+      {{ controls.help("analytics") }}
     </nav>
     {{ period_nav() }}
     {% if analytics_enabled %}
-      {{ retention_controls('activity', 'Delete Activity Records', 'analytics.clear_records') }}
       <section class="grid grid-cols-2 gap-3 lg:grid-cols-5"
                data-role="analytics-summary">
         {{ stat("Total Events", dashboard.total) }}
         {{ stat("Page Views", dashboard.page_views, "page") }}
         {{ stat("Public Views", dashboard.public_views, "public") }}
         {{ stat("Logins", dashboard.logins, "user") }}
-        {{ stat("Known Users", dashboard.known_users, "user") }}
+        {{ stat("Known Users", dashboard.known_users, "user", "col-span-2 lg:col-span-1") }}
       </section>
       {{ top_pages() }}
       {{ route_groups() }}
+      {{ retention_controls('activity', 'Delete Activity Records', 'analytics.clear_records') }}
       {% if dashboard.total >= query_limit %}
         <div class="text-sm text-base-medium">Showing the latest {{ query_limit }} events for this period.</div>
       {% endif %}

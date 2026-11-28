@@ -9,7 +9,7 @@
           data-selected="false"
           data-empty="{{ 'true' if count == 0 else 'false' }}"
           aria-pressed="false"
-          class="{{ styles.attributes.button }} group cursor-pointer">
+          class="{{ styles.attributes.button }} shrink-0 whitespace-nowrap group cursor-pointer">
     <span data-role="attribute-icons" class="{{ styles.attributes.iconStack }}">
       <span data-role="icon"
             class="{{ styles.attributes.icon }}"
@@ -32,11 +32,11 @@
     <div class="flex flex-col gap-4 py-4 sm:py-6 lg:py-8">
       <div data-role="search-summary"
            class="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-base">
-        <span class="font-semibold text-base-dark">{{ pagination.total }} {{ 'result' if pagination.total == 1 else 'results' }}</span>
+        <span class="font-semibold tabular-nums text-base-dark">{{ pagination.total }} {{ 'result' if pagination.total == 1 else 'results' }}</span>
         <span class="text-base-medium">for</span>
         <span class="font-semibold text-base-dark">“{{ query }}”</span>
       </div>
-      <div class="{{ styles.attributes.container }} group/facets cursor-default"
+      <div class="flex flex-row flex-nowrap items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 group/facets cursor-default"
            data-role="facets"
            data-has-selection="false">
         <button type="button"
@@ -44,7 +44,7 @@
                 data-selected="true"
                 aria-pressed="true"
                 title="Show all results"
-                class="{{ styles.search.allFacet }}">
+                class="{{ styles.search.allFacet }} shrink-0 whitespace-nowrap">
           <span data-role="text">All</span>
           <span data-role="count" class="{{ styles.search.facetCount }}">{{ unfiltered_total }}</span>
         </button>

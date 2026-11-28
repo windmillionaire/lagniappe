@@ -1,19 +1,28 @@
 ---
 title: Model Tasks
+category: tasks_and_collaboration
+keywords:
+  - model tasks
+  - task template
+  - workflow phase
+  - project tasks
+  - in progress
+  - completed
+  - reorder model tasks
 related:
-- create_project
-- tasks
-- create_form
-- filters
+  - create_project
+  - tasks
+  - create_form
+  - filters
 ---
-Model tasks are reusable task types or phases within a project. They help group repeated work such as Intake, Inspection, Approval, or Follow-up.
+Model tasks define reusable task phases or templates inside a Project—like Intake, Inspection, Approval, or Follow-up.
 
-Create a model task inside the project, give it a recognizable name, and optionally attach a task form. Tasks linked to that model can use the form to collect consistent answers.
+Open a [Project](/help/create_project) to create, reorder, and manage model tasks in the left **Model Tasks** card, optionally linking a shared task form to each model.
 
-## Use a model task
+## Working with Model Tasks
 
-When creating or editing real work, select the project and the appropriate model task. The real task stays on its originating page and appears in the project's relevant views.
+- **Shared structure**: When you create or edit a real task and link it to a project and model task, that real task picks up consistent form structure while staying on its originating page.
+- **Progress filtering**: Use **In Progress** and **Completed** views inside Model Tasks—or the project's live [Filter bar](/help/filters)—to inspect tasks matching a phase by status, assignment, dates, or form answers.
+- **Ordering and forms**: Use reorder arrows on desktop to arrange project phases. Attach a task form when repeated work needs structured checklists or fields, or leave forms off when a clear title and description are enough.
 
-Use **In Progress** and **Completed** views to inspect work associated with a model task. Project filters can narrow the results by available task fields and form answers.
-
-A model task describes a reusable kind of work; it is not itself a completed submission. Use forms when the phase needs structured answers or checks, and leave them off when a name and description are enough. Task assignment and ordinary permissions still determine who can act on each real task.
+A model task describes a template phase rather than being a completed submission itself; assignment and ordinary record permissions still govern who can open and edit each linked real task.

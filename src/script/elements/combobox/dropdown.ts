@@ -14,6 +14,7 @@ type DropdownOptionHandler<Result> = (
 
 export interface DropdownItem extends ComboboxOption {
 	icon?: string;
+	active?: boolean;
 	html?: string;
 	closeOnClick?: boolean | DropdownOptionHandler<boolean>;
 	onClick?: DropdownOptionHandler<void>;
@@ -73,6 +74,10 @@ export class Dropdown extends Combobox<[menu: DropdownMenu]> {
 		itemButton.className = STYLES.dropdown.option.action;
 		itemButton.type = "button";
 		itemButton.setAttribute("role", this.optionRole);
+		if (item.active) {
+			itemButton.dataset.active = "true";
+			itemButton.setAttribute("aria-current", "page");
+		}
 
 		if (item.icon) {
 			const icon = document.createElement("span");

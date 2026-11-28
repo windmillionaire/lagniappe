@@ -1,20 +1,32 @@
 ---
 title: Service Provider Links
+category: site_administration
+keywords:
+  - service provider links
+  - app engine
+  - identity platform
+  - cloud storage
+  - billing
+  - redis
+  - dns
+  - resend
+  - cloud dashboards
 related:
-- site_settings
-- site_deployment
-- site_installation_access
+  - site_settings
+  - site_deployment
+  - site_installation_access
+  - backups_archives
 ---
-Service Provider Links opens the outside dashboards supporting this Lagniappe installation. Following a link does not change a setting inside Lagniappe or grant access to that provider account.
+Jump straight to the external cloud and provider dashboards powering this Lagniappe instance from **Admin → Site Settings → Service Provider Links**.
 
-Use the appropriate dashboard for the question:
+Opening a provider link never alters settings inside Lagniappe or grants access to those provider consoles—each service checks its own sign-in and cloud permissions.
 
-- **App Engine** for application versions, runtime logs, and instance behavior.
-- **Identity Platform** for configured sign-in services and authentication accounts.
-- **Cloud Storage** for managed buckets and stored assets.
-- **Billing** for project usage and charges.
-- The configured Redis, DNS, and email providers for their service health and setup.
+## Which dashboard to open
 
-Account changes in those systems can affect login, uploads, processing, and deployment immediately. Some configuration changes also need a setup update and deployment before the app can use them.
+- **App Engine**: Application versions, runtime logs, traffic, and instance behavior.
+- **Identity Platform**: Configured sign-in providers and authentication accounts.
+- **Cloud Storage**: Managed storage buckets and stored file assets.
+- **Billing**: Project usage, quotas, and hosting costs.
+- **Redis, DNS, and Email providers**: Service health, domain verification, and delivery setup.
 
-Application Administrator status and cloud/provider permissions are separate. Ask the Owner or responsible operator for the appropriate access when a dashboard rejects your account. Use the installation workflow for coordinated configuration and handoff changes instead of assuming a provider edit updates every dependent service.
+Changes in external consoles (like credentials, domains, or provider keys) can affect sign-in, file processing, and email immediately, while some infrastructure changes also require `./setup.sh update` and a deploy so Lagniappe picks them up. Application Administrator access inside Lagniappe does not grant Google Cloud IAM roles—ask the Owner or cloud operator if a console rejects your sign-in, and use [Installation Access and Handoff](/help/site_installation_access) for coordinated ownership transfers.

@@ -50,12 +50,13 @@ builder:
     classes: group/builder mx-auto hidden max-w-7xl flex-col gap-6 px-4 sm:px-0 lg:flex
     intent: desktop builder layout hidden below the desktop-only notice breakpoint
     surfaces: [server]
+    css: [src/style/forms.css]
   workspace:
     classes: flex flex-row justify-center gap-8
     intent: three-column workspace row beneath the full-width form builder header
     surfaces: [server]
   component:
-    classes: text-md flex cursor-move flex-row items-center gap-3 rounded-md bg-form-bg px-3 py-1.5 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark
+    classes: text-md flex cursor-move flex-row items-center gap-2.5 rounded-md bg-form-bg px-3 py-1 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark
     intent: component presentation within builder
     surfaces: [frontend]
   header:
@@ -87,7 +88,7 @@ builder:
       intent: model presentation within builder panels
       surfaces: [server]
     default:
-      classes: mb-4 flex flex-col gap-4 rounded-lg p-4 outline-2 outline-form-default
+      classes: mb-4 flex flex-col gap-4 rounded-lg px-4 pt-4 pb-5 outline-2 outline-form-default
       intent: default presentation within builder panels
       surfaces: [server]
     preview:
@@ -118,14 +119,14 @@ builder:
     intent: model presentation within builder
     surfaces: [frontend]
     markers: [form-element]
-    css: [src/style/forms.css]
+    css: [src/style/forms.css, src/style/editor.css]
   generate:
     classes: flex grow flex-row items-center gap-3 rounded-md bg-kind-bg px-3 py-1.5 text-base font-semibold text-base-dark shadow-sm outline-2 outline-kind-default hover:bg-kind-light hover:outline-kind-dark
     intent: generate presentation within builder
     surfaces: [server]
   sections:
     side:
-      classes: "basis-1/4 lg:sticky lg:top-20 self-start max-h-[calc(100vh-6rem)] overflow-y-auto group-data-[expanded=true]/builder:hidden"
+      classes: "p-1 basis-1/4 lg:sticky lg:top-20 self-start max-h-[calc(100vh-6rem)] overflow-y-auto group-data-[expanded=true]/builder:hidden"
       intent: side presentation within builder sections
       surfaces: [server]
     main:
@@ -138,11 +139,11 @@ builder:
       intent: item presentation within builder settings
       surfaces: [frontend]
     open:
-      classes: min-w-0 flex-1 cursor-pointer rounded-md bg-white/50 px-2 py-1 text-left sm:text-sm transition-colors duration-100 hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default focus-visible:outline-offset-0
+      classes: min-w-0 flex-1 cursor-pointer rounded-md border border-form-light bg-white px-2 py-1 text-left shadow-2xs sm:text-sm transition-colors duration-100 hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default focus-visible:outline-offset-0
       intent: compact builder list editor with a two-pixel outline reserved for hover and keyboard focus
       surfaces: [frontend]
     section:
-      classes: flex flex-col gap-1 sm:text-sm p-2 rounded-md outline-2 bg-form-bg outline-form-default
+      classes: flex flex-col gap-1.5 sm:text-sm p-2.5 rounded-md outline-2 bg-form-bg outline-form-default
       intent: section presentation within builder settings
       surfaces: [frontend]
     title:
@@ -448,7 +449,7 @@ entity:
     hooks: [slide-right]
     css: [src/style/navigation.css]
   tabIcon:
-    classes: relative inline-grid place-items-center text-kind-default hover:text-kind-dark tab-icon outline-none
+    classes: relative inline-grid place-items-center text-kind-default hover:text-kind-dark tab-icon
     intent: consistently sized tab control distinguished by its selected underline
     surfaces: [server]
     css: [src/style/navigation.css, src/style/icons.css]
@@ -469,6 +470,7 @@ entity:
       classes: min-w-0
       intent: wrapping anchor for an entity title and its adjacent action menu
       surfaces: [server]
+      css: [src/style/navigation.css]
       exceptions:
         - diagnostic: duplicate-style-value
           target: entity.name.wrapper
@@ -594,7 +596,7 @@ form:
       intent: zero-width header companion for the row action anchor cell
       surfaces: [frontend]
     actionButton:
-      classes: inline-flex size-6 items-center justify-center rounded-md leading-none text-kind-default transition-colors duration-100 hover:bg-kind-light/25 hover:text-kind-dark focus-visible:bg-kind-light/35 focus-visible:text-kind-dark focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer
+      classes: inline-flex size-6 items-center justify-center rounded-md leading-none text-kind-default transition-colors duration-100 hover:bg-kind-bg hover:text-kind-dark focus-visible:bg-kind-bg focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50 cursor-pointer
       intent: action button presentation within form table
       surfaces: [frontend]
       css: [src/style/tables.css, src/style/icons.css]
@@ -704,7 +706,7 @@ home:
     intent: component presentation within home
     surfaces: [server]
   form:
-    classes: group/form flex flex-col gap-6 rounded-md bg-kind-bg p-4 outline-2 outline-kind-default
+    classes: group/form flex flex-col gap-6 rounded-md bg-kind-bg p-4 border-2 border-kind-light
     intent: form presentation within home
     surfaces: [server]
   generate:
@@ -714,11 +716,11 @@ home:
     hooks: [home-generate-button]
     css: [src/style/interaction.css]
   reportFilter:
-    classes: flex min-h-9 flex-1 items-center justify-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-base-medium shadow-sm outline outline-base-light/50 data-[active=true]:bg-kind-light data-[active=true]:text-kind-dark data-[active=true]:outline-kind-default focus-visible:outline-2
+    classes: flex min-h-9 flex-1 items-center justify-center gap-2 rounded-md border border-base-light/50 bg-white px-3 py-1.5 text-sm font-semibold text-base-medium shadow-xs data-[active=true]:border-base-default data-[active=true]:bg-base-bg data-[active=true]:text-base-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-dark cursor-pointer
     intent: independently pressed report category filter with total count
     surfaces: [server]
   reportList:
-    classes: rounded-md bg-white outline-2 outline-base-light text-base-dark
+    classes: rounded-md bg-white border border-base-light/60 text-base-dark
     intent: report list outline around rows or an empty message, with dividers owned by the rows
     surfaces: [server]
   reportClear:
@@ -887,7 +889,7 @@ index:
       css: [src/style/icons.css]
   mobile:
     controls:
-      classes: rounded-md border border-kind-light/40 bg-kind-bg p-3 text-base flex flex-col font-semibold mt-4
+      classes: rounded-md border border-kind-light bg-kind-bg p-3 text-base flex flex-col font-semibold mt-4
       intent: controls presentation within index mobile
       surfaces: [server]
       css: [src/style/buttons.css, src/style/tables.css]
@@ -900,7 +902,7 @@ index:
       intent: row presentation within index mobile
       surfaces: [server]
     status:
-      classes: inline-flex items-center rounded-full border border-kind-light/70 bg-white/90 px-2 py-0.5 text-xs font-medium text-kind-dark
+      classes: inline-flex items-center rounded-full border border-kind-light bg-white/90 px-2 py-0.5 text-xs font-medium text-kind-dark
       intent: active sort or filter summary badge beside a column title in mobile table controls
       surfaces: [server]
     unchecked:
@@ -983,9 +985,10 @@ layout:
       intent: mobile presentation within layout nav
       surfaces: [server]
     flipper:
-      classes: inline-grid min-w-9 min-h-9 place-items-center focus:outline-none text-kind-default sm:hidden text-lg
+      classes: inline-grid min-w-9 min-h-9 place-items-center text-kind-default sm:hidden text-lg
       intent: flipper presentation within layout nav
       surfaces: [server]
+      css: [src/style/navigation.css]
     group:
       classes: flex flex-row items-center
       intent: group presentation within layout nav
@@ -1044,7 +1047,7 @@ link:
     hooks: [link-default]
     css: [src/style/links.css]
   title:
-    classes: font-semibold focus-visible:outline-none focus-visible:underline link-title
+    classes: font-semibold focus-visible:underline link-title
     intent: title presentation within link
     surfaces: [server, frontend]
     hooks: [link-title]
@@ -1183,8 +1186,16 @@ manual:
     intent: button presentation within manual
     surfaces: [server]
   codeShell:
-    classes: bg-base-dark rounded-lg my-2 w-full min-w-0 max-w-full overflow-hidden
+    classes: bg-base-dark rounded-lg my-3.5 w-full min-w-0 max-w-full overflow-hidden
     intent: command block shell with a copy control
+    surfaces: [server]
+  codeSingle:
+    classes: flex items-center justify-between gap-2 px-3 py-2
+    intent: compact single-line command row aligning snippet and copy button horizontally
+    surfaces: [server]
+  codeInline:
+    classes: text-project-light font-mono text-sm min-w-0 flex-1 overflow-x-auto whitespace-pre py-1
+    intent: horizontally scrollable single-line command text inside a compact shell
     surfaces: [server]
   codeToolbar:
     classes: flex justify-end px-2 pt-2
@@ -1198,6 +1209,10 @@ manual:
     classes: text-project-light px-4 pb-4 pt-2 font-mono text-sm block w-full min-w-0 max-w-full overflow-x-auto whitespace-pre
     intent: line-preserving, horizontally scrollable command block within manual content
     surfaces: [server]
+  mobilePanel:
+    classes: "p-1 scroll-py-1 scrollbar-thin scrollbar-thumb-base-light scrollbar-track-transparent absolute z-50 hidden max-h-[min(30rem,68vh)] min-w-64 overflow-y-auto rounded-md bg-white shadow-lg outline outline-base-light/50"
+    intent: mobile manual section picker panel sized to show sections cleanly without slicing rows
+    surfaces: [frontend]
   content:
     classes: sm:rounded-lg sm:shadow-sm w-full sm:border bg-white sm:border-base-light/50 sm:p-6
     intent: content presentation within manual
@@ -1265,17 +1280,29 @@ files:
 
 modal:
   wrapper:
-    classes: fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-100
+    classes: fixed inset-0 p-4 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-100
     intent: wrapper presentation within modal
     surfaces: [server, frontend]
   content:
-    classes: "bg-white rounded-lg shadow-xl max-w-4xl mx-4 max-h-[90vh] overflow-y-auto relative"
+    classes: "bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] overflow-y-auto relative"
     intent: content presentation within modal
     surfaces: [server, frontend]
   header:
-    classes: sticky top-0 z-50 bg-white border-b px-6 py-4 flex justify-between items-center
+    classes: sticky top-0 z-50 bg-white border-b border-base-light/50 px-6 py-4 flex justify-between items-center
     intent: header presentation within modal
     surfaces: [server, frontend]
+  dialog:
+    classes: "bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden relative"
+    intent: flex-column modal dialog container with edge-to-edge header and dedicated scrolling body
+    surfaces: [server]
+  dialogHeader:
+    classes: "shrink-0 bg-white border-b border-base-light/50 px-4 py-3.5 sm:px-6 sm:py-4 flex justify-between items-center gap-3"
+    intent: non-scrolling edge-to-edge header for flex-column modal dialogs
+    surfaces: [server]
+  dialogBody:
+    classes: "min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6"
+    intent: dedicated scrollable body region below a full-width modal header
+    surfaces: [server]
   actions:
     alias: filters
     intent: horizontal action group in modal content
@@ -1293,12 +1320,6 @@ nav:
     intent: navigation action shown only in the mobile layout
     surfaces: [server]
     hooks: [action-icon-button, mobile]
-    css: [src/style/buttons.css, src/style/navigation.css]
-  desktopButton:
-    classes: action-icon-button transition-colors duration-100 desktop
-    intent: navigation action shown only in the desktop layout
-    surfaces: [server]
-    hooks: [action-icon-button, desktop]
     css: [src/style/buttons.css, src/style/navigation.css]
   bar:
     wrapper:
@@ -1386,7 +1407,7 @@ radio:
     surfaces: [server, frontend]
 
 section:
-  classes: outline outline-base-light rounded-md px-4 pb-4 bg-white w-full
+  classes: border border-kind-light rounded-md p-4 bg-white w-full
   intent: shared presentation for the section UI role
   surfaces: [frontend]
 
@@ -1487,12 +1508,12 @@ table:
     hooks: [table-scroll-wrapper]
     css: [src/style/tables.css]
   default:
-    classes: w-full table-auto border-collapse divide-y sm:text-sm mt-4
+    classes: w-full table-auto border-collapse divide-y divide-base-light/60 sm:text-sm mt-4
     intent: default presentation within table
     surfaces: [server]
     css: [src/style/tables.css]
   card:
-    classes: w-full table-auto border-collapse divide-y sm:text-sm
+    classes: w-full table-auto border-collapse divide-y divide-base-light/60 sm:text-sm
     intent: full-width index table embedded inside a primary card tab without negative bleed
     surfaces: [server]
     css: [src/style/tables.css]
@@ -1505,7 +1526,7 @@ table:
     intent: bordered scrollable container framing a card-hosted index table on desktop without double-bordering mobile cards
     surfaces: [server]
   embedded:
-    classes: w-full table-auto border-collapse divide-y sm:text-sm min-w-max bg-white
+    classes: w-full table-auto border-collapse divide-y divide-base-light/60 sm:text-sm min-w-max bg-white
     intent: embedded presentation within table
     surfaces: [server]
     css: [src/style/tables.css]
@@ -1524,7 +1545,7 @@ table:
       intent: embedded presentation within table thead
       surfaces: [server]
     th:
-      classes: "group/header max-w-48 gap-2 truncate py-2.5 px-3 text-left font-medium data-[active=false]:border-b-2"
+      classes: "group/header max-w-48 gap-2 truncate py-2.5 px-3 text-left font-medium data-[active=false]:border-b data-[active=false]:border-base-light/70"
       intent: th presentation within table thead
       surfaces: [server]
     actionCell:
@@ -1556,7 +1577,7 @@ table:
       surfaces: [server]
     compact:
       th:
-        classes: group/header w-36 min-w-32 max-w-44 py-2.5 px-3 text-left font-medium leading-snug whitespace-nowrap data-[active=false]:border-b-2
+        classes: group/header w-36 min-w-32 max-w-44 py-2.5 px-3 text-left font-medium leading-snug whitespace-nowrap data-[active=false]:border-b data-[active=false]:border-base-light/70
         intent: th presentation within table cell compact
         surfaces: [server]
       default:
@@ -1578,7 +1599,7 @@ table:
       intent: column name label prefix inside the desktop table sort and filter bar
       surfaces: [frontend]
     panel:
-      classes: mt-0.5 mb-2 flex flex-col gap-2 rounded-md border border-kind-light/45 bg-white/90 p-2.5 shadow-xs
+      classes: mt-0.5 mb-2 flex flex-col gap-2 rounded-md border border-kind-light bg-white/90 p-2.5 shadow-xs
       intent: mobile table sort and filter panel tucked beneath its column row
       surfaces: [frontend]
     option:
@@ -1592,6 +1613,7 @@ table:
         classes: ml-1.5 inline-grid align-middle text-slate-400
         intent: container presentation within table filters icon
         surfaces: [server]
+        css: [src/style/tables.css]
       active:
         classes: "[grid-area:1/1] group-data-[sorting=true]/header:invisible hover:text-kind-default"
         intent: available filter action shown on unfiltered table columns
@@ -1601,8 +1623,8 @@ table:
         intent: clear-filter action shown on actively filtered table columns
         surfaces: [server]
   editStatus:
-    classes: table-edit-status hidden sm:inline-flex h-7 items-center rounded-md px-2.5 text-xs font-semibold text-project-dark whitespace-nowrap
-    intent: compact borderless green chip matching editable table cells as a visual key
+    classes: table-edit-status hidden sm:inline-flex items-center text-xs font-semibold text-project-dark whitespace-nowrap
+    intent: compact pill matching editable table cells as a visual key
     surfaces: [frontend]
     hooks: [table-edit-status]
     css: [src/style/tables.css]
@@ -1667,7 +1689,7 @@ task:
       hooks: [task-chip-editable]
       css: [src/style/content.css]
     form:
-      classes: lp-badge task-chip-form ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-kind-bg/70 py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
+      classes: lp-badge task-chip-form ring-kind-light inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-kind-bg py-1 pl-2 pr-2.5 text-sm/6 font-semibold whitespace-nowrap text-kind-default ring ring-inset transition-colors hover:bg-kind-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default
       intent: tinted panel-toggle chip for attached task form and task history
       surfaces: [server]
       hooks: [task-chip-form]
@@ -1795,11 +1817,11 @@ upload:
     intent: options presentation within upload
     surfaces: [frontend]
   processing:
-    classes: pt-4 border-t flex flex-col gap-2 bg-white
+    classes: pt-4 border-t border-base-light/50 flex flex-col gap-2 bg-white
     intent: processing presentation within upload
     surfaces: [frontend]
   context:
-    classes: pt-4 border-t flex flex-col gap-2 outline-base-light bg-white
+    classes: pt-4 border-t border-base-light/50 flex flex-col gap-2 outline-base-light bg-white
     intent: context presentation within upload
     surfaces: [frontend]
   contextRow:
@@ -1815,7 +1837,7 @@ upload:
     intent: header presentation within upload
     surfaces: [frontend]
   dropzone:
-    classes: relative flex min-h-24 w-full cursor-pointer select-none flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic transition-colors hover:border-kind-default/70 hover:bg-kind-bg/30
+    classes: relative flex min-h-24 w-full cursor-pointer select-none flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-base-light bg-white p-3 text-center text-sm text-base-medium italic transition-colors hover:border-kind-default hover:bg-kind-bg
     intent: dropzone presentation within upload
     surfaces: [frontend]
   chip:
@@ -1824,7 +1846,7 @@ upload:
     surfaces: [frontend]
   image:
     container:
-      classes: relative aspect-square cursor-pointer select-none rounded-lg p-4 outline-2 outline-base-light outline-dashed transition-colors hover:outline-kind-default hover:bg-kind-bg/30
+      classes: relative aspect-square cursor-pointer select-none rounded-lg p-4 outline-2 outline-base-light outline-dashed transition-colors hover:outline-kind-default hover:bg-kind-bg
       intent: container presentation within upload image
       surfaces: [server]
     text:
@@ -1866,7 +1888,7 @@ page:
       intent: right-aligned cancel and save button group inside the inline page description editor
       surfaces: [frontend]
     remove:
-      classes: cursor-pointer text-xs font-medium text-base-medium transition-colors hover:text-delete-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default disabled:pointer-events-none disabled:opacity-50
+      classes: cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-base-medium transition-colors hover:bg-base-bg hover:text-delete-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-delete-default disabled:pointer-events-none disabled:opacity-50
       intent: subtle remove link inside the inline page description editor
       surfaces: [frontend]
     cancel:

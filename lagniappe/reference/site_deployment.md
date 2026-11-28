@@ -1,21 +1,31 @@
 ---
 title: Deployment Settings
+category: site_administration
+keywords:
+  - deployment settings
+  - app engine
+  - scaling
+  - basic scaling
+  - automatic scaling
+  - instance class
+  - workers
+  - min idle
+  - setup.sh update
 related:
-- site_settings
-- site_maintenance
-- offline
-- site_service_providers
+  - site_settings
+  - site_maintenance
+  - offline
+  - site_service_providers
+  - backups_archives
 ---
-Deployment settings save supported App Engine preferences for the next setup update. Saving them does not deploy the application. Run `./setup.sh update`, then deploy, to apply the generated configuration.
+Configure App Engine scaling, instance size, and worker concurrency preferences from **Admin → Site Settings → Deployment Settings**.
 
-## Scaling and capacity
+Saving changes here stores preferences for your next setup run—to apply updated configuration to App Engine, run `./setup.sh update` and deploy from your checkout.
 
-**Basic scaling** lets an idle installation stop its instances. The next request may wait for startup. **Automatic scaling** uses the configured warm-instance settings to reduce that delay, with different ongoing resource use.
+## Scaling and worker options
 
-Instance class selects the available memory and CPU. Basic scaling uses B classes; automatic scaling uses F classes. Worker count controls how many application workers run within an instance, so additional workers also consume memory.
+- **Basic scaling vs. Automatic scaling**: **Basic scaling** allows instances to scale down to zero when idle (the next visitor may wait briefly for startup); **Automatic scaling** keeps warm instances ready according to your **Min Idle** target to minimize cold starts, with different ongoing hosting cost.
+- **Instance classes & limits**: Basic scaling uses **B** classes; automatic scaling uses **F** classes. **Worker count** sets application workers per instance (more workers use more memory; **F2** and **B2** support at most **three** Lagniappe workers per instance).
+- **Min Idle vs. Max**: Under Automatic scaling, **Min Idle** sets warm instances (`0` or higher, never exceeding **Max**). Basic scaling configures only the maximum instance count.
 
-Automatic scaling separates **Min Idle**, the warm-instance target, from **Max**, the instance limit. Min Idle can be zero and cannot exceed Max. Basic scaling uses only the maximum instance count. F2 and B2 installations support at most three Lagniappe workers per instance.
-
-Open **Service Provider Links / App Engine** for runtime logs and instance activity, or **Billing** for the project's usage and charges. Those dashboards require their own Google Cloud permissions.
-
-The installation chapter covers the longer setup and deployment procedure.
+Check **Service Provider Links → App Engine** for live runtime logs and instance metrics, or **Billing** for usage and spend (both require matching Google Cloud access). See the [Installation manual](/manual/installation) for full deployment details.

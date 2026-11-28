@@ -1,24 +1,33 @@
 ---
 title: Public Page
+category: pages_and_forms
+keywords:
+  - publishing
+  - public page
+  - document settings
+  - alias
+  - public url
+  - directory
+  - index in public search
+  - summarize
+  - make public
 related:
-- documents
-- site_public_pages
-- permissions
+  - documents
+  - site_public_pages
+  - permissions
+  - page_info
 ---
-Public Page settings share a page document with anyone who has its public URL, without requiring sign-in.
+Publishing shares a single Page Document cleanly at a public link—or through your site's public directory—without requiring sign-in or exposing private page records.
 
-Choose **Public**, fill in any public title and description you want to use, then choose **Update Public Page**. The panel displays the public link after saving. Open that link to see what visitors see.
+Open a page's **Document** tab and select **Publishing** to configure public sharing, fill in any public title and description, choose an optional custom **Alias**, and save.
 
-## What is published
+## What visitors can see
 
-The public view can include the document, its embedded images, the public title and description, and an explicitly selected preview image. A preview image must already be used in the document. Internal form values, tasks, files, notes, and private page details are not automatically published.
+- **Included content**: Public pages display the document body, its embedded images, the public title and description, and an optional preview image selected from images already used inside the document.
+- **Excluded private records**: Internal form fields, tasks, files, notes, and private page metadata stay private automatically.
+- **Directory category label**: If the page appears in the public directory, you may pick one attached category label to show publicly (that category's name becomes visible; your page's other category links remain private).
 
-If the page participates in the public directory, you can select an attached category label for display. Selecting it publishes that category's name; other category memberships remain private.
+## Discovery, links, and revocation
 
-## Links and discovery
-
-Public access provides a shareable link. Search discovery is a separate site-wide choice, and an individual page can opt out. Eligible discoverable pages can appear in the public directory and sitemap.
-
-Making the page private stops access through its public URL. Turning off discovery asks search engines to stop listing it while keeping its public link available. Search engines, social previews, and people who saved copies may retain previously published content.
-
-Publishing requires the relevant permission; viewing general help about publishing does not grant it.
+- **Shareable link vs. search indexing**: Making a page public creates its shareable link. Search engine indexing and inclusion in `/sitemap.xml` are controlled by both site-wide discovery settings and the page's own indexing toggle.
+- **Revoking access**: Switching the page back to private immediately closes access through its public URL; turning off search indexing tells search engines not to list it while keeping the direct URL live. Note that search engines or people who previously opened the page may retain cached copies. See [Site Public Pages](/help/site_public_pages) and [Permissions](/help/permissions).

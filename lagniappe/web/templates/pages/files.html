@@ -49,6 +49,9 @@
                alt=""
                data-role="thumbnail"
                class="size-16 shrink-0 rounded-md object-cover">
+        {% else %}
+          <span class="flex size-16 shrink-0 items-center justify-center rounded-md border border-base-light/50 bg-file-bg text-file-default"
+                aria-hidden="true">{{ render_icon("file", "icon-xl") }}</span>
         {% endif %}
         <div class="flex min-w-0 flex-col gap-1">
           <a data-role="title"

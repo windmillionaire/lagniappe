@@ -1,24 +1,32 @@
 ---
 title: Converting and Deleting Form Elements
+category: pages_and_forms
+keywords:
+  - convert field
+  - replace with
+  - delete element
+  - form update
+  - form migration
+  - existing answers
+  - retry form update
+  - before and after
 related:
-- form_builder
-- form_settings
-- task_history
+  - form_builder
+  - form_settings
+  - task_history
 ---
-Replace and Delete change the form's draft. Existing submissions are changed only after you save. Builder Undo reverses a draft change; it does not restore answers after a saved change has been applied.
+Replace With and Delete stage schema changes inside your Form Builder draft and apply them to existing pages or tasks once you save.
 
-## Convert values
+Builder **Undo** reverses draft changes before saving; once you save a form update and data migration runs, Undo cannot roll back converted or cleared answers.
 
-Choose a supported component under **Replace With**, then choose **Convert**. Deterministic conversions use fixed rules: “42” can become a number, while “unknown” cannot. Values that do not fit the destination type are cleared.
+## Converting field values
 
-Choices requiring AI need Create AI access and access to every affected page or task. Add conversion instructions before Save. For tables, configure destination columns first; for selects, configure options and Multiple. Conversion uses those final settings.
+- Select an element in the builder, open **Replace With**, pick a compatible component type, and choose **Convert**.
+- **Deterministic conversions** use predictable rules (for example, `"42"` converts cleanly into a number, while `"unknown"` does not; values that cannot convert cleanly are cleared).
+- **AI-assisted conversions** require **Create** AI access and edit access on every affected page or task. Add any conversion guidance before clicking **Save**.
+- When converting to **Table** or **Select**, configure final destination columns, options, and **Multiple** settings before saving—conversion uses the saved target configuration. Components without a valid replacement offer **Delete** only.
 
-A component with no supported replacement offers Delete only.
+## Deleting elements and monitoring updates
 
-## Delete and publish
-
-Delete removes the field and, after Save, clears its answers from current submissions using that form. Original completed submissions and existing task history retain their recorded values and form generations.
-
-While the update runs, affected submissions cannot be edited. The builder shows **Form update finished.** when it is done. If it shows **Form update needs attention**, read the error beside the message and use **Retry** to continue unfinished work.
-
-Changed submissions can show a notice with before-and-after values. That notice clears when the submission is next updated or the task is completed or reopened.
+- **Delete** removes the component from the form and, upon **Save**, clears its current values from active submissions (completed task history preserves original recorded answers and form generations).
+- Affected submissions stay locked while the migration runs; the builder reports **Form update finished.** or **Form update needs attention** (with error details and **Retry**). Updated submissions may display a before-and-after change notice until the next save, completion, or reopen.

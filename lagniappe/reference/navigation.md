@@ -1,26 +1,41 @@
 ---
 title: Home and Navigation
+category: getting_started
+keywords:
+  - navigation
+  - home
+  - menu
+  - navbar
+  - header
+  - sidebar
+  - starred
+  - my page
+  - account settings
+  - plans and reports
+  - edit table
 related:
-- page_info
-- search
-- personal_task
-- ai_tools
-- offline
+  - page_info
+  - search
+  - personal_task
+  - ai_tools
+  - offline
 ---
-Home brings together your starred records, upcoming work, saved AI plans, notes, and the application directory. What you can open depends on your account and workspace permissions.
+Home brings together your personal workspace, starred records, upcoming tasks, notes, projects, categories, and saved AI plans, while the top bar keeps navigation, search, and notifications one click away.
 
-## Find your way
+What appears in menus and Home sections depends on your account and workspace permissions.
 
-Use the header search box to find workspace records or help. The account link opens your personal page. Star pages, categories, or projects you visit often so they are easier to return to from Home.
+## Using the Navigation menu and header
 
-The directory opens indexes such as Categories, Forms, Tasks, and Users when permitted, plus the Manual and available administrative tools. Create controls appear where your access allows new records.
+- **Navigation menu (top left)**: Open **Home**, **My Page**, **Messages**, **Active Tasks**, **Forms**, **Users**, **Analytics**, **Admin**, **Manual**, **Account Settings** (your **My Page** **Settings** view), or **Sign out**.
+- **Brand logo**: Click the logo anytime to jump back to **Home**.
+- **Header utilities (top right)**: Use **Search...** (click **×** to clear what you typed), check the **Offline** status indicator, or open **Notifications** to **Message a user** or **Clear all notifications**.
 
-Home section labels expand and collapse their lists; an adjacent plus opens the creation form. A listed record opens its page. The logo returns Home; Manual and My Page open directly.
+## Moving around Home and views
 
-Page and project tabs switch between their related views. Tables offer sorting, columns, and other controls appropriate to the current view; **Edit table** enables supported inline edits where available.
+- **Home panels**: Home features **Pages**, **Notes**, **Tasks**, **Projects**, and **Categories** alongside **My Page**, **Starred**, **Manual**, and **Plans & Reports**. Section labels expand and collapse their lists, an adjacent **+** opens creation controls, and listed items open directly.
+- **Starred shortcuts**: Star frequently visited pages, categories, projects, or files to keep them pinned on **Home → Starred**.
+- **Tabs and tables**: Page, project, file, and admin views organize tools into tabs. Index tables support sorting, column controls, and inline editing (**Edit table inline** in Categories and **Edit table** in Active Tasks).
 
-## Notes and saving
+## Saving and offline status
 
-Notes can contain text, a photo, or both. Private notes remain available to their creator and application Administrators. Shared page notes follow page visibility; creating shared Home notes requires Administrator access.
-
-Use a form's Save, Update, or creation button to save your changes. Documents save automatically. **Queued Sync** means a form submission is saved in this browser and waiting for a connection. A disabled **Server Offline** button means that form needs a connection before it can be submitted.
+Collaborative documents save automatically. Forms and tasks use their **Save** or **Update** controls. **Queued Sync** (or **Pending sync** for new tasks and notes) shows work waiting safely in your browser until you reconnect; a disabled **Server Offline** button means that form needs a live connection first—see [Working Offline and Reconnecting](/help/offline).

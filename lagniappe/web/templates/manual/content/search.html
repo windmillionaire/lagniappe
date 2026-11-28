@@ -1,5 +1,6 @@
-{% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, subheading, card, callout, concept, link, nav_buttons %}
 <div class="space-y-6">
+  {{ chapter_header("Search & Filters", icon="search", kind="page") }}
   {% call card() %}
     <p class="text-base-medium text-lg leading-relaxed mb-3">
       Search and filters are how you find things once a workspace fills up.
@@ -68,10 +69,10 @@
       </li>
     </ul>
     <p class="text-base-medium">
-      You can preview a filter's results before saving it, and a saved filter
-      becomes a reusable view with its own columns. Because form fields can be
-      filtered, a filter can reach into the structured data on each record, not
-      just its name and dates.
+      Results update automatically as you add, change, or clear condition chips,
+      and saving a filter keeps it in the <strong>Filters</strong> dropdown for
+      quick reuse. Because form fields can be filtered, a filter can reach into
+      the structured data on each record, not just its name and dates.
     </p>
   {% endcall %}
   {{ heading("Access Is Built In") }}

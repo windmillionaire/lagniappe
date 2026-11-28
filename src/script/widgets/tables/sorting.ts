@@ -302,7 +302,7 @@ export class TableSorting {
 			"button[data-toggle='filter']",
 		);
 		if (desktopButton) {
-			const label = `Sort or filter ${title}`;
+			const label = `Sort ${title}`;
 			desktopButton.title = label;
 			desktopButton.setAttribute("aria-label", label);
 		}

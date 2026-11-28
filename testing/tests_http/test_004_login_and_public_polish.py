@@ -298,6 +298,7 @@ def test_public_manual_sections_render_cleanly_including_all_mcp_clients(
     monkeypatch: pytest.MonkeyPatch,
     http_client,
 ):
+    from bs4 import BeautifulSoup
     from lagniappe.core.definitions.manual import MANUAL_SECTIONS
 
     monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", True)
@@ -305,6 +306,14 @@ def test_public_manual_sections_render_cleanly_including_all_mcp_clients(
         response = http_client.get(f"/manual/section/{section['key']}")
         assert response.status_code == 200, f"Failed rendering manual section {section['key']}"
         html = response.get_data(as_text=True)
+        soup = BeautifulSoup(html, "html.parser")
+        assert len(soup.find_all("h1")) == 1, f"Expected one <h1> in manual section {section['key']}"
+        levels = [int(tag.name[1]) for tag in soup.find_all(re.compile(r"^h[1-6]$"))]
+        for previous, following in zip(levels, levels[1:], strict=False):
+            assert following <= previous + 1, (
+                f"Heading hierarchy skipped level in {section['key']}: {levels}"
+            )
+        assert 'href="/help/' not in html
         if section["key"] == "ai":
             for role in (
                 "external-ai-chatgpt-setup",
@@ -326,6 +335,31 @@ def test_public_manual_sections_render_cleanly_including_all_mcp_clients(
             assert "./setup.sh --agent" in html
             assert "documentation/INSTALL_WITH_AI.md" in html
             assert "Assistant Playbook" in html
+
+    from lagniappe.core.tools.site import public_pages
+
+    monkeypatch.setattr(
+        public_pages,
+        "runtime_settings",
+        lambda *_a, **_k: {"PUBLIC_PAGE_INDEXING": False},
+    )
+    overview_page = http_client.get("/manual/")
+    assert overview_page.status_code == 200
+    overview_html = overview_page.get_data(as_text=True)
+    assert "<h1" in overview_html
+    assert "organizes knowledge, checklists, forms, projects, and AI tools" in overview_html
+    assert 'content="private, internal, non-indexed"' in overview_html
+
+    monkeypatch.setattr(
+        public_pages,
+        "runtime_settings",
+        lambda *_a, **_k: {"PUBLIC_PAGE_INDEXING": True},
+    )
+    indexable_overview = http_client.get("/manual/")
+    assert indexable_overview.status_code == 200
+    indexable_html = indexable_overview.get_data(as_text=True)
+    assert '<meta name="robots" content="index, follow">' in indexable_html
+    assert 'content="private, internal, non-indexed"' not in indexable_html
 
 
 def test_public_directory_places_ordered_group_before_manual(
@@ -508,3 +542,60 @@ def test_signed_out_manual_ai_hides_account_details(
     assert 'data-role="ai-email-account-details"' not in html
     assert 'data-role="external-ai-account-details"' not in html
     assert "secret-inbox@example.com" not in html
+
+
+def test_help_index_and_article_navigation(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client,
+):
+    from lagniappe import reference
+    from lagniappe.core.definitions import Resource
+
+    anonymous = http_client.get("/help/")
+    assert anonymous.status_code == 302
+    assert "/users/login" in anonymous.headers["Location"]
+
+    signed_in_user = SimpleNamespace(
+        email="reader@example.test",
+        name="Reader",
+        hash="reader-hash",
+        urlsafe_key="reader-key",
+        page=SimpleNamespace(key="reader-page", urlsafe_key="reader-page-key"),
+        is_public=False,
+        is_owner=False,
+        is_admin=False,
+        is_authenticated=True,
+        is_active=True,
+        is_anonymous=False,
+        invalidate_cache=False,
+        properties=SimpleNamespace(
+            starred=SimpleNamespace(keys=set()),
+            restrictions=SimpleNamespace(user_assign_restrictions=False),
+        ),
+        access=lambda _tier: False,
+        allowed=lambda *_a, **_k: False,
+        get_id=lambda: "reader@example.test",
+    )
+    monkeypatch.setattr(Resource, "allowed", lambda *_a, **_k: False)
+    monkeypatch.setattr(
+        "lagniappe.web.auth._load_session_user_context",
+        lambda *_a, **_k: (signed_in_user, None),
+    )
+
+    index_response = http_client.get("/help/")
+    assert index_response.status_code == 200
+    index_html = index_response.get_data(as_text=True)
+    assert "<h1" in index_html
+    assert "Help Topics" in index_html
+    for topic in reference.topics().values():
+        assert f'href="{topic.url}"' in index_html
+
+    article_response = http_client.get("/help/backups_archives")
+    assert article_response.status_code == 200
+    article_html = article_response.get_data(as_text=True)
+    assert "Help Topics" in article_html
+    assert "Related topics" in article_html
+    assert 'href="/help/"' in article_html
+    assert "All help topics" in article_html
+    assert 'href="/manual/"' in article_html
+    assert 'content="private, internal, non-indexed"' in article_html

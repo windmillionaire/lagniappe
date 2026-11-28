@@ -4,7 +4,21 @@
 
 /* @style entity.tabIcon */
 button.tab-icon {
+	border-radius: var(--radius-md);
 	padding: 0;
+	&:focus-visible {
+		outline: 2px solid var(--kind-default);
+		outline-offset: 2px;
+	}
+}
+
+/* @style layout.nav.flipper */
+button[data-role="flipper"] {
+	border-radius: var(--radius-md);
+	&:focus-visible {
+		outline: 2px solid var(--kind-default);
+		outline-offset: 2px;
+	}
 }
 
 /* @style entity.tabIcon */
@@ -105,6 +119,30 @@ nav[data-role="page-header"] [data-role="title"] {
 	overflow-wrap: break-word;
 }
 
+/* @style entity.name.anchor */
+[data-menu-anchor]:not(:has(#form-name-display)) {
+	& > [data-role="title"]:not([hidden]),
+	& > a:not([hidden]) {
+		padding-inline-end: 2rem;
+	}
+	& > [lp-menu="title"]:not([hidden]) {
+		margin-inline-start: -1.75rem;
+	}
+}
+
+@media (max-width: 639.98px) {
+	/* @style entity.name.anchor */
+	[data-menu-anchor]:not(:has(#form-name-display)) {
+		& > [data-role="title"]:not([hidden]),
+		& > a:not([hidden]) {
+			padding-inline-end: 2.5rem;
+		}
+		& > [lp-menu="title"]:not([hidden]) {
+			margin-inline-start: -2.25rem;
+		}
+	}
+}
+
 /* @style layout.nav.title */
 [lp-nav] [data-role="header"] > [data-role="title"] {
 	display: inline-block;
@@ -151,7 +189,17 @@ nav[data-role="page-header"] [data-role="title"] {
 	transform: translateY(1px);
 }
 
-/* @style nav.button nav.mobileButton nav.desktopButton */
+/* @style toggle.tabAction */
+[lp-view][data-kind="admin"]:has(
+		#ingress
+			ul[data-widget="IngressList"][data-visible="true"]
+			> [data-role="empty"]
+	)
+	.tab-subtoggle[lp-show="ingress:IngressFileUpload"] {
+	display: none;
+}
+
+/* @style nav.button nav.mobileButton */
 [data-role="actions"] {
 	align-items: center;
 	align-self: flex-start;
@@ -168,10 +216,6 @@ nav[data-role="page-header"] [data-role="title"] {
 			outline: none;
 		}
 		@media (min-width: 640px) {
-			&.desktop {
-				display: inline-grid;
-				place-items: center;
-			}
 			&.mobile {
 				display: none;
 			}
@@ -188,9 +232,6 @@ nav[data-role="page-header"] [data-role="title"] {
 			&.mobile {
 				display: inline-grid;
 				place-items: center;
-			}
-			&.desktop {
-				display: none;
 			}
 		}
 	}

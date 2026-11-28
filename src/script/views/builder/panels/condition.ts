@@ -113,6 +113,20 @@ export class ConditionPanel {
 		this.panel.dataset.visible = "true";
 		this.condition = condition;
 		this.loading = false;
+		requestAnimationFrame(() => {
+			if (
+				this.condition !== condition ||
+				this.panel.dataset.visible !== "true"
+			) {
+				return;
+			}
+			const focusableSelector =
+				"input:not([type='hidden']):not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])";
+			condition.focus();
+			if (!this.panel.contains(document.activeElement)) {
+				this.panel.querySelector<HTMLElement>(focusableSelector)?.focus();
+			}
+		});
 	}
 
 	hide() {

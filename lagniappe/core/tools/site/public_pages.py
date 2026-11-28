@@ -225,11 +225,13 @@ def manual_metadata(section: Mapping[str, str], *, indexing: bool, app_name: str
     """Build public-safe search metadata for one full manual section."""
     path = _manual_path(section)
     name = section["name"]
+    template = section.get("description") or f"Read the {name} section of the {{app_name}} manual."
+    description = template.format(app_name=app_name)
     return {
         "path": path,
         "canonical_url": absolute_url(path),
         "title": f"{name} — {app_name} Manual",
-        "description": f"Read the {name} section of the {app_name} manual.",
+        "description": description,
         "robots": "index, follow" if indexing else "noindex, follow",
     }
 

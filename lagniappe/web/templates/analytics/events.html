@@ -9,9 +9,9 @@
           </div>
           {% if activity.path %}<div class="truncate text-sm text-base-medium">{{ activity.path }}</div>{% endif %}
           {% if activity.visitors %}
-            <div class="flex flex-row flex-wrap gap-x-2 gap-y-1 text-sm text-base-medium">
-              {% for visitor in activity.visitors %}<span>{{ visitor.label }}</span>{% endfor %}
-              {% if activity.remaining_visitors %}<span>+{{ activity.remaining_visitors }} more</span>{% endif %}
+            <div class="flex flex-row flex-wrap items-center gap-x-2 gap-y-1 text-sm text-base-medium">
+              {% for visitor in activity.visitors %}<span>{{ visitor.name }} (<span class="tabular-nums">{{ visitor.count }}</span>)</span>{% endfor %}
+              {% if activity.remaining_visitors %}<span class="rounded-full bg-base-bg px-2 py-0.5 text-xs font-medium text-base-default">+{{ activity.remaining_visitors }} more</span>{% endif %}
             </div>
           {% endif %}
         </div>

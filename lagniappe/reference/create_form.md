@@ -1,18 +1,33 @@
 ---
 title: Creating Forms
+category: pages_and_forms
+keywords:
+  - create form
+  - forms
+  - page form
+  - task form
+  - form index
+  - template
+  - reusable fields
 related:
-- form_builder
-- form_components
-- form_settings
-- form_element_changes
+  - form_builder
+  - form_components
+  - form_settings
+  - form_element_changes
 ---
-Forms define reusable fields for pages or tasks. Create a form from the Form Index or the available creation controls, then open its builder to design the fields.
+Forms define reusable fields for pages or tasks so structured information stays consistent across categories, projects, and checklists.
 
-## Choose the form type
+Open **Navigation → Forms** (the **Forms** index) or click **+ (New Form)** inside a form selector to create a form, then open its builder to design fields and rules.
 
-- **Page Form** describes a record, such as a client, recipe, inventory item, or contact. Its values can support category filters.
-- **Task Form** collects work submissions, such as an inspection, approval, checklist, or intake. Required fields can prevent completion until the necessary answers are present.
+## Choosing a form type
 
-Give the form a recognizable name, choose its type, and create it. In the builder, add components or generate a draft, configure their settings, preview the result, and save.
+- **Page Form**: Describes a record—such as a client, recipe, inventory item, or contact. Page form values can be sliced and compared in [Category filters](/help/filters) and index [Tables](/help/tables).
+- **Task Form**: Captures submissions on checklists or repeatable work—such as an inspection, intake, review, or approval. Required fields can block completion until every mandatory answer is filled in.
 
-Attach page forms directly to pages or use them as category defaults. Attach task forms directly to tasks or use them with model tasks in projects. Reusing one form keeps related records consistent, but later field changes can affect every attached submission. [Converting and Deleting Form Elements](/help/form_element_changes) explains what happens to existing answers.
+## From creation to reuse
+
+1. Give the form a clear name, select **Page Form** or **Task Form**, and create it.
+2. In the [Form Builder](/help/form_builder), drag fields into place or use **Form settings → Generate** (when AI is available) to draft a starting layout, test conditional logic with **Preview**, and click **Save**.
+3. Attach page forms directly on a page's **Info** tab or as a category's default form; attach task forms directly on tasks or to project model tasks.
+
+Because reusing one form connects all attached pages or tasks, later element replacements or deletions update every attached submission—see [Converting and Deleting Form Elements](/help/form_element_changes) before modifying live forms.

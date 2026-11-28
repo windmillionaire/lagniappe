@@ -1,19 +1,27 @@
 ---
 title: User Groups
+category: permissions_and_users
+keywords:
+  - user groups
+  - groups
+  - role
+  - group permissions
+  - team permissions
+  - new group
+  - public group
 related:
-- create_user_group
-- permissions
-- user_settings
-- public_permissions
+  - create_user_group
+  - permissions
+  - user_settings
+  - public_permissions
 ---
-User Groups lets authorized administrators maintain shared permission sets. A change to one group affects its members, making groups useful for stable roles across the workspace.
+User Groups let authorized administrators maintain shared permission sets for teams and roles so updating one group updates every member cleanly.
 
-## Group controls
+Open **Navigation → Users → User Groups** (from the Users header icon) to inspect and manage all roles across your workspace.
 
-Choose **New Group** to create a role, **Public** to inspect the limited public-user policy, or an existing group to edit its name and permissions. Add members from user creation or a person's User Settings.
+## Managing groups and tracing access
 
-Membership in multiple groups combines their grants. Removing a grant from one group does not remove an equivalent grant supplied by another group or individual permission. Restrictions can also require membership in particular groups before a record is visible.
-
-Use specific resource grants when a role covers only part of the workspace. A group called “Owners” or “Administrators” does not assign the application Owner or Administrator role; the Owner manages those roles separately.
-
-To trace a person's access, open their **User Settings** to see their groups. Then open each group in **User Groups** to see its permissions. Page and form restrictions can still limit access.
+- **Controls**: Select **New Group** (`+`) to create a role, pick **Public** to adjust the signed-in public-user policy, or open any existing group to rename it and update permissions. Assign people during user creation or under [User Settings](/help/user_settings).
+- **Combining memberships**: Multiple groups add their grants together—removing an action from one group leaves any equivalent grant from another group or personal permission untouched. Page and form [Restrictions](/help/restrictions) still enforce membership checks separately.
+- **Specific vs. broad grants**: Use specific category or project grants when a role applies only to one part of the workspace. Naming a group `"Administrators"` or `"Owners"` does **not** grant application Administrator or Owner status; the Owner manages those roles separately.
+- **Auditing someone's access**: Check a user's **User Settings** to list their groups, then inspect each group here (plus any page or form restrictions on target records).

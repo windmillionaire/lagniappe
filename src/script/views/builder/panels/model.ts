@@ -199,6 +199,13 @@ const checkbox = (schema: FormFieldSchema) => {
 	return element;
 };
 
+const _previewHint = (text: string) => {
+	const hint = document.createElement("p");
+	hint.dataset.role = "field-preview-hint";
+	hint.textContent = text;
+	return hint;
+};
+
 const html = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -209,6 +216,7 @@ const html = (schema: FormFieldSchema) => {
 		tag: "h3",
 	});
 	element.appendChild(label);
+	element.appendChild(_previewHint("Formatted text"));
 	return element;
 };
 
@@ -265,22 +273,25 @@ const link = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 
-	let linkElt: HTMLElement;
 	if (display.location === "out") {
-		linkElt = primitives.label({
-			icon: display.location,
-			label: display.title,
-			tag: "h3",
-		});
+		element.appendChild(
+			primitives.label({
+				icon: display.location,
+				label: display.title,
+				tag: "h3",
+			}),
+		);
+		element.appendChild(_previewHint(schema.placeholder || "External link"));
 	} else {
-		linkElt = _selectPreview({
-			label: display.title,
-			icon: display.location,
-			selectIcon: "search",
-		});
+		element.appendChild(
+			_selectPreview({
+				label: display.title,
+				icon: display.location,
+				selectIcon: "search",
+			}),
+		);
 	}
 
-	element.appendChild(linkElt);
 	return element;
 };
 
@@ -294,6 +305,7 @@ const bookmark = (schema: FormFieldSchema) => {
 	});
 
 	element.appendChild(label);
+	element.appendChild(_previewHint("Page bookmark"));
 	return element;
 };
 
@@ -378,6 +390,7 @@ const signature = (schema: FormFieldSchema) => {
 	});
 
 	element.appendChild(label);
+	element.appendChild(_previewHint("Signature capture"));
 	return element;
 };
 
@@ -390,8 +403,13 @@ const status = (schema: FormFieldSchema) => {
 		label: display.title,
 		icon: "status",
 	});
+	const statusCount = schema.status?.length || 0;
+	const statusHint = statusCount
+		? `${statusCount} status ${statusCount === 1 ? "rule" : "rules"}`
+		: "Automatic status";
 
 	element.appendChild(label);
+	element.appendChild(_previewHint(statusHint));
 	return element;
 };
 
@@ -423,6 +441,7 @@ const todo = (schema: FormFieldSchema) => {
 			tag: "h3",
 		}),
 	);
+	element.appendChild(_previewHint("Checklist items"));
 	return element;
 };
 
@@ -459,18 +478,33 @@ const table = (schema: FormFieldSchema) => {
 	return element;
 };
 
+function _withConditional(fn: (schema: FormFieldSchema) => HTMLDivElement) {
+	return (schema: FormFieldSchema) => {
+		const element = fn(schema);
+		if (schema.visibility?.length || schema.status?.length) {
+			const badge = document.createElement("span");
+			badge.dataset.role = "conditional-badge";
+			badge.textContent = "Conditional";
+			const host =
+				element.querySelector<HTMLElement>("[data-role='label']") ?? element;
+			host.appendChild(badge);
+		}
+		return element;
+	};
+}
+
 export const ModelElement = {
-	checkbox,
-	html,
-	input,
-	link,
-	bookmark,
-	location,
-	radio,
-	select,
-	signature,
-	status,
-	textarea,
-	table,
-	todo,
+	checkbox: _withConditional(checkbox),
+	html: _withConditional(html),
+	input: _withConditional(input),
+	link: _withConditional(link),
+	bookmark: _withConditional(bookmark),
+	location: _withConditional(location),
+	radio: _withConditional(radio),
+	select: _withConditional(select),
+	signature: _withConditional(signature),
+	status: _withConditional(status),
+	textarea: _withConditional(textarea),
+	table: _withConditional(table),
+	todo: _withConditional(todo),
 };

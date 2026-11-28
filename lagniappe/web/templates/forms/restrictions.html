@@ -2,7 +2,7 @@
 
 {% macro restrict_access(form) %}
   <form data-role="restrict-access" data-form-control="access-restrictions"
-       class="{{ styles.form.tools }} rounded-md bg-kind-bg p-4 outline-2 outline-kind-default"
+       class="{{ styles.form.tools }} w-full box-border rounded-md bg-kind-bg p-4 border-2 border-kind-default"
        data-kind="user"
        data-route="{{ url_for('forms.restrictions', key=form.urlsafe_key) }}"
        method="post">

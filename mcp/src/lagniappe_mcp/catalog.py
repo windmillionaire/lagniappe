@@ -450,7 +450,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
     return (
         ToolDefinition(
             "answer_question",
-            "Get lightweight guidance and personal Page context for answering or retrieving tasks without saving a report. The client model answers using plan-free read tools; this does not call a server model or create a Plan. Answer in chat first and offer to save afterward. Only when the user wants to save, use start_plan then submit_plan. Reuse this context during the conversation.",
+            "Get lightweight guidance and personal Page context for answering questions, retrieving tasks, or looking up how Lagniappe works via get_help without saving a report. The client model answers using plan-free read tools; this does not call a server model or create a Plan. Answer in chat first and offer to save afterward. Only when the user wants to save, use start_plan then submit_plan. Reuse this context during the conversation.",
             {"type": "object", "properties": {}, "additionalProperties": False},
             _WIRE["AnswerContext"],
             "answer_context",

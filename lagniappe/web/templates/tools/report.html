@@ -230,6 +230,8 @@
   {% endif %}
 {% endmacro %}
 
+{% from 'home/tools.html' import report_stage_label, report_stage_pill_classes %}
+
 {% block title %}
   {{ report.name }}
 {% endblock title %}
@@ -261,6 +263,7 @@
   {% set revise_heading = "Create a corrective plan" if creates_correction else ("Revise Response" if is_ask else "Revise Proposal") %}
   {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
   {% set operation_status = report._operation_status|default(none) %}
+  {% set stage_label = report_stage_label(report)|trim %}
   <div lp-view
         lp-entity
         data-key="{{ report.urlsafe_key }}"
@@ -284,11 +287,20 @@
         class="group/view max-w-5xl mx-auto">
     <div class="{{ styles.layout.view.header }}" data-flipped="false">
       <nav class="{{ styles.layout.view.title }}" data-nav="view">
-        <div class="flex min-w-0 items-center gap-2.5">
-          {{ render_icon(report_icon, "icon-xl shrink-0 text-kind-default") }}
-          <h1 data-role="title">{{ report_title }}</h1>
+        <div class="flex min-w-0 items-start gap-2.5">
+          {{ render_icon(report_icon, "icon-xl mt-0.5 shrink-0 text-kind-default") }}
+          <div class="flex min-w-0 flex-col gap-1.5">
+            <h1 data-role="title">{{ report_title }}</h1>
+            {% if stage_label %}
+              <span data-role="report-stage"
+                    class="inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold {{ report_stage_pill_classes(report)|trim }}">{{ stage_label }}</span>
+            {% endif %}
+          </div>
         </div>
         <div class="{{ styles.layout.nav.group }}" data-role="actions">
+          {% if report.allowed(Action.DELETE) %}
+            {{ controls.delete(label='Delete ' ~ report.name) }}
+          {% endif %}
           <a href="{{ url_for('home.home_page') }}"
              class="{{ styles.toggle.container }}"
              aria-label="Close"
@@ -621,7 +633,7 @@
                   data-submitting="{{ 'Creating corrective plan' if creates_correction else ('Revising Response' if is_ask else 'Revising Plan') }}"
                   data-submitted="{{ 'Corrective plan started' if creates_correction else 'Revision Started' }}"
                   data-icon="generate"
-                  class="flex flex-col gap-2 rounded-md bg-base-bg p-3 outline-2 outline-kind-default">
+                  class="flex w-full flex-col gap-2 rounded-md border border-base-light/60 bg-base-bg p-3">
               <label for="report-feedback"
                      class="text-sm font-semibold text-base-dark">{{ revise_heading }}</label>
               {% if creates_correction %}

@@ -85,6 +85,7 @@ class Cache:
                 raise
             schema = (
                 TextField("name", weight=4, sortable=True),
+                TextField("keywords", weight=2, sortable=True),
                 TextField("desc", weight=1, sortable=True),
                 TextField("doc", weight=0.5, sortable=True),
                 TextField("values", weight=0.25, sortable=True),

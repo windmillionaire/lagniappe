@@ -145,9 +145,7 @@
         {{ render_icon("check", (styles.checkbox.icon)) }}
       </div>
       <div data-menu-anchor class="{{ styles.task.title }}">
-        <span class="text-base-dark" data-role="title">{{ t.name }}</span>
-        {% if can_edit_chips or can_move or can_combine or t.allowed(Action.DELETE) %}
-          {% call menus.title("Task actions", "ml-1") %}
+        <span class="text-base-dark" data-role="title">{{ t.name }}</span>{%- if can_edit_chips or can_move or can_combine or t.allowed(Action.DELETE) -%}{%- call menus.title("Task actions", "ml-1") -%}
             {% if can_edit_chips %}
               {{ menus.action("Rename", "edit", "rename", "task") }}
             {% endif %}

@@ -593,3 +593,32 @@ img.ProseMirror-separator {
 .ProseMirror-focused .ProseMirror-gapcursor {
 	display: block;
 }
+
+/* @style builder.model */
+#model-panel [data-role="conditional-badge"],
+#default-panel [data-role="conditional-badge"] {
+	margin-inline-start: 0.25rem;
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	border-radius: 9999px;
+	border: 1px solid var(--color-form-light);
+	background-color: var(--color-form-bg);
+	padding: 0.125rem 0.5rem;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	line-height: 1;
+	color: var(--color-form-dark);
+}
+
+/* @style builder.model */
+.form-element > [data-role="field-preview-hint"] {
+	margin-top: 0.25rem;
+	padding-inline-start: 1.5rem;
+	font-size: 0.75rem;
+	line-height: 1.25;
+	color: var(--color-base-medium);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

@@ -71,6 +71,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 	declare _panelHandlersAdded?: boolean;
 	declare _observer?: IntersectionObserver | null;
 	declare _panelKeydown: (event: KeyboardEvent) => void;
+	declare _elementFocusOut: (event: FocusEvent) => void;
 
 	constructor(element: HTMLElement) {
 		this._destroyed = false;
@@ -97,6 +98,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 
 		this.elementKeydown = this.elementKeydown.bind(this);
 		this.elementClick = this.elementClick.bind(this);
+		this._elementFocusOut = this.elementFocusOut.bind(this);
 		this._documentClick = this._documentClick.bind(this);
 		this._documentKeydown = this._documentKeydown.bind(this);
 
@@ -163,6 +165,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 
 		this.element.addEventListener("keydown", this.elementKeydown);
 		this.element.addEventListener("click", this.elementClick);
+		this.element.addEventListener("focusout", this._elementFocusOut);
 		this._elementHandlersAdded = true;
 	}
 
@@ -171,6 +174,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 
 		this.element.removeEventListener("keydown", this.elementKeydown);
 		this.element.removeEventListener("click", this.elementClick);
+		this.element.removeEventListener("focusout", this._elementFocusOut);
 		this._elementHandlersAdded = false;
 	}
 
@@ -219,6 +223,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		this.panel.addEventListener("click", this._optionClick);
 		if (this.popupRole === "menu") {
 			this.panel.addEventListener("keydown", this._panelKeydown);
+			this.panel.addEventListener("focusout", this._elementFocusOut);
 		}
 		this._panelHandlersAdded = true;
 	}
@@ -230,6 +235,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		this.panel?.removeEventListener("pointerdown", this._panelPointerDown);
 		this.panel?.removeEventListener("click", this._optionClick);
 		this.panel?.removeEventListener("keydown", this._panelKeydown);
+		this.panel?.removeEventListener("focusout", this._elementFocusOut);
 		this._panelHandlersAdded = false;
 	}
 
@@ -624,6 +630,28 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		// Keep DOM focus on the trigger so aria-activedescendant keeps working
 		// and the input doesn't lose focus when the user clicks an option.
 		event.preventDefault();
+	}
+
+	elementFocusOut(event: FocusEvent) {
+		if (!this.panelOpen) return;
+		const next = event.relatedTarget;
+		if (
+			next instanceof Node &&
+			(this.element.contains(next) || this.panel?.contains(next))
+		) {
+			return;
+		}
+		queueMicrotask(() => {
+			if (this._destroyed || !this.panelOpen) return;
+			const active = document.activeElement;
+			if (
+				active instanceof Node &&
+				(this.element.contains(active) || this.panel?.contains(active))
+			) {
+				return;
+			}
+			this.hidePanel();
+		});
 	}
 
 	_documentClick(event: MouseEvent) {

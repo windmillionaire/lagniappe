@@ -16,8 +16,7 @@
            data-kind="category">{{ category.name }}</a>
       {% else %}
         <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
-          <span data-role="title" class="text-kind-default" data-kind="category">{{ category.name }}</span>
-          {% call menus.title("Category actions") %}
+          <span data-role="title" class="text-kind-default" data-kind="category">{{ category.name }}</span>{%- call menus.title("Category actions") -%}
             {% if can_edit %}
               {{ menus.category_action("Rename", "edit", "rename", "category") }}
               {{ menus.category_action("Edit description" if category.description else "Add description", "textarea", "description", "category", "description-action-label") }}
@@ -45,6 +44,7 @@
     <div data-role="actions">
       <button type="button"
               class="{{ styles.nav.mobileButton }}"
+              data-kind="default"
               lp-show="table:MobileTableControls"
               data-toggle="true"
               aria-label="Table controls"
@@ -114,7 +114,7 @@
                hidden></div>
         {% endif %}
       {% endif %}
-      {{ mobile_toggles((index or filtered).table.columns) }}
+      {{ mobile_toggles((index or filtered).table.columns, kind=(index or filtered).table.kind) }}
     </div>
     {% if not filtered and can_edit %}{{ tools_section(category) }}{% endif %}
     {% if filtered %}

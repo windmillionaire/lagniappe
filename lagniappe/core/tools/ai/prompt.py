@@ -50,9 +50,10 @@ TOOL_CALL_PLANNING = """
   applicable `get_guidelines` bundle.
 - Defer a call only when its arguments depend on an earlier tool result. Do not
   add unnecessary calls merely to form a batch.
-- When get_help is available, consult it for questions about Lagniappe features
-  and cite the returned topic URLs. General help does not establish the user's
-  permission to act on a particular record.
+- When get_help is available, consult it (via query, topic_id, or
+  list_topics=true) for questions about Lagniappe features and cite the
+  returned topic URLs. General help does not establish the user's permission to act
+  on a particular record.
 """
 
 

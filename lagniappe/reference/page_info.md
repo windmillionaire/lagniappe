@@ -1,26 +1,42 @@
 ---
 title: Pages and Page Information
+category: getting_started
+keywords:
+  - page info
+  - page actions
+  - rename page
+  - description
+  - my page
+  - categories
+  - attached form
+  - autofill
+  - photo
+  - image
+  - hide image
+  - replace image
+  - paste image
+  - generate image
+  - star
 related:
-- create_page
-- documents
-- tasks
-- upload_file
-- document_settings
+  - create_page
+  - documents
+  - tasks
+  - upload_file
+  - document_settings
+  - restrictions
 ---
-A page is a workspace record for a person, subject, item, or other information you want to keep together. Use its tabs to move between details, tasks, files, and documents.
+A page brings together structured details, tasks, files, notes, and a document for one person, item, or topic.
 
-## What a page contains
+Open your own personal page anytime via **Navigation → My Page** or the **My Page** shortcut on **Home**.
 
-**Info** holds its name, description, category membership, optional image, and attached page form. Form fields collect structured values that can be used in category filters.
+## Page actions and inline controls
 
-Tasks track work belonging to the page. Files hold uploaded materials. Notes beneath the title can contain text, a photo, or both. A shared note is visible to people who can view the page; a private note is visible to its creator and application Administrators.
+- **Page actions menu**: Rename the page (**Rename**), **Add description** / **Edit description**, pin it to **Home → Starred** (**Star**), add a scratchpad update beneath the title (**Add note**), or **Delete** the page when permitted.
+- **Tabs**: Switch between **Document**, **Info**, **Tasks**, and **Files** (`Image` also appears as a dedicated tab on mobile when an image exists).
+- **Tab tools**: Desktop tab headers offer quick shortcuts to **Restrictions** (for sharing non-user pages, or **Settings** / **User settings** on user pages), **Publishing** (on the **Document** tab—publishes only that document without exposing private page data), and **Upload** (on **Files**).
 
-The document provides a rich text writing space. Public sharing has separate controls and does not publish the whole private workspace record.
+## Page Info and cover images
 
-## Your personal page
-
-The account link in the header opens your personal page. Tasks created from Home belong there. **User Settings** controls account preferences and, for authorized administrators, account access.
-
-Star a page for easy access from Home. Use **Edit table** where available for supported inline updates. A page can appear in multiple categories, but any page or form restrictions still apply to ordinary users.
-
-The title actions provide Star, Add note, and Delete when permitted. Image controls can upload, generate, show, or hide the page image. On mobile, use the Image tab for an existing image and Info for available image-creation controls.
+- **Info tab**: Holds the page's **Categories** (a page can belong to multiple categories), **Attached Form**, structured form fields (used in category filters), and optional **AI autofill**.
+- **Cover images**: Use the Info photo controls to **Upload image**, **Generate image** (when enabled), or **Hide image**, and use the **Image** menu to **Replace**, **Paste**, **Generate**, or **Remove** an image. On mobile, use **Info** for image-creation controls and the **Image** tab for existing photos.
+- **Public access separation**: Page and form restrictions still apply to ordinary users wherever a page appears. Publishing controls share only the document; see [Document Settings](/help/document_settings).

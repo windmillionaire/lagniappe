@@ -6,10 +6,10 @@
 
 {% block description -%}
   <p class="text-delete-default text-sm">
-    Are you sure you want to delete this task? This will also delete all attached files.
+    Are you sure you want to delete <strong class="font-semibold">{{ entity.name }}</strong>? This will also delete all attached files.
   </p>
 {%- endblock description %}
 
 {% block button -%}
-  {{ delete_action(url_for('tasks.delete', key=entity.urlsafe_key), "Delete " ~ entity.name) }}
+  {{ delete_action(url_for('tasks.delete', key=entity.urlsafe_key), "Delete Task") }}
 {%- endblock button %}

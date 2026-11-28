@@ -108,9 +108,10 @@ const dueDateText = (parent: SectionToggleControl) => {
 		const pluralUnit = parseInt(String(interval), 10) > 1 ? `${unit}s` : unit;
 		displayText += ` (repeats when completed after ${interval} ${pluralUnit})`;
 	} else if (schedule.scheduled) {
-		displayText += ` (repeats ${
-			schedule.scheduled.text || schedule.scheduled.mode
-		})`;
+		const scheduleLabel = schedule.scheduled.text || schedule.scheduled.mode;
+		if (scheduleLabel) {
+			displayText += ` (repeats ${scheduleLabel})`;
+		}
 	} else if (schedule.periodic) {
 		displayText += ` (repeats ${schedule.periodic.text || "periodically"})`;
 	}

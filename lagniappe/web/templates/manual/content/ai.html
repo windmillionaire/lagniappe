@@ -1,5 +1,6 @@
-{% from "manual/macros.html" import heading, subheading, card, callout, code, concept, nav_buttons, link %}
+{% from "manual/macros.html" import chapter_header, heading, subheading, card, callout, code, concept, nav_buttons, link %}
 <div class="space-y-6">
+  {{ chapter_header("AI Integration", icon="generate", kind="form") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
       Lagniappe can use Google Vertex AI for optional generation, extraction, and
@@ -11,7 +12,7 @@
       permission context.
     </p>
   {% endcall %}
-  {{ heading("What AI Can Do", icon="generate", kind="form") }}
+  {{ heading("What AI Can Do") }}
   {% call card() %}
     <ul class="list-disc pl-5 text-base-medium space-y-2">
       <li>Generate draft form schemas from descriptions.</li>
@@ -25,7 +26,7 @@
       <li>Suggest workspace-native actions, such as adding pages, tasks, files, forms, or projects in the right place.</li>
     </ul>
   {% endcall %}
-  {{ heading("Plans & Reports", icon="generate", kind="form") }}
+  {{ heading("Plans & Reports") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
       Open <strong>Create a Plan</strong> on Home with a question, a request,
@@ -114,9 +115,10 @@
       </p>
     {% endif %}
   {% endcall %}
+  {{ heading("External AI Connections") }}
   {% call card() %}
     <details class="group" data-role="external-ai-help">
-      <summary class="{{ styles.disclosure.summary }} text-page-default font-semibold">
+      <summary class="{{ styles.disclosure.summary }} text-base-dark font-semibold hover:text-page-default rounded-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default">
         <span>Use an external AI agent: MCP or skill</span>
         {{ render_icon("down", styles.disclosure.chevron) }}
       </summary>
@@ -135,7 +137,7 @@
         {% if show_connection_details %}
           <div data-role="external-ai-account-details" class="space-y-2">
             {% if CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE %}
-              <p>Connection name: <code>{{ CONFIG.MCP_NAME }}</code></p>
+              <p>Connection name: <code class="whitespace-nowrap">{{ CONFIG.MCP_NAME }}</code></p>
               <p>MCP server: <code>{{ CONFIG.MCP_RESOURCE }}</code></p>
             {% else %}
               <p>Ask the installation Owner for the MCP server address once setup is complete.</p>
@@ -153,7 +155,7 @@
           {% set mcp_url = CONFIG.MCP_RESOURCE if show_connection_details else 'https://MCP-ENDPOINT/mcp' %}
           {% set mcp_name = CONFIG.MCP_NAME if show_connection_details else 'lagniappe-remote' %}
           <div data-role="external-ai-chatgpt-setup" class="space-y-3">
-            <h3 class="font-semibold text-page-default">Connect ChatGPT</h3>
+            <h3 class="font-semibold text-base-dark">Connect ChatGPT</h3>
             <p>You can add this installation as a custom MCP connector in the ChatGPT
               desktop app or on the web. No Codex CLI or Lagniappe API key is needed.</p>
             <ol class="list-decimal pl-5 space-y-2">
@@ -163,7 +165,7 @@
                 Availability depends on your ChatGPT plan and workspace policy.</li>
               <li>Open <strong>Plugins</strong> (or <strong>Connectors</strong>)
                 and choose <strong>Add</strong> / <strong>Create</strong> to add
-                a custom MCP server. Enter <code>{{ mcp_name }}</code> as the
+                a custom MCP server. Enter <code class="whitespace-nowrap">{{ mcp_name }}</code> as the
                 name and a short description such as “Connect to my Lagniappe
                 workspace.”</li>
               <li>Enter the MCP server URL:
@@ -187,7 +189,7 @@
               <strong>My Page / User Settings / Manage AI connections</strong> in Lagniappe.</p>
           </div>
           <div data-role="external-ai-codex-setup" class="space-y-3">
-            <h3 class="font-semibold text-page-default">Connect Codex CLI</h3>
+            <h3 class="font-semibold text-base-dark">Connect Codex CLI</h3>
             <p>With Codex CLI installed, run this command in a terminal.
               No Lagniappe API key or local Lagniappe package is needed.</p>
             {% if not show_connection_details %}
@@ -211,14 +213,14 @@
               in Lagniappe.</p>
           </div>
           <div data-role="external-ai-claude-setup" class="space-y-3">
-            <h3 class="font-semibold text-page-default">Connect Claude: web, desktop, or Claude Code</h3>
+            <h3 class="font-semibold text-base-dark">Connect Claude: web, desktop, or Claude Code</h3>
             <p>Claude web, Claude Desktop, and Claude Code connect over remote MCP
               with OAuth metadata discovery. No Lagniappe API key or manual client
               secret is needed.</p>
             <ol class="list-decimal pl-5 space-y-2">
               <li><strong>Claude web or desktop:</strong> open
                 <strong>Settings / Connectors</strong>, add a custom connector named
-                <code>{{ mcp_name }}</code> with server URL <code>{{ mcp_url }}</code>,
+                <code class="whitespace-nowrap">{{ mcp_name }}</code> with server URL <code>{{ mcp_url }}</code>,
                 then follow the sign-in prompt and choose <strong>Allow</strong>.</li>
               <li><strong>Claude Code CLI:</strong> add the remote HTTP server and
                 complete the browser sign-in prompt:</li>
@@ -228,7 +230,7 @@
               <strong>My Page / User Settings / Manage AI connections</strong> in Lagniappe.</p>
           </div>
           <div data-role="external-ai-antigravity-setup" class="space-y-3">
-            <h3 class="font-semibold text-page-default">Connect Antigravity</h3>
+            <h3 class="font-semibold text-base-dark">Connect Antigravity</h3>
             <p>Add the remote MCP server URL <code>{{ mcp_url }}</code> in your
               Antigravity MCP configuration (or via the Antigravity CLI) without
               an API key; Antigravity discovers OAuth automatically via its
@@ -239,7 +241,7 @@
               <strong>My Page / User Settings / Manage AI connections</strong> in Lagniappe.</p>
           </div>
           <div data-role="external-ai-pi-setup" class="space-y-3">
-            <h3 class="font-semibold text-page-default">Connect Pi</h3>
+            <h3 class="font-semibold text-base-dark">Connect Pi</h3>
             <p>With Pi's built-in MCP client enabled, add the remote MCP server
               URL <code>{{ mcp_url }}</code> using OAuth client metadata
               discovery (<code>--oauth-client-registration cimd</code>, or set

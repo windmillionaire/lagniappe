@@ -1,26 +1,34 @@
 ---
 title: Uploading Files
+category: pages_and_forms
+keywords:
+  - upload file
+  - files
+  - attachments
+  - preview
+  - text content
+  - extracted text
+  - download
+  - move file
+  - file actions
+  - reload to view text
 related:
-- ai_tools
-- import_data
-- tasks
+  - ai_tools
+  - import_data
+  - tasks
+  - page_info
 ---
-Upload File adds material to a page or task. Choose or drop a file from your device to upload it.
+Attach documents, images, spreadsheets, and PDFs to any page or task while preserving the original download alongside optional text extraction and AI summaries.
 
-The original upload is retained. Optional extraction and AI summaries add readable or searchable information without rewriting the original file.
+Open a page's **Files** tab (or use the desktop **Upload** button) and choose or drag-and-drop files from your device, or attach a file inside a task's detail chips.
 
-## Processing options
+## Processing, Preview, and Text Content
 
-- Extract text from supported documents when you need readable content inside the app.
-- Enable search for content that should be discoverable through workspace search.
-- Generate a summary when a short description would make the file easier to recognize.
+- **Extraction and search**: Choose to extract readable text, index that content for workspace [Search](/help/search), or generate an AI summary so teammates can skim long uploads faster.
+- **Checking status**: On a file's **File info** tab, **Text Extraction** and **Content Summarization** show live progress and clear error messages if processing fails. When extraction finishes with **Text extraction complete.**, click **Reload to view text**, then switch to **Text Content**.
+- **File views**: Use **Preview** for supported native previews, **Text Content** for extracted text, the header **Download** link for the untouched original file, and **File actions** (**Star**, **Delete**) in the title menu. Badges link directly back to owning pages or tasks.
 
-On the file's **Info** tab, **Text Extraction** and **Content Summarization** show a spinner while work is running and an error if it fails. If **Text extraction complete.** appears, choose **Reload to view text**, then open **Text Content**.
+## Ownership and visibility
 
-**Preview** displays supported original content; **Text Content** displays extracted text. The filename can open a browser preview, and badges link back to related pages or tasks.
-
-## Ownership and access
-
-Each uploaded file belongs to one page or one task. To move it, change its owner in File Info. This transfers the file rather than attaching it to both records. Task-owned files inherit their task's access and restrictions.
-
-Files uploaded as plan evidence can remain readable through that plan without appearing in workspace search. Approved execution files them onto a page or task when the proposal requests it. Publishing a page document does not make all its uploaded files public.
+- Every uploaded file belongs to one page or one task; changing its owner in **File info** transfers the file rather than cloning it. Task-owned files follow that task's access and restrictions.
+- Files uploaded onto an AI plan as evidence stay readable inside that plan without cluttering workspace search unless an approved execution moves them onto a page or task. Publishing a page's document does not automatically publish all files uploaded on that page.

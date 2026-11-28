@@ -18,17 +18,26 @@
 
 /* @style link.title */
 .link-title {
+	border-radius: var(--radius-sm);
 	color: var(--kind-default);
 	max-width: 100%;
 	overflow-wrap: break-word;
 	&:focus {
 		outline: none;
 	}
-	&:hover,
+	&:hover {
+		text-decoration-line: underline;
+		color: var(--kind-dark);
+		text-decoration-color: var(--kind-dark);
+	}
 	&:focus-visible,
 	.group\/item:hover:not(:has(a:hover)) & {
 		text-decoration-line: underline;
 		color: var(--kind-dark);
 		text-decoration-color: var(--kind-dark);
+	}
+	&:focus-visible {
+		outline: 2px solid var(--kind-default);
+		outline-offset: 2px;
 	}
 }

@@ -86,9 +86,16 @@ export class FormRenderer {
 	async render() {
 		await this._createElements();
 
-		const html = Array.from(this.elements.values())
-			.map((element) => element.elt)
-			.filter((element): element is HTMLElement => Boolean(element));
+		const html: HTMLElement[] = [];
+		for (const element of this.elements.values()) {
+			try {
+				if (element.elt) html.push(element.elt);
+			} catch (error) {
+				captureError(error, this.target, {
+					schema: element.schema,
+				});
+			}
+		}
 		this.form.target.replaceChildren(...html);
 
 		this._initStatusTriggers();

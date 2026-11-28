@@ -138,7 +138,7 @@
     </div>
   </div>
   {% if not can_edit_form %}
-    <p data-role="readonly-notice" class="{{ styles.message }} mt-3">
+    <p data-role="readonly-notice" data-kind="form" class="{{ styles.message }} mt-3">
       <strong>Read-only mode.</strong> You can explore the builder and preview changes, but your changes won't be saved.
     </p>
   {% endif %}
@@ -209,10 +209,17 @@
          class="flex items-start gap-3 rounded-md border border-form-light/70 bg-form-bg/60 p-3.5 text-sm text-base-dark">
       {{ render_icon("info", "icon-lg shrink-0 text-form-default mt-0.5") }}
       <div class="min-w-0">
-        <p class="font-semibold text-base-dark">Editing is desktop-only</p>
-        <p class="mt-0.5 text-base-medium">
-          Showing a read-only preview of this form. Open this page on a larger screen to edit fields, settings, or conditions.
-        </p>
+        {% if can_edit_form %}
+          <p class="font-semibold text-base-dark">Editing is desktop-only</p>
+          <p class="mt-0.5 text-base-medium">
+            Showing a read-only preview of this form. Open this page on a larger screen to edit fields, settings, or conditions.
+          </p>
+        {% else %}
+          <p class="font-semibold text-base-dark">Read-only preview</p>
+          <p class="mt-0.5 text-base-medium">
+            Showing a read-only preview of this form.
+          </p>
+        {% endif %}
       </div>
     </div>
     <section aria-label="Form preview"
@@ -256,7 +263,7 @@
           <h2>Components</h2>
           {{ help('form_components') }}
         </div>
-        <div class="flex flex-col gap-3" id="components-panel"></div>
+        <div class="flex flex-col gap-2 pb-2" id="components-panel"></div>
       </section>
       <section class="{{ styles.builder.sections.main }}"
                id="main-column"
@@ -300,6 +307,12 @@
         <div id="form-settings-panel" data-visible="true" class="flex flex-col">
           {% if can_generate_form %}{{ generate() }}{% endif %}
           {% if can_restrict_form %}{{ restrict_access(form) }}{% endif %}
+          {% if not can_generate_form and not can_restrict_form %}
+            <p data-role="empty-settings-prompt"
+               class="rounded-md border border-dashed border-base-light/60 bg-base-bg/40 px-4 py-6 text-center text-sm italic text-base-medium">
+              Select a field to inspect its settings.
+            </p>
+          {% endif %}
         </div>
         <div id="settings-panel" class="flex flex-col gap-3" data-visible="false"></div>
       </section>

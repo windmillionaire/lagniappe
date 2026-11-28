@@ -17,6 +17,7 @@ Provides tools that let the AI query the app's data at generation time:
 - get_filter_schema: describe project/category filter fields and comparators
 - query_workspace_filter: filter project tasks or category pages via shared cache
 - get_guidelines: retrieve detailed prompt guidelines on demand
+- get_help: search, load, or list Lagniappe reference help articles
 """
 
 from collections.abc import Callable, Iterable, Mapping

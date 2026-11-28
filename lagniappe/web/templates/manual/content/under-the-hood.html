@@ -1,5 +1,6 @@
-{% from "manual/macros.html" import heading, subheading, card, callout, link, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, subheading, card, callout, link, nav_buttons %}
 <div class="space-y-6">
+  {{ chapter_header("Under the Hood", icon="sitemap", kind="page") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
       Lagniappe is a Flask/Jinja application with server-rendered HTML and

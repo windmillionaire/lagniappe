@@ -1,21 +1,29 @@
 ---
 title: Administrators
+category: site_administration
+keywords:
+  - administrators
+  - owner
+  - admin role
+  - site administrators
+  - revoke admin
+  - handoff
 related:
-- permissions
-- create_user
-- site_settings
-- site_installation_access
+  - permissions
+  - create_user
+  - site_settings
+  - site_installation_access
 ---
-Administrators manage ordinary Lagniappe content, users, groups, ingress, exports, and site settings. The primary Owner controls who holds this role.
+Administrators operate day-to-day workspace content, users, user groups, data imports, backups, and site settings, while the primary Owner controls who holds Administrator status.
 
-## Assign or remove the role
+The Administrator roster appears under **Admin → Site Settings** for the **Owner**.
 
-Use the Administrator roster as the Owner to add an eligible managed user or remove an additional Administrator. Removing the role keeps the managed account active; use Users when an account should be deleted.
+## Adding or removing Administrators
 
-An additional Administrator cannot edit or delete the Owner or another Administrator. Privileged account changes must be made by the Owner. Secret-bearing Configuration and installation handoff controls also remain Owner-only.
+- As the **Owner**, add an eligible managed user to grant Administrator privileges, or remove an additional Administrator when they should return to ordinary managed permissions. Removing Administrator status keeps their regular account intact—use **Users** when an account should be deleted completely.
+- **Privileged boundaries**: Additional Administrators cannot edit or delete the Owner or another Administrator, and cannot open secret-bearing **Configuration** or **Installation Access** handoff controls.
 
-## Separate systems of access
+## Application roles vs. cloud & AI access
 
-Application Administrator status does not grant a Google Cloud IAM role or access to outside provider accounts. It also does not automatically raise the person's site-funded AI tier.
-
-If someone is helping with installation, distinguish their temporary application role from their cloud and provider access. Removing an Administrator in Lagniappe does not finish an infrastructure handoff. Use the installation-access guidance and setup workflow for that work.
+- Holding Administrator status inside Lagniappe does **not** grant Google Cloud IAM roles, external service dashboards, or automatic site-funded AI credits (users still keep their own **None / Ask / Create** tier).
+- If an installer helped deploy the site under a temporary Administrator role, removing them here is only part of handoff—complete [Installation Access and Handoff](/help/site_installation_access) with `./setup.sh handoff` so cloud bindings and setup metadata match.

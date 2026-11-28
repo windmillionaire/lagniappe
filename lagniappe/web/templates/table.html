@@ -54,8 +54,8 @@
                       class="{{ styles.table.filters.icon.container }}"
                       data-visible="false"
                       data-toggle="filter"
-                      aria-label="Sort or filter {{ col.title }}"
-                      title="Sort or filter {{ col.title }}">
+                      aria-label="Sort {{ col.title }}"
+                      title="Sort {{ col.title }}">
                 {{ render_icon("filter.active", styles.table.filters.icon.active) }}
                 {{ render_icon("filter.inactive", styles.table.filters.icon.inactive) }}
               </button>
@@ -70,7 +70,7 @@
                     class="{{ styles.toggle.container }} inline-grid"
                     lp-show="{{ resolved_id }}:TableVisibility"
                     data-toggle="true"
-                    data-kind="{{ parent.table.kind }}"
+                    data-kind="default"
                     aria-label="Choose visible columns"
                     title="Choose visible columns">
               {{ render_icon("column") }}
@@ -137,10 +137,11 @@
   </tr>
 {% endmacro %}
 
-{% macro mobile_toggles(columns) %}
+{% macro mobile_toggles(columns, kind=None) %}
   <div id="mobile-controls"
        data-widget="MobileTableControls"
        data-visible="false"
+       {% if kind %}data-kind="{{ kind }}"{% endif %}
        class="{{ styles.index.mobile.controls }}">
     <div data-role="mobile-controls-header"
          class="{{ styles.index.mobile.header }}">

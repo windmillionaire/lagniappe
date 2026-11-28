@@ -1,21 +1,38 @@
-{% macro modal(title) %}
+{% macro modal(title, action_href=None, action_label=None, action_kind='page') %}
   <div id="modal"
        class="{{ styles.modal.wrapper }}">
-    <div class="{{ styles.modal.content }}"
+    <div class="{{ styles.modal.dialog }}"
          id="modal-content"
          role="dialog"
          aria-modal="true"
          aria-labelledby="modal-title">
-      <div class="{{ styles.modal.header }}">
-        <h2 id="modal-title" class="text-xl font-bold text-base-dark">{{ title }}</h2>
-        <button type="button"
-                lp-control="close"
-                class="{{ styles.button.close }}">
-          Close
-        </button>
+      <div class="{{ styles.modal.dialogHeader }}">
+        <div class="flex min-w-0 items-center gap-2">
+          <button type="button"
+                  data-role="help-modal-back"
+                  hidden
+                  aria-label="Back to previous help topic"
+                  class="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md border border-base-light/70 bg-white px-2.5 py-1 text-sm font-semibold text-base-dark hover:bg-base-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default sm:min-h-0">
+            {{ render_icon("back") }}
+            <span class="hidden sm:inline">Back</span>
+          </button>
+          <h2 id="modal-title" class="min-w-0 text-lg font-bold leading-snug text-base-dark sm:text-xl">{{ title }}</h2>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
+          {% if action_href and action_label %}
+            <a href="{{ action_href }}"
+               data-kind="{{ action_kind }}"
+               class="inline-flex min-h-9 items-center justify-center rounded-md bg-kind-default px-3 py-1.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-kind-dark focus-visible:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-dark">{{ action_label }}</a>
+          {% endif %}
+          <button type="button"
+                  lp-control="close"
+                  class="{{ styles.button.close }}">
+            Close
+          </button>
+        </div>
       </div>
-      <div class="p-6">
-        <div class="space-y-6">{{ caller() }}</div>
+      <div data-role="help-modal-body" class="{{ styles.modal.dialogBody }}">
+        <div class="space-y-4">{{ caller() }}</div>
       </div>
     </div>
   </div>

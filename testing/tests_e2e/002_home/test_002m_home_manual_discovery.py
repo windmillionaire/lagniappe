@@ -63,7 +63,7 @@ def test_public_manual_search_metadata_and_navigation(get_user):
     expect(anonymous.page).to_have_title(f"Security — {CONFIG.APP_NAME} Manual")
     expect(anonymous.locate("meta[name='description']")).to_have_attribute(
         "content",
-        f"Read the Security section of the {CONFIG.APP_NAME} manual.",
+        f"Understand {CONFIG.APP_NAME}'s server-enforced permissions, Google Identity Platform sign-in, HTTP security headers, owner boundaries, and Secret Manager.",
     )
     expect(anonymous.locate("link[rel='canonical']")).to_have_attribute(
         "href", re.compile(r"/manual/security$")
@@ -85,7 +85,7 @@ def test_public_manual_search_metadata_and_navigation(get_user):
     expect(anonymous.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
     expect(anonymous.locate("meta[name='description']")).to_have_attribute(
         "content",
-        f"Read the Forms section of the {CONFIG.APP_NAME} manual.",
+        "Design reusable structured forms with sections, field validation, conditional rules, and attached AI summaries.",
     )
     expect(anonymous.locate("link[rel='canonical']")).to_have_attribute(
         "href", re.compile(r"/manual/forms$")
@@ -102,7 +102,7 @@ def test_public_manual_search_metadata_and_navigation(get_user):
     expect(anonymous.page).to_have_title(f"Forms — {CONFIG.APP_NAME} Manual")
     expect(anonymous.locate("meta[name='description']")).to_have_attribute(
         "content",
-        f"Read the Forms section of the {CONFIG.APP_NAME} manual.",
+        "Design reusable structured forms with sections, field validation, conditional rules, and attached AI summaries.",
     )
     expect(anonymous.locate("link[rel='canonical']")).to_have_attribute(
         "href", re.compile(r"/manual/forms$")

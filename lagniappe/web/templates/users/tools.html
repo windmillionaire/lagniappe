@@ -100,7 +100,7 @@
        data-role="group-selectors">
     {% if Resource.USER_GROUPS.allowed(Action.CREATE) %}
       <button type="button"
-              class="{{ styles.index.tools.selector.show }}"
+              class="flex flex-row items-center gap-1 rounded-md bg-user-default px-3 py-2 font-semibold text-white shadow-xs hover:bg-user-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-dark loader"
               lp-show="user-groups:CreateUserGroup">
         {{ render_icon("add") }}
         <span>New Group</span>

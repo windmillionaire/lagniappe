@@ -60,6 +60,13 @@ tbody[data-editing="true"] td[data-editable="true"] {
 
 /* @style form.table.form */
 tbody[data-editing="true"]
+	td[data-column]:not([data-editable="true"]):not([data-column="delete"]) {
+	opacity: 0.72;
+	color: var(--color-base-medium);
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"]
 	td[data-editable="true"]:not(:has([data-type="checkbox"])) {
 	cursor: pointer;
 	outline: 1px dashed
@@ -115,6 +122,18 @@ td[data-column="completed"][data-edit-state="error"] {
 		var(--color-project-bg) 88%,
 		var(--color-project-light) 12%
 	);
+	border: 1px solid var(--color-project-light);
+	border-radius: 9999px;
+	padding: 0.125rem 0.625rem;
+}
+
+/* @style table.filters.icon.container */
+button[data-toggle="filter"] {
+	border-radius: var(--radius-sm);
+	&:focus-visible {
+		outline: 2px solid var(--kind-default);
+		outline-offset: 2px;
+	}
 }
 
 /* @style form.table.actionButton */
@@ -330,6 +349,11 @@ tbody[aria-busy="true"] > tr[lp-entity] {
 }
 
 /* @style index.mobile.controls */
+#mobile-controls {
+	border-color: color-mix(in oklch, var(--kind-light) 45%, transparent);
+}
+
+/* @style index.mobile.controls */
 #mobile-controls > [data-column] ~ [data-column] {
 	border-top: 1px solid
 		color-mix(in oklch, var(--color-base-light) 35%, transparent);
@@ -351,7 +375,7 @@ tbody[aria-busy="true"] > tr[lp-entity] {
 
 /* @style table.filters.option table.filters.bar */
 tr[data-widget="TableSorting"] .table-sort-option:has(> input:checked) {
-	background-color: white;
+	background-color: color-mix(in oklch, var(--kind-bg) 65%, white);
 	box-shadow: var(--shadow-xs);
 }
 
@@ -482,6 +506,30 @@ tr[data-widget="TableSorting"] .table-sort-option:has(> input:checked) {
 		& > tbody > tr > td[data-column="delete"] {
 			display: none;
 		}
+
+		&
+			> tbody[data-editing="true"]
+			> tr
+			> td[data-editable="true"]:not(:has([data-type="checkbox"])) {
+			outline-offset: -5px;
+			border-radius: 0.25rem;
+		}
+	}
+
+	table[data-kind="task"]
+		> tbody
+		> tr
+		> td[data-column]:is(
+			[data-column="completed"],
+			[data-column="due_date"],
+			[data-column="modified"],
+			[data-column="status"],
+			[data-column="assigned_to"]
+		) {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
 	}
 }
 

@@ -113,6 +113,7 @@ export class EmbeddedTableVisibility {
 		this.toggle.type = "button";
 		this.toggle.className = STYLES.table.thead.actionButton;
 		this.toggle.dataset.role = "embedded-table-visibility";
+		this.toggle.dataset.kind = "default";
 		this.toggle.setAttribute("aria-label", "Choose visible columns");
 		this.toggle.setAttribute("aria-expanded", "false");
 		this.toggle.title = "Choose visible columns";

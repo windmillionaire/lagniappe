@@ -716,11 +716,7 @@ export default class Core extends ShellView {
 			if (!flip) return;
 			const flipped = flip.dataset.flipped === "false";
 			flip.dataset.flipped = flipped ? "true" : "false";
-			return;
-		} else if (button && control === "help") {
-			e.preventDefault();
-			e.stopPropagation();
-			void this._showHelpModal(button);
+			button.setAttribute("aria-expanded", flipped ? "true" : "false");
 			return;
 		} else if (button && control === "star") {
 			e.preventDefault();
@@ -784,18 +780,6 @@ export default class Core extends ShellView {
 			async (classes) => {
 				if (!classes?.DeleteModal) return;
 				const modal = new classes.DeleteModal(this, button);
-				await modal.init();
-			},
-		);
-	}
-
-	async _showHelpModal(button: HTMLButtonElement) {
-		return this.runColdAction(
-			button,
-			() => this.ensureModalClasses(),
-			async (classes) => {
-				if (!classes?.HelpModal) return;
-				const modal = new classes.HelpModal(this, button);
 				await modal.init();
 			},
 		);

@@ -76,7 +76,8 @@ execution begins. Start with compact context and request selected action schemas
 through get_guidelines(task="report_actions", actions=[...]) or the plan contract.
 For a saved answer without changes, request the contract with an empty actions
 selection; no action guidance is needed.
-For questions about Lagniappe itself, consult get_help and cite the returned
+For questions about Lagniappe itself, consult get_help (search with query, load by
+topic_id, or pass list_topics=true to list every topic) and cite the returned
 topic URLs. General help explains behavior; use the actor context and live
 record permissions to establish what this user can actually do.
 Classify each upload in file_usage as evidence or organize. Evidence-only files
@@ -107,7 +108,7 @@ def answer_context(user: User) -> dict[str, object]:
             "You, the client model, answer the question; this endpoint does not call a model or save a Plan.",
             "Use permission-bounded read tools without plan_id for questions and task lookups. Reuse enough context to continue the user's work.",
             "Prefer keyword candidates and compare names and context. A user's abbreviation or paraphrase is not an exact name; names_only category browsing is available when useful.",
-            "Answer directly in the conversation, distinguishing workspace evidence from inference. Use human names and tool-returned URLs for links.",
+            "Answer directly in the conversation, distinguishing workspace evidence from inference. For how Lagniappe works, call get_help (or pass list_topics=true) and cite returned topic URLs. Use human names and tool-returned URLs for links.",
             "After answering, offer to save the answer in Lagniappe. Only after the user requests saving, start a Plan and submit the agreed answer. Do not generate an unwanted draft or automatically save every follow-up.",
             "For requested workspace changes, start a Plan and follow its execution policy. Plans require authenticated browser review unless capabilities.execute_plan is enabled for this connection. Answering never authorizes mutations.",
             "No answer or query session is persisted by this context endpoint. Normal authenticated request/security logging still applies.",

@@ -1,24 +1,34 @@
 ---
 title: Messages and Notifications
+category: tasks_and_collaboration
+keywords:
+  - messages
+  - notifications
+  - message a user
+  - clear all notifications
+  - mention
+  - mentions
+  - email digest
+  - five minute email
+  - suppress email
 related:
-- user_settings
-- tasks
-- documents
+  - user_settings
+  - tasks
+  - documents
+  - navigation
 ---
-Messages support direct conversations between managed users. Notifications collect events such as mentions, assignments, and completed background work so you can return to the relevant record.
+Exchange direct messages with eligible teammates and catch mentions, task assignments, and finished AI work from the top-right notification menu.
 
-## Conversations and mentions
+Open **Navigation → Messages** for full conversations, or click the notification badge in the top-right header to **Message a user** or **Clear all notifications**.
 
-Open Messages to start or continue a conversation with an eligible user. Document mentions can notify another person, but a mention does not grant access to a private page or project. Choose recipients who can use the linked context.
+## Conversations and document mentions
 
-In a collaborative document, type **@** and select an eligible user to mention them.
+- **Direct messages**: Only eligible managed users can exchange messages. Opening a notification jumps directly to the task, document, conversation, or result it refers to.
+- **Document mentions**: Type **@** in a collaborative document to mention and notify an eligible teammate. Mentioning someone does **not** grant them access to a private page or project, so pick recipients who can already view that record.
+- **Owner opt-ins**: The Owner separately opts in to receiving messages/mentions and task assignments under [User Settings](/help/user_settings) without reducing Owner permissions.
 
-The Owner separately opts in to receiving messages and mentions from managed users. Task assignments to the Owner have their own opt-in. These controls do not change the Owner's workspace permissions.
+## Notification email preferences
 
-## Email preferences
-
-On your own managed account, choose no notification email, email after five minutes, or a daily digest at **8:00 AM in your timezone**. In-app notifications remain available with any choice.
-
-Five-minute email can be suppressed when you are recently active in the app. Message mail can also be suppressed after you read, clear, hide, or reply to the conversation. A daily digest can include events already viewed in the app.
-
-Public accounts use separate site-email consent. Open a notification to go to the task, document, conversation, or result it refers to.
+- Managed accounts choose **no notification email**, **five-minute email**, or an **8:00 AM local-time daily digest** in [User Settings](/help/user_settings) (in-app notifications always appear regardless of email choice).
+- **Suppression rules**: Five-minute email can be suppressed when you were recently active in the app, and message mail can be suppressed after you read, clear, hide, or reply to the conversation. A daily digest may still include events you already viewed in the app.
+- **Public accounts**: Use a separate site-email consent toggle rather than managed-user digest preferences.

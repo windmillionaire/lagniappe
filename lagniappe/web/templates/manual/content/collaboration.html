@@ -1,5 +1,6 @@
-{% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, subheading, card, callout, concept, link, nav_buttons %}
 <div class="space-y-6">
+  {{ chapter_header("Collaboration", icon="users", kind="user") }}
   {% call card() %}
     <p class="text-base-medium text-lg leading-relaxed mb-3">
       More than one person can work in the same workspace at the same time.
@@ -70,7 +71,8 @@
       to the relevant conversation, document, or task.
     </p>
     <p class="text-base-medium mb-3">
-      On your own personal page, <strong>User Settings</strong> controls whether
+      Open <strong>Navigation &rarr; Account Settings</strong> (your personal
+      <strong>My Page &rarr; Settings</strong> view) to choose whether
       notification email is disabled, sent after five minutes, or collected in
       a daily digest at 8:00 AM local time. This preference changes email
       delivery, not the in-app notification.

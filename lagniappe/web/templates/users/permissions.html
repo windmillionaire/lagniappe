@@ -29,13 +29,14 @@
 {% endmacro %}
 
 {% macro sections(configs) %}
-  <div data-form-control="permission-sections" class="flex flex-col gap-4">
+  <div data-form-control="permission-sections"
+       class="flex flex-col divide-y divide-base-light/50 rounded-md bg-white/80 px-3 py-1">
     {% for name in ['public', 'models', 'forms', 'users', 'groups', 'categories', 'projects', 'pages'] %}
       {% set config = configs.get(name) %}
       {% if config %}
         <div data-section="{{ name }}" data-kind="{{ config.kind or 'default' }}"
-             class="w-full rounded-md pt-2 pb-3 px-3 outline-1 bg-slate-100 outline-user-default">
-          <h3 class="text-lg font-bold text-base-dark mb-3">{{ config.title }}</h3>
+             class="w-full py-3">
+          <h3 class="text-base font-bold text-base-dark mb-2.5">{{ config.title }}</h3>
           {% if config.select %}
             <input type="text" data-role="permission-picker"
                    name="{{ config.select.id }}" data-index="{{ config.select.index }}"

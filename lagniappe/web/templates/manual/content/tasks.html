@@ -1,5 +1,6 @@
-{% from "manual/macros.html" import heading, subheading, card, callout, concept, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, subheading, card, callout, concept, nav_buttons %}
 <div class="space-y-6">
+  {{ chapter_header("Tasks", icon="tasks", kind="task") }}
   {% call card() %}
     <p class="text-base-medium text-lg leading-relaxed mb-3">
       Tasks in Lagniappe live on the page they are about. A task can be a simple
@@ -17,8 +18,10 @@
   {% call card() %}
     <p class="text-base-medium mb-3">
       A task is attached to a page: a property, person, vehicle, client,
-      appliance, website, or whatever else you track. Opening the page shows the
-      document, structured data, files, notes, and tasks in one place.
+      appliance, website, or whatever else you track. Add one quickly with
+      <strong>add a task...</strong>, expand <strong>+</strong> (<strong>Add task details</strong>)
+      for descriptions, schedules, forms, projects, assignees, or files, and check tasks
+      complete right from the page list or task table.
     </p>
     {% call callout("tip", False) %}
       The page is the thing. The task is work related to that thing. Projects can
@@ -48,11 +51,11 @@
 
   {{ heading("Scheduling") }}
   {% call card() %}
-    <p class="text-base-medium mb-3">Tasks can have manual due dates or recurring schedules:</p>
+    <p class="text-base-medium mb-3">Tasks can have one-time due dates or repeating schedules:</p>
     <ul class="list-disc pl-5 text-base-medium space-y-2 mb-3">
-      <li><strong>Recurring:</strong> every N days, weeks, months, or years.</li>
-      <li><strong>Scheduled:</strong> calendar rules such as weekdays, month days, or yearly dates.</li>
-      <li><strong>Periodic:</strong> describe the repetition in words and AI converts it into a structured schedule.</li>
+      <li><strong>After completion:</strong> every N days, weeks, months, or years after completing the task.</li>
+      <li><strong>On a schedule:</strong> calendar rules including Daily, Weekly, Monthly, or Yearly intervals.</li>
+      <li><strong>Periodically:</strong> set a start date and describe how often it repeats in plain language; AI converts your description into a schedule when you save.</li>
     </ul>
     <p class="text-base-medium">
       Scheduled tasks can automatically set the next due date and reset after

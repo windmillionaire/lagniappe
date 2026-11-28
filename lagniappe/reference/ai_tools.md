@@ -1,28 +1,42 @@
 ---
 title: Create a Plan
+category: ai_and_automation
+keywords:
+  - create a plan
+  - plans and reports
+  - ai tools
+  - ai plan
+  - execute proposal
+  - revise plan
+  - auto execute
+  - run safe changes automatically
+  - undo completed actions
+  - executed
+  - answers
+  - cancel retry
 related:
-- ai_email
-- external_ai
-- upload_file
+  - ai_email
+  - external_ai
+  - upload_file
+  - analytics
 ---
-Create a Plan can answer questions, organize files, and propose changes to your workspace. Start with a request, files, or both. An answer and proposed changes can belong to the same saved plan.
+Create a Plan answers workspace questions, analyzes uploaded evidence, and prepares reviewable workspace changes from Home's Plans & Reports card.
+
+Start with a question, supporting files, or both—an answer and proposed workspace updates can live in the same saved plan.
 
 ## From request to result
 
-1. Open **Create a Plan** on Home. Describe what you need and add any supporting files, then choose **Start**.
-2. Read the saved answer and inspect each proposed action, including file destinations and changes to existing records.
-3. Use **Revise Plan** for corrections before execution. Choose **Execute Proposal** when the changes are ready to apply.
+1. Open **Plans & Reports → + (Create a Plan)** on Home, enter your request, attach any supporting files, and choose **Start** (check **Run safe changes automatically** when offered if you want low-risk changes applied automatically).
+2. Watch progress or use **Cancel** / **Retry generation** if a run stalls. When ready, inspect the saved answer and every proposed action, including file destinations and edits to existing records.
+3. Use **Revise Plan** to refine proposals before applying them, or choose **Execute Proposal** when everything looks right.
 
-A question without changes finishes when its answer is ready. Proposed workspace changes happen only after execution. Uploads can remain with the plan as evidence; say when a file should support an answer without being filed. Files submitted alone request organization.
+Questions without mutations finish once the answer is saved; proposed changes never run until executed. Files submitted alone ask the AI to organize them, whereas evidence-only files stay on the plan without being filed onto pages or tasks if you tell the planner not to file them. After execution, **Result** lists completed actions and any errors; **Retry Proposal** continues interrupted runs, and **Undo Completed Actions** reverses completed steps when offered.
 
-Plans remain available from Home. Open a plan to see its progress. After execution, **Result** lists the completed actions and any errors. If execution stops early, **Retry Proposal** continues unfinished work. When offered, **Undo Completed Actions** reverses work already done; later changes can prevent an undo.
+## Saved reports and filters
 
-## Saved reports
+Home's **Active**, **Executed**, and **Answers** tabs filter saved reports (badges reflect counts including items hidden by other tabs). **Active** tracks pending proposals and items needing attention, **Executed** lists completed proposals (with **Delete all executed proposals** to clear old reports, undo history, and report-only uploads while leaving created workspace records untouched), and **Answers** holds saved read-only answers.
 
-Home's **Active**, **Executed**, and **Answers** filters select saved reports. Active includes pending proposals and work needing attention; Executed contains completed proposals; Answers contains saved answers without executable changes. Counts include reports hidden by the other filters. Selecting Executed alone offers bulk deletion after confirmation. This deletes reports, undo history, and report-only uploads; created workspace records remain.
+## Access levels and reliability
 
-## Access and evidence
-
-**Ask** access permits questions and uploaded evidence. **Create** also permits proposals and other generation features. These levels govern Lagniappe's configured AI provider; ordinary record permissions still apply. External AI clients use their own provider access.
-
-AI can retrieve permitted workspace records and application help as it works. Review important claims against the referenced records or files.
+- **Ask** permits workspace questions and uploaded evidence; **Create** also allows proposals and other generation tools. Both govern Lagniappe's configured AI provider while ordinary record permissions remain enforced.
+- AI can search permitted workspace records and application help ([External AI Connections](/help/external_ai) cover your own MCP or REST client). Always double-check important claims against the linked records or files.

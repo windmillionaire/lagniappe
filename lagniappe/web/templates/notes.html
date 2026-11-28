@@ -42,7 +42,7 @@
         class="{{ styles.note.form[surface] }}">
     <div data-role="header" class="{{ styles.form.header.container }}">
       <h2 class="{{ styles.form.header.title }}" data-role="title">New Note</h2>
-      <div class="{{ styles.form.header.controls }}" data-role="controls">{{ controls.close(close_target) }}</div>
+      <div class="{{ styles.form.header.controls }}" data-role="controls">{{ controls.help("notes") }}{{ controls.close(close_target) }}</div>
     </div>
     <textarea name="body"
               rows="{{ 5 if surface == 'page' else 3 }}"

@@ -78,6 +78,7 @@
 .icon[data-icon="close"] {
 	--icon-offset-x: 0.5px;
 	--icon-offset-y: 0.5px;
+	--icon-size: var(--icon-lg-glyph-size);
 }
 
 .icon[data-icon="addRow"],

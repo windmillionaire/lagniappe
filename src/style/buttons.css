@@ -39,6 +39,14 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+	&:not(:disabled):focus-visible {
+		background-color: var(--kind-dark);
+		outline-style: solid;
+		outline-color: var(--kind-dark);
+		outline-width: 2px;
+		outline-offset: 2px;
+	}
+
 	@media (min-width: 640px) {
 		&:not(:disabled):hover,
 		&:not(:disabled):focus {
@@ -50,7 +58,12 @@
 		}
 	}
 	&:disabled {
-		opacity: 0.5;
+		background-color: var(--color-base-bg);
+		color: var(--color-base-default);
+		border: 1px solid
+			color-mix(in oklch, var(--color-base-light) 55%, transparent);
+		box-shadow: none;
+		opacity: 0.85;
 		cursor: not-allowed;
 	}
 }
@@ -99,7 +112,7 @@
 	}
 }
 
-/* @style nav.button nav.mobileButton nav.desktopButton toggle.container toggle.plain */
+/* @style nav.button nav.mobileButton toggle.container toggle.plain */
 .action-icon-button {
 	color: var(--kind-default);
 	display: inline-grid;
@@ -117,6 +130,7 @@
 		outline-style: solid;
 		outline-color: var(--kind-dark);
 		outline-width: 2px;
+		outline-offset: 2px;
 	}
 	@media (hover: hover) {
 		&:hover {
@@ -158,8 +172,11 @@
 .action-icon-button[data-role="saved-delete"],
 .action-icon-button[data-role="delete"],
 .action-icon-button[data-role="remove"][data-kind="delete"] {
-	color: var(--color-base-medium);
-	opacity: 0.65;
+	color: var(--color-base-default);
+	opacity: 0.72;
+	@media (max-width: 639px) {
+		opacity: 0.85;
+	}
 	&:focus-visible {
 		color: var(--color-delete-default);
 		background-color: white;
@@ -207,7 +224,7 @@
 	--action-offset-y: -0.125rem;
 }
 
-/* @style nav.button nav.mobileButton nav.desktopButton toggle.container toggle.plain */
+/* @style nav.button nav.mobileButton toggle.container toggle.plain */
 .action-icon-button .icon {
 	grid-area: 1 / 1;
 }
@@ -267,6 +284,7 @@
 .builder-save-button {
 	display: inline-grid;
 	grid-template-columns: auto auto;
+	column-gap: 0.25rem;
 	align-items: center;
 	padding-inline: 0.625rem;
 	&:focus-visible {

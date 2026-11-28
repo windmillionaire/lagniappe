@@ -27,12 +27,10 @@
           <a href="{{ file.preview }}"
              data-kind="file"
              class="{{ styles.link.default }}">
-            <span data-role="title">{{- file.name -}}</span>
-          </a>
+            <span data-role="title">{{- file.name -}}</span></a>
         {% else %}
           <span data-role="title">{{- file.name -}}</span>
-        {% endif %}
-        {% call menus.title("File actions") %}
+        {% endif %}{%- call menus.title("File actions") -%}
           {{ menus.star(is_starred(file)) }}
           {% if file.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
         {% endcall %}
@@ -138,6 +136,7 @@
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
       <button type="button"
               data-role="flipper"
+              aria-expanded="false"
               aria-label="Toggle tabs"
               title="Toggle tabs"
               class="{{ styles.layout.nav.flipper }} text-xl">
@@ -161,7 +160,7 @@
     <div class="{{ styles.layout.view.header }}">
       {{ view_header(file) }}
       <div data-role="description"
-           class="{{ styles.entity.description }} hidden sm:flex">
+           class="{{ styles.entity.description }}">
         {%- if file.summary -%}
           <span>{{- file.summary -}}</span>
         {%- endif -%}

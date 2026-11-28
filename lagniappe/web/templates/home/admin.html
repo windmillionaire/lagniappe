@@ -5,9 +5,23 @@
         href="/chunks/admin-tools.js?v={{ CONFIG.BUILD_ID }}">
 {% endblock extras %}
 {% from 'home/site_settings.html' import site_settings %}
-{% from 'manual/macros.html' import card as manual_card, code as command_block, subheading as manual_subheading with context %}
+{% from 'manual/macros.html' import card as manual_card, subheading as manual_subheading with context %}
 {% import 'home/ingress.html' as ingress %}
 {% import 'controls.html' as controls %}
+
+{% macro command_block(text) %}
+  <div data-role="manual-command-shell"
+       class="{{ styles.manual.codeShell }} {{ styles.manual.codeSingle }}">
+    <pre data-role="manual-command"
+         tabindex="0"
+         class="{{ styles.manual.codeInline }}"><code>{{ text }}</code></pre>
+    <button type="button"
+            data-role="manual-command-copy"
+            aria-label="Copy command"
+            aria-live="polite"
+            class="{{ styles.manual.copyButton }} shrink-0">Copy</button>
+  </div>
+{% endmacro %}
 
 {% macro view_header() %}
   <nav class="{{ styles.layout.view.title }}" data-nav="view">
@@ -74,6 +88,7 @@
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
       <button type="button"
               data-role="flipper"
+              aria-expanded="false"
               aria-label="Toggle tabs"
               title="Toggle tabs"
               class="{{ styles.layout.nav.flipper }} text-xl pt-0.25">
@@ -112,7 +127,7 @@
         data-route='{{ url_for("internal.get", kind="ingress") }}'
         data-persistent="true"
         data-visible="true"
-        class="{{ styles.list.container }}">
+        class="-mt-px divide-y divide-base-light/50 has-[>[lp-entity]]:border-t has-[>[lp-entity]]:border-base-light/50">
     </ul>
   </div>
 {% endmacro %}
@@ -125,10 +140,13 @@
        data-visible="false"
        data-kind="default"
        data-role="manual-content"
-       class="mt-4 sm:mt-0 p-4 sm:p-6"
+       class="mt-4 sm:mt-0 p-4 sm:p-6 space-y-6"
        data-parent-nav="tabs">
     {% call manual_card() %}
-      {{ manual_subheading("Data protection") }}
+      <div class="flex items-start justify-between gap-2">
+        {{ manual_subheading("Data protection") }}
+        {{ controls.help("backups_archives") }}
+      </div>
       {% if data_protection_error %}
         <p class="mt-2 text-red-700">Backup status is currently unavailable: {{ data_protection_error }}</p>
       {% else %}
@@ -222,7 +240,7 @@
           Archive validation is a read-only, offline integrity check. It verifies the manifest and
           checksums, portable data schema and relationships, local viewer links, and saved-file
           inventory. Pass the directory or ZIP path printed when the archive was created; replace
-          the default path above when a custom output path was used.
+          ARCHIVE_PATH below when a custom output path was used.
         </p>
         <p class="mt-3 font-medium">Validate any portable archive</p>
         {{ command_block('./setup.sh archive validate "ARCHIVE_PATH"') }}
@@ -238,7 +256,7 @@
        data-default-tab="settings"
        class="group/view max-w-5xl mx-auto"
        data-readonly="false">
-    <div class="{{ styles.layout.view.header }}" data-flipped="false">{{ view_header() }}</div>
+    <div class="{{ styles.layout.view.header }}">{{ view_header() }}</div>
     {{ mobile_nav() }}
     <div id="layout" data-visible="false" class="sm:mt-4">
       <div id="tabs"

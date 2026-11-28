@@ -13,7 +13,9 @@
       <meta name="robots" content="{{ search_metadata.robots }}">
       <link rel="canonical" href="{{ search_metadata.canonical_url }}">
     {% endif %}
-    <meta name="keywords" content="private, internal, non-indexed">
+    {% if not search_metadata or 'noindex' in search_metadata.robots %}
+      <meta name="keywords" content="private, internal, non-indexed">
+    {% endif %}
     <meta name="mode" content="{{ page_mode|default(default_page_mode) }}">
     <meta name="analytics" content="{{ CONFIG.ANALYTICS|yesno }}">
     <link rel="icon"

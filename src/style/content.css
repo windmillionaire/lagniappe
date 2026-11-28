@@ -22,6 +22,15 @@
 .dropdown-option-flow {
 	display: block;
 	line-height: 1.5;
+	padding-block: 0.5rem;
+}
+
+/* @style dropdown.option.flow dropdown.search.link dropdown.search.more */
+[role="listbox"] > .dropdown-option-flow + .dropdown-option-flow {
+	border-top: 1px solid
+		color-mix(in oklch, var(--color-base-light) 30%, transparent);
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
 }
 
 /* @style dropdown.option.flow dropdown.search.link dropdown.search.result */
@@ -54,6 +63,15 @@
 }
 
 /* @style dropdown.option.action */
+.dropdown-option-action[data-active="true"] {
+	background-color: var(--color-page-bg);
+	color: var(--color-page-dark);
+	font-weight: 600;
+	box-shadow: inset 0 0 0 1px
+		color-mix(in oklch, var(--color-page-default) 55%, transparent);
+}
+
+/* @style dropdown.option.action */
 @media (max-width: 639px) {
 	.dropdown-option-action[data-desktop-only="true"] {
 		display: none;
@@ -66,6 +84,16 @@
 	& > span:not(.icon):not(:has(> .icon)) {
 		line-height: 1.25;
 		transform: translateY(1px);
+	}
+}
+
+/* @style dropdown.option.action */
+[role="menu"] > .dropdown-option-action[data-kind="delete"] {
+	color: var(--color-delete-default);
+	&:hover,
+	&[aria-selected="true"] {
+		background-color: var(--color-delete-bg);
+		color: var(--color-delete-dark);
 	}
 }
 
@@ -163,6 +191,50 @@
 	margin-block-end: 0;
 }
 
+/* @style help.content */
+.help-content .help-section :is(ul, ol) {
+	padding-inline-start: 1.35rem;
+	margin-block: 0.5rem 0.75rem;
+}
+
+/* @style help.content */
+.help-content .help-section ul {
+	list-style-type: disc;
+}
+
+/* @style help.content */
+.help-content .help-section ol {
+	list-style-type: decimal;
+}
+
+/* @style help.content */
+.help-content :not(pre) > code {
+	white-space: normal;
+	overflow-wrap: break-word;
+	word-break: normal;
+	hyphens: none;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+/* @style help.content */
+.help-content a:focus-visible {
+	border-radius: 2px;
+	outline: 2px solid var(--color-page-default);
+	outline-offset: 2px;
+}
+
+/* @style help.content */
+@media (max-width: 639px) {
+	.help-content .help-summary,
+	.help-content .help-section {
+		padding: 0.875rem;
+	}
+	.help-content .help-section :is(ul, ol) {
+		padding-inline-start: 1.05rem;
+	}
+}
+
 /* ==========================================================================
    MANUAL CONTENT
    ========================================================================== */
@@ -179,7 +251,9 @@
 	font-weight: 500;
 	line-height: 1.35;
 	white-space: normal;
-	overflow-wrap: anywhere;
+	overflow-wrap: break-word;
+	word-break: normal;
+	hyphens: none;
 	box-decoration-break: clone;
 	-webkit-box-decoration-break: clone;
 }
@@ -206,7 +280,7 @@
 	}
 	&[data-due="today"] {
 		background-color: var(--color-note-bg);
-		color: var(--color-note-default);
+		color: var(--color-note-dark);
 	}
 }
 

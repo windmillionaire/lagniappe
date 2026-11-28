@@ -74,6 +74,22 @@ function _syncEmptyCount(
 	}
 }
 
+function _syncReportCount(
+	toggle: HTMLButtonElement | null,
+	widgetName: string,
+	count: number,
+) {
+	const indicator = toggle?.querySelector<HTMLElement>(
+		`[data-indicator='${widgetName}']`,
+	);
+	if (!indicator) return;
+
+	indicator.dataset.empty = count === 0 ? "true" : "false";
+	indicator.classList.remove("hidden");
+	indicator.classList.add("flex", "font-bold", "tabular-nums");
+	indicator.textContent = String(count);
+}
+
 /**
  * Shared loading lifecycle for simple home collection lists.
  *
@@ -200,6 +216,7 @@ export class ToolReportList extends BaseList {
 	init() {
 		this.component.elt.addEventListener("click", this._click);
 		this._renderFilters();
+		_syncReportCount(this._listToggle, this.name, this.itemCount);
 	}
 
 	get reportItems() {
@@ -280,17 +297,20 @@ export class ToolReportList extends BaseList {
 			empty.hidden = visible > 0;
 			const suffix = paginated ? " on this page." : ".";
 			const [firstFilter] = this.filters;
-			empty.textContent = !firstFilter
-				? "Select a report type to show."
-				: this.filters.size === 1
-					? `${
-							{
-								active: "No active proposals",
-								executed: "No executed proposals",
-								answers: "No answers",
-							}[firstFilter]
-						}${suffix}`
-					: `No reports match the selected types${suffix}`;
+			empty.textContent =
+				this.itemCount === 0 && !paginated
+					? "No plans or answers yet."
+					: !firstFilter
+						? "Select a report type to show."
+						: this.filters.size === 1
+							? `${
+									{
+										active: "No active proposals",
+										executed: "No executed proposals",
+										answers: "No answers",
+									}[firstFilter]
+								}${suffix}`
+							: `No reports match the selected types${suffix}`;
 		}
 		const clear = this.target.querySelector<HTMLButtonElement>(
 			"[data-role='delete-executed-reports']",
@@ -337,7 +357,7 @@ export class ToolReportList extends BaseList {
 		void this.view
 			.ensureDeferredOperations?.()
 			.then((manager) => manager?.scan(this.target));
-		_syncEmptyCount(this._listToggle, this.name, this.itemCount === 0);
+		_syncReportCount(this._listToggle, this.name, this.itemCount);
 		if (this.itemCount > 0 && this._listToggle) {
 			this._listToggle.classList.remove("opacity-50", "pointer-events-none");
 		}

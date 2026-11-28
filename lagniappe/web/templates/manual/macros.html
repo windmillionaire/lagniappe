@@ -1,3 +1,12 @@
+{% macro chapter_header(title, icon=None, kind=None) %}
+  <h1 class="text-2xl font-bold text-base-dark flex items-center gap-2.5 mb-4">
+    {% if icon %}
+      {{ render_icon((icon), "text-kind-default", kind or 'page') }}
+    {% endif %}
+    {{ title }}
+  </h1>
+{% endmacro %}
+
 {% macro heading(title, icon=None, kind=None) %}
   <h2 class="{{ styles.manual.heading }}">
     {% if icon %}
@@ -12,8 +21,7 @@
 {% endmacro %}
 
 {% macro card() %}
-  <div data-role="manual-card"
-       class="rounded-lg border border-base-light/50 bg-white p-5 mb-5">{{ caller() }}</div>
+  <div data-role="manual-card" class="space-y-3">{{ caller() }}</div>
 {% endmacro %}
 
 {% macro callout(kind="info", margin_bottom=True) %}
@@ -41,28 +49,42 @@
 {% endmacro %}
 
 {% macro code(text) %}
-  <div data-role="manual-command-shell" class="{{ styles.manual.codeShell }}">
-    <div class="{{ styles.manual.codeToolbar }}">
+  {% if '\n' in text.strip() %}
+    <div data-role="manual-command-shell" class="{{ styles.manual.codeShell }}">
+      <div class="{{ styles.manual.codeToolbar }}">
+        <button type="button"
+                data-role="manual-command-copy"
+                aria-label="Copy command"
+                aria-live="polite"
+                class="{{ styles.manual.copyButton }}">Copy</button>
+      </div>
+      <pre data-role="manual-command"
+           tabindex="0"
+           class="{{ styles.manual.code }}"><code>{{ text }}</code></pre>
+    </div>
+  {% else %}
+    <div data-role="manual-command-shell"
+         class="{{ styles.manual.codeShell }} {{ styles.manual.codeSingle }}">
+      <pre data-role="manual-command"
+           tabindex="0"
+           class="{{ styles.manual.codeInline }}"><code>{{ text }}</code></pre>
       <button type="button"
               data-role="manual-command-copy"
               aria-label="Copy command"
               aria-live="polite"
-              class="{{ styles.manual.copyButton }}">Copy</button>
+              class="{{ styles.manual.copyButton }} shrink-0">Copy</button>
     </div>
-    <pre data-role="manual-command"
-         tabindex="0"
-         class="{{ styles.manual.code }}"><code>{{ text }}</code></pre>
-  </div>
+  {% endif %}
 {% endmacro %}
 
-{% macro concept(title, icon=None, kind=None) %}
+{% macro concept(title, icon=None, kind=None, level=3) %}
   <div class="rounded-lg border border-base-light/50 bg-white p-4">
-    <h4 class="{{ styles.manual.conceptTitle }}">
+    <h{{ level }} class="{{ styles.manual.conceptTitle }}">
       {% if icon %}
         {{ render_icon((icon), "text-kind-default", kind or 'page') }}
       {% endif %}
       {{ title }}
-    </h4>
+    </h{{ level }}>
     <p class="text-base-medium text-sm">{{ caller() }}</p>
   </div>
 {% endmacro %}
@@ -88,18 +110,18 @@
   </div>
 {% endmacro %}
 
-{% macro step(number, title) %}
+{% macro step(number, title, level=3) %}
   <div class="flex items-start gap-3 mb-4">
     <span class="shrink-0 w-7 h-7 bg-base-medium text-white rounded-full flex items-center justify-center font-semibold text-sm">{{ number }}</span>
     <div class="flex-1 min-w-0">
-      <h4 class="font-semibold text-base-dark mb-1">{{ title }}</h4>
+      <h{{ level }} class="font-semibold text-base-dark mb-1">{{ title }}</h{{ level }}>
       {{ caller() }}
     </div>
   </div>
 {% endmacro %}
 {%- macro link(url, text) -%}
   <a href="{{ url }}"
-     class="underline text-page-default"
+     class="underline text-page-default rounded-xs hover:text-page-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default"
      target="_blank"
      rel="noopener noreferrer">{{ text }}</a>
 {%- endmacro -%}

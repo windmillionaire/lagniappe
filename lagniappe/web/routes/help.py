@@ -9,10 +9,16 @@ if TYPE_CHECKING:
 
 from flask import Blueprint, abort, render_template
 
-from lagniappe.reference import get_topic
+from lagniappe.reference import get_topic, grouped_topics
 from lagniappe.web.auth import logged_in
 
 help_pages = Blueprint("help", __name__)
+
+
+@help_pages.route("/")
+@logged_in
+def index() -> ResponseReturnValue:
+    return render_template("help/index.html", groups=grouped_topics())
 
 
 @help_pages.route("/<topic_id>")

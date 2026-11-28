@@ -74,6 +74,37 @@ STOPWORDS = frozenset(
     }
 )
 
+HELP_STOPWORDS = STOPWORDS | frozenset(
+    {
+        "about",
+        "can",
+        "could",
+        "did",
+        "do",
+        "does",
+        "from",
+        "how",
+        "i",
+        "me",
+        "my",
+        "need",
+        "our",
+        "should",
+        "want",
+        "way",
+        "we",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "would",
+        "you",
+        "your",
+    }
+)
+
 
 def _current_search_results(results):
     """Hydrate results and remove projections whose entity details are gone."""
@@ -140,17 +171,41 @@ def _highlighted_html(text):
     return Markup("").join(parts)
 
 
-def _build_term_list(user_query, expanded=False):
+def _extract_terms(user_query: str, *, include_help: bool = False) -> list[str]:
     normalized = SUBSTITUTE.sub(" ", user_query)
-    terms = [t for t in normalized.split() if len(t) > 1 and t.lower() not in STOPWORDS]
+    base_terms = [t for t in normalized.split() if len(t) > 1 and t.lower() not in STOPWORDS]
+    if not include_help or not base_terms:
+        return base_terms
+    return [t for t in base_terms if t.lower() not in HELP_STOPWORDS] or base_terms
+
+
+def _build_term_list(
+    user_query: str,
+    expanded: bool = False,
+    *,
+    allow_help: bool = False,
+    include_primary_boost: bool = True,
+):
+    terms = _extract_terms(user_query, include_help=allow_help)
     if not expanded:
         return [f"(@name:{term}*)" for term in terms]
 
-    expanded_terms = [
-        f"((@name:{term}*) | (@desc:{term}*) | (@doc:{term}*) | (@values:{term}*))"
-        for term in terms
-    ]
-    if not terms:
+    if allow_help:
+        expanded_terms = [
+            f"((@name:{token} | @name:{token}*) | "
+            f"(@keywords:{token} | @keywords:{token}*) | "
+            f"(@desc:{token} | @desc:{token}*) | "
+            f"(@doc:{token} | @doc:{token}*) | "
+            f"(@values:{token} | @values:{token}*))"
+            for term in terms
+            for token in (term.lower(),)
+        ]
+    else:
+        expanded_terms = [
+            f"((@name:{term}*) | (@desc:{term}*) | (@doc:{term}*) | (@values:{term}*))"
+            for term in terms
+        ]
+    if not terms or not include_primary_boost:
         return expanded_terms
 
     kinds = " | ".join(PRIMARY_NAME_KINDS)
@@ -384,7 +439,9 @@ def _build_search_query_string(
     if Restriction.is_denied(required) and not allow_help:
         return None
 
-    term_list = _build_term_list(user_query, expanded=True)
+    term_list = _build_term_list(user_query, expanded=True, allow_help=allow_help)
+    if not term_list:
+        return None
 
     expanded_kinds = [kind for kind in _expand_result_kinds(kinds) if kind != "help"]
     scopes = []
@@ -404,6 +461,30 @@ def _build_search_query_string(
     # entities over help with the same text and a higher document weight.
     term_list.append("(" + " | ".join(scopes) + ") => { $weight: 0; }")
     return " ".join(filter(None, term_list)) or "*"
+
+
+def _run_fulltext_search(
+    query_string: str,
+    *,
+    offset: int,
+    limit: int,
+) -> tuple[list[SearchRecord], int]:
+    redis_query = (
+        Query(query_string)
+        .dialect(SEARCH_QUERY_DIALECT)
+        .highlight(
+            fields=["desc", "doc", "values"],
+            tags=[HIGHLIGHT_OPEN, HIGHLIGHT_CLOSE],
+        )
+        .summarize(fields=["desc", "doc"], num_frags=1, context_len=25)
+        .paging(offset=offset, num=limit)
+    )
+    results = cache.search(redis_query)
+    formatted_results = [
+        _format_result(doc, snippets=True) for doc in results.docs
+    ]
+    formatted_results, stale_count = _current_search_results(formatted_results)
+    return formatted_results, max(0, results.total - stale_count)
 
 
 def search(
@@ -427,22 +508,36 @@ def search(
     if not query_string:
         return [], 0
 
-    redis_query = (
-        Query(query_string)
-        .dialect(SEARCH_QUERY_DIALECT)
-        .highlight(
-            fields=["desc", "doc", "values"],
-            tags=[HIGHLIGHT_OPEN, HIGHLIGHT_CLOSE],
-        )
-        .summarize(fields=["desc", "doc"], num_frags=1, context_len=25)
-        .paging(offset=(page - 1) * limit, num=limit)
+    return _run_fulltext_search(query_string, offset=(page - 1) * limit, limit=limit)
+
+
+def help_search(user_query: str, *, limit: int = 3) -> tuple[list[SearchRecord], int]:
+    """Search public help topics with conversational stopword filtering and OR relaxation."""
+    terms = _extract_terms(user_query, include_help=True)
+    if not terms:
+        return [], 0
+
+    bounded_limit = max(1, int(limit or 1))
+    strict_results, total = search(
+        " ".join(terms),
+        [],
+        Restriction.BELONGS_TO_NONE,
+        kinds=["help"],
+        limit=bounded_limit,
+        include_help=True,
     )
-    results = cache.search(redis_query)
-    formatted_results = [
-        _format_result(doc, snippets=True) for doc in results.docs
-    ]
-    formatted_results, stale_count = _current_search_results(formatted_results)
-    return formatted_results, max(0, results.total - stale_count)
+    if strict_results or len(terms) <= 1:
+        return strict_results, total
+
+    relaxed_terms = _build_term_list(
+        " ".join(terms[:CANDIDATE_RELAXATION_MAX_TERMS]),
+        expanded=True,
+        allow_help=True,
+        include_primary_boost=False,
+    )
+    or_clause = "(" + " | ".join(relaxed_terms) + ")"
+    scope = f"({help_clause(ensure_help())}) => {{ $weight: 0; }}"
+    return _run_fulltext_search(f"{or_clause} {scope}", offset=0, limit=bounded_limit)
 
 
 def search_facet_counts(

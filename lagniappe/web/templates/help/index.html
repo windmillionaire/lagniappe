@@ -1,0 +1,47 @@
+{% extends "layouts/base.html" %}
+{% set view_entry = "help" %}
+
+{% block title %}Help Topics{% endblock title %}
+{% block content %}
+  <div lp-view data-kind="help" data-readonly="true" class="group/view max-w-4xl mx-auto">
+    <div class="{{ styles.layout.view.header }}" data-flipped="false">
+      <nav class="{{ styles.layout.view.title }}" data-nav="view">
+        <div class="flex min-w-0 items-center">
+          {{ render_icon("help", "mr-3 shrink-0") }}
+          <h1 data-role="title">Help Topics</h1>
+        </div>
+        <a href="{{ url_for('home.home_page') }}" class="{{ styles.toggle.container }}" aria-label="Close" title="Close">
+          {{ render_icon("close") }}
+        </a>
+      </nav>
+    </div>
+    <div class="sm:mt-4 space-y-6">
+      <section class="{{ styles.card.primary }} p-4 sm:p-5 space-y-3">
+        <p class="text-sm text-base-dark">Browse reference guides for every feature in {{ config.APP_NAME }}, or read the <a href="{{ url_for('manual.index') }}" class="text-page-default underline rounded-xs hover:text-page-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default">User manual</a> for a walkthrough from start to finish.</p>
+        <nav aria-label="Help categories" class="flex flex-wrap gap-2">
+          {% for category_id, category_title, _category_description, _items in groups %}
+            <a href="#help-{{ category_id }}" class="text-xs px-2.5 py-1 rounded border border-base-light/50 bg-white text-base-dark hover:border-page-default/60 hover:bg-page-bg/50 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default">{{ category_title }}</a>
+          {% endfor %}
+        </nav>
+      </section>
+      {% for category_id, category_title, category_description, items in groups %}
+        <section id="help-{{ category_id }}" class="{{ styles.card.primary }} p-4 sm:p-5 space-y-4">
+          <div>
+            <h2 class="text-lg font-semibold text-base-dark">{{ category_title }}</h2>
+            <p class="text-sm text-base-medium mt-1">{{ category_description }}</p>
+          </div>
+          <ul class="grid gap-3 md:grid-cols-2">
+            {% for topic in items %}
+              <li>
+                <a href="{{ topic.url }}" class="block h-full rounded-lg border border-base-light/50 bg-white p-4 hover:border-page-default/50 hover:bg-page-bg/30 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default">
+                  <span class="font-medium text-page-default underline">{{ topic.title }}</span>
+                  <p class="text-sm text-base-medium mt-1">{{ topic.summary }}</p>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock content %}

@@ -360,6 +360,7 @@ export class DueDate {
 		} else if (target.name === "scheduled") {
 			if (target.checked) {
 				this.schedule.scheduled ??= {};
+				this.schedule.scheduled.mode ??= "daily";
 				this.container.appendChild(this.scheduled);
 			} else {
 				this.clearGroup(this.groups.scheduled);

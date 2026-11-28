@@ -1,4 +1,5 @@
 {% macro body(topic, embedded=False) %}
+  {% set link_classes = "text-page-default underline rounded-xs hover:text-page-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-default" %}
   <div data-role="help-body" data-topic="{{ topic.id }}" class="{{ styles.help.content }}">
     {% for section in help_sections(topic.id, embedded=embedded) %}
       <div class="{% if loop.first %}help-summary{% else %}help-section{% endif %}">{{ section|safe_html }}</div>
@@ -6,27 +7,34 @@
   </div>
   {% set context = help_context(topic.id, current_user) %}
   {% if context.email_address %}
-    <p data-role="help-context" class="mt-4 text-sm text-base-dark break-words">
+    <p data-role="help-context" class="mt-4 rounded-lg border border-base-light/60 bg-base-bg/60 p-3.5 text-sm text-base-dark break-words">
       AI email for this installation:
-      <a href="mailto:{{ context.email_address }}" class="underline">{{ context.email_address }}</a>
+      <a href="mailto:{{ context.email_address }}" class="{{ link_classes }}">{{ context.email_address }}</a>
     </p>
   {% endif %}
   {% if context.skill_url %}
-    <div data-role="external-ai-account-details" class="mt-4 space-y-2 text-sm text-base-dark break-words">
+    <div data-role="external-ai-account-details" class="mt-4 rounded-lg border border-base-light/60 bg-base-bg/60 p-3.5 space-y-1.5 text-sm text-base-dark break-words">
       {% if context.mcp_url %}
-        <p>Connection name: <code>{{ context.connection_name }}</code></p>
-        <p>MCP server: <code>{{ context.mcp_url }}</code></p>
+        <p>Connection name: <code class="whitespace-nowrap rounded bg-white px-1.5 py-0.5 font-mono text-xs border border-base-light/50">{{ context.connection_name }}</code></p>
+        <p>MCP server: <code class="rounded bg-white px-1.5 py-0.5 font-mono text-xs border border-base-light/50 break-all">{{ context.mcp_url }}</code></p>
       {% endif %}
-      <p>Skill URL (requires your API key): <code>{{ context.skill_url }}</code></p>
+      <p>Skill URL (requires your API key): <code class="rounded bg-white px-1.5 py-0.5 font-mono text-xs border border-base-light/50 break-all">{{ context.skill_url }}</code></p>
     </div>
   {% endif %}
   {% if topic.related %}
-    <nav aria-label="Related help" class="mt-5 border-t border-base-light/50 pt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-      {% for related_id in topic.related %}
-        {% set related = help_topic(related_id) %}
-        <a href="{{ related.url }}"
-           class="text-page-default underline">{{ related.title }}</a>
-      {% endfor %}
+    <nav aria-label="Related help" class="mt-5 border-t border-base-light/50 pt-4 space-y-2 text-sm">
+      <p class="text-xs font-medium uppercase tracking-wide text-base-medium">Related topics</p>
+      <div class="flex flex-wrap gap-x-4 gap-y-2">
+        {% for related_id in topic.related %}
+          {% set related = help_topic(related_id) %}
+          <a href="{{ related.url }}"
+             class="{{ link_classes }}">{{ related.title }}</a>
+        {% endfor %}
+      </div>
     </nav>
   {% endif %}
+  <div class="mt-4 pt-3 border-t border-base-light/50 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+    <a href="{{ url_for('help.index') }}" data-help-index class="{{ link_classes }}">All help topics</a>
+    <a href="{{ url_for('manual.index') }}" class="{{ link_classes }}">User manual</a>
+  </div>
 {% endmacro %}

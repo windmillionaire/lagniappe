@@ -1,23 +1,34 @@
 ---
 title: Permissions
+category: permissions_and_users
+keywords:
+  - permissions
+  - roles
+  - owner
+  - administrator
+  - editor
+  - viewer
+  - grants
+  - access control
+  - view edit create delete assign publish
 related:
-- restrictions
-- user_groups
-- site_administrators
-- public_permissions
+  - restrictions
+  - user_groups
+  - site_administrators
+  - public_permissions
 ---
-Permissions determine which workspace resources a user can view, edit, create, delete, assign, or publish. Grants can come from user groups and individual permissions.
+Permissions determine which workspace resources each person can view, edit, create, delete, assign, or publish through individual grants and user group memberships.
 
-## Grants and scope
+Lagniappe enforces all permissions on the server before rendering pages or returning search, filter, or AI tool results.
 
-Higher applicable grants include the lower actions defined for that resource. View permits reading; Edit permits updates. Editing a category also permits creating pages within it. Creating categories, projects, forms, or users requires the corresponding creation permission. Assign and Publish control their respective operations.
+## How grants combine and cascade
 
-Broad grants cover a resource area; specific grants cover a particular category, project, page, or group. The permissions display can hide specific rows already covered by a broad grant. A missing row can therefore mean the person already has access through the broader permission.
+- **Hierarchy**: Higher grants imply lower ones on the same resource—**Edit** includes **View**; editing a category also permits creating new pages inside it; creating categories, projects, forms, or users requires the dedicated creation grant; **Assign** and **Publish** govern those specific actions.
+- **Broad vs. specific grants**: Broad grants cover an entire resource type, while specific grants target one category, project, page, or user group. Permission screens hide redundant specific rows already implied by a broad grant—so an omitted row often means the user already holds broader access.
+- **Additive grants, narrowing restrictions**: Group memberships and individual grants combine by taking the **strongest** grant; page and form **Restrictions** then narrow access for ordinary users rather than adding extra permissions.
 
-Group and individual grants combine using the strongest applicable permission. Page and form restrictions add membership requirements for ordinary users; they are not extra grants.
+## Roles at a glance
 
-## Roles
-
-The **Owner** has full application access and manages the Administrator roster and privileged accounts. **Administrators** manage ordinary content, users, groups, and site settings, but cannot manage the Owner or other Administrators. Secret-bearing configuration remains Owner-only.
-
-Regular managed users receive their configured grants. Signed-in public users have a separate limited public-permissions policy. Public users are different from anonymous readers of a published page.
+- **Owner**: Full workspace access plus exclusive control over the Administrator roster, secret-bearing configuration, and privileged Administrator accounts.
+- **Administrators**: Manage ordinary content, users, groups, backups, and site settings, without ability to edit the Owner, other Administrators, or Owner-only secrets.
+- **Managed and Public users**: Managed users receive tailored group and individual grants; signed-in **Public** accounts follow the site's limited [Public Permissions](/help/public_permissions) policy (distinct from anonymous visitors reading a published page document).

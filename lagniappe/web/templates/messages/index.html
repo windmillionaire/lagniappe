@@ -1,5 +1,6 @@
 {% extends "layouts/base.html" %}
 {% set view_entry = "messages" %}
+{% import 'controls.html' as controls %}
 
 {% block title %}Messages{% endblock title %}
 
@@ -13,11 +14,12 @@
     <div class="{{ styles.layout.view.header }}">
       <nav class="{{ styles.layout.view.title }}" data-role="page-header">
         <span data-role="title">Messages</span>
+        {{ controls.help("messages_notifications") }}
       </nav>
     </div>
     <div id="layout" class="{{ styles.entity.cards }} sm:mt-4">
       <aside data-kind="user"
-             class="{{ styles.card.secondary }} overflow-hidden group-data-[empty=true]/view:hidden sm:group-data-[empty=true]/view:hidden">
+             class="{{ styles.card.secondary }} overflow-hidden md:min-h-[32rem] group-data-[empty=true]/view:hidden sm:group-data-[empty=true]/view:hidden">
         <div class="{{ styles.layout.nav.mobile }} mt-4 h-16 py-3 font-semibold md:mt-0 md:h-auto md:border-0 md:bg-white md:px-6 md:py-5">
           <span data-role="title" class="hidden md:inline">Conversations</span>
           <button type="button"

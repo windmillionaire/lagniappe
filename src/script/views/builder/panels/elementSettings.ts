@@ -80,7 +80,7 @@ const _condition = (condition: FieldCondition, index: number) => {
 	text.textContent = condition.checked ? " is " : " has the value ";
 
 	const status = wrapper.appendChild(document.createElement("span"));
-	status.className = `font-semibold text-project-default`;
+	status.className = `font-semibold text-project-dark`;
 	status.textContent = condition.checked
 		? "checked"
 		: (condition.label ?? null);
@@ -623,6 +623,7 @@ export class ElementSettings {
 		for (const section of sections) {
 			const setting = section.dataset.setting;
 			if (setting === "input") {
+				section.className = "px-1 py-0.5";
 				if (!section.querySelector("[data-role='saved-input-type']")) {
 					const notice = document.createElement("p");
 					notice.dataset.role = "saved-input-type";

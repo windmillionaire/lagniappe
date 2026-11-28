@@ -1,5 +1,6 @@
-{% from "manual/macros.html" import heading, subheading, card, callout, concept, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, subheading, card, callout, concept, nav_buttons %}
 <div class="space-y-6">
+  {{ chapter_header("Permissions", icon="permissions", kind="user") }}
   {% call card() %}
     <p class="text-base-medium text-lg leading-relaxed mb-3">
       Permissions control what each user can see and do. They are enforced on

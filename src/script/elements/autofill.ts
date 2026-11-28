@@ -3,7 +3,7 @@ import { withTransition } from "../shared/transitions.ts";
 import { BaseUpload } from "./base/baseUpload.ts";
 import { UploadMenu, uploadElement } from "./upload.ts";
 
-const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or a pdf";
+const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or PDF";
 
 export interface AutofillParent {
 	target: HTMLElement;
@@ -37,6 +37,7 @@ export class AutofillUpload extends BaseUpload {
 
 		this.context = uploadElement.contextUpload({
 			text: AUTOFILL_DROPZONE_TEXT,
+			descriptionPlaceholder: "Describe what to extract or fill in…",
 		});
 		this.inputName = "autofill-file";
 		this.dropzone = this.context.dropzone;

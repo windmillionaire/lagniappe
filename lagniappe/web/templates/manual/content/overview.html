@@ -1,4 +1,4 @@
-{% from "manual/macros.html" import heading, card, concept, link, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, card, concept, link, nav_buttons %}
 
 {% macro open_source() %}
   {{ heading("Open Source") }}
@@ -21,6 +21,7 @@
   {% endcall %}
 {% endmacro %}
 <div class="space-y-6">
+  {{ chapter_header("Overview", icon="overview", kind="category") }}
   {% call card() %}
     <p class="text-base-medium text-lg leading-relaxed mb-3">
       Lagniappe is a private web app for individuals and small organizations

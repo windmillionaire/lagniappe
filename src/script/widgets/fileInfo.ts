@@ -109,7 +109,8 @@ export class FileInfo extends FormWidget {
 		label.textContent = "File Name";
 
 		const value = wrapper.appendChild(document.createElement("p"));
-		value.className = "sm:text-sm text-kind-default";
+		value.className =
+			"min-h-10 flex items-center rounded-md border border-base-light/35 bg-white/70 px-3 py-2 sm:text-sm text-base-dark break-all";
 		value.textContent = this.target.dataset.filename ?? "";
 
 		return wrapper;
@@ -127,7 +128,8 @@ export class FileInfo extends FormWidget {
 		label.textContent = "File Type";
 
 		const value = wrapper.appendChild(document.createElement("p"));
-		value.className = "sm:text-sm text-kind-default";
+		value.className =
+			"min-h-10 flex items-center rounded-md border border-base-light/35 bg-white/70 px-3 py-2 sm:text-sm text-base-dark break-all";
 		const encoding = this.target.dataset.encoding;
 		value.textContent = encoding ? `${mimetype} (${encoding})` : mimetype;
 

@@ -411,10 +411,31 @@ export default class ShellView {
 			void this.copyCommand(copyButton);
 			return;
 		}
+		const helpButton = hasClosest(target)
+			? target.closest<HTMLButtonElement>("button[lp-control='help']")
+			: null;
+		if (helpButton) {
+			event.preventDefault();
+			event.stopPropagation();
+			void this._showHelpModal(helpButton);
+			return;
+		}
 		this._click(event);
 	}
 
 	_click(_event: MouseEvent) {}
+
+	async _showHelpModal(button: HTMLButtonElement) {
+		return this.runColdAction(
+			button,
+			() => import("../../shared/modal.ts"),
+			async ({ HelpModal }) => {
+				if (this._destroyed || !HelpModal) return;
+				const modal = new HelpModal(this, button);
+				await modal.init();
+			},
+		);
+	}
 
 	async copyCommand(button: HTMLButtonElement) {
 		const command = button

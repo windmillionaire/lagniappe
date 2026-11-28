@@ -89,11 +89,18 @@
   {%- elif field.is_entity_valued and value is iterable -%}
     {%- for f in value -%}
       <p>{{- format_name(f) -}}</p>
+    {%- else -%}
+      {%- if field.id == 'groups' -%}
+        <span class="text-base-medium" aria-label="None">—</span>
+      {%- endif -%}
     {%- endfor -%}
   {%- elif field.icon == 'tel' and value -%}
     {{- value|format_phone -}}
   {%- elif field.icon == 'email' and value -%}
-    <a href="mailto:{{ value }}">{{- value -}}</a>
+    <a href="mailto:{{ value }}"
+       class="inline-block max-w-full break-all rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default">{{- value -}}</a>
+  {%- elif field.id == 'form_type' and value is string -%}
+    {{- value|title -}}
   {%- elif value is string -%}
     {{- value -}}
   {%- elif field.id == 'due_date' and value -%}
@@ -102,7 +109,7 @@
     {%- elif value is in_past -%}
       <span class="text-delete-default">{{ value|format_date }}</span>
     {%- else -%}
-      <span class="text-note-default">{{ value|format_date }}</span>
+      <span class="text-amber-800 font-semibold">{{ value|format_date }}</span>
     {%- endif -%}
   {%- elif field.icon == 'time' and value is datetime and value -%}
     {{- value|format_time -}}

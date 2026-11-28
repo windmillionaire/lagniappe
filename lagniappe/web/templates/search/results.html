@@ -18,7 +18,9 @@
         {% endfor %}
       </ul>
     {% else %}
-      <div class="text-delete-default italic py-4">No matches for the query "{{ query }}".</div>
+      <div class="rounded-md border border-base-light/40 bg-base-bg/60 p-4 text-sm text-base-medium">
+        No matches for <span class="font-semibold text-base-dark">“{{ query }}”</span>. Try fewer words or check your spelling.
+      </div>
     {% endif %}
     {% if pagination.total > 0 %}{{ footer(pagination) }}{% endif %}
   </div>
@@ -26,7 +28,7 @@
 
 {% macro footer(pagination) %}
   <div class="{{ styles.search.pagination.footer }}">
-    <p class="{{ styles.search.pagination.summary }}"
+    <p class="{{ styles.search.pagination.summary }} tabular-nums"
        aria-label="Showing {{ pagination.showing }} to {{ pagination.to }} of {{ pagination.total }} results">
       <span class="sm:hidden">
         <span class="font-semibold">{{ pagination.showing }}–{{ pagination.to }}</span>

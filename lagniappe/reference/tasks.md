@@ -1,26 +1,38 @@
 ---
 title: Tasks
+category: tasks_and_collaboration
+keywords:
+  - tasks
+  - add task
+  - checklist
+  - assign task
+  - assignee
+  - complete task
+  - undo
+  - move to page
+  - combine with task
+  - delete task
+  - task actions
+  - reopen task
 related:
-- task_scheduling
-- task_history
-- model_tasks
-- quick_tasks
-- permissions
+  - task_scheduling
+  - task_history
+  - model_tasks
+  - quick_tasks
+  - permissions
+  - personal_task
 ---
-Tasks track work on a page. A task can include a name, description, assignee, due date, schedule, form answers, files, and project or page links.
+Track actionable work on any Page—complete with inline descriptions, due dates, repeating schedules, task forms, assignees, attachments, and Project links.
 
-## Create and complete work
+Create tasks right on the page they belong to (or capture quick reminders on **Home** for **My Page**).
 
-Create a task on the page where it belongs, then add only the context the work needs. Use a project or model task to connect it to a workflow. Attach a task form for structured answers and supporting files for evidence.
+## Adding, editing, and organizing tasks
 
-Use the task's update controls to save edits. Checking completion records the work as complete; if its form is open, the submitted answers accompany completion. Required fields or a background form update can prevent completion until resolved.
+- **Quick add and details**: On a page's **Tasks** tab, type into **add a task...** and click **Add**, click descriptions inline to edit, or open **+** (**Add task details**) to add **Description**, **Schedule**, **Form**, **Project**, **Assignee**, and **File** chips.
+- **Saving**: Edit form fields or task metadata and watch the **Saved** / **Save** / **Saving…** pill or **Update** control to persist changes cleanly.
+- **Completing and reopening**: Tick the **Completed** checkbox (live in page lists and tables) to finish a task—any open form answers save with that completion. Required fields or an active background form migration can block completion until resolved. Reopening clears answers for a fresh submission and archives history; see [Task Completion and History](/help/task_history).
+- **Task actions menu**: Open **Task actions** to **Rename**, **Change Form**, **Move to Page** (opens a page picker), **Combine with Task** (shows compatible tasks when available), or **Delete**.
 
-Reopening clears answers for a fresh submission and archives the selected completed values. Use task history when you need earlier results.
+## Permissions and assignments
 
-The task's actions menu includes **Move to Page**, **Combine with Task**, and **Delete** when permitted. **Move to Page** opens a page selector. **Combine with Task** lists compatible tasks; if none are available, it says so.
-
-## Who can work on a task
-
-People who can edit the originating page can edit its tasks. An assigned user can work on the assigned task, subject to applicable restrictions, without receiving access to the entire origin page. Links and project membership can provide visibility without granting edit access.
-
-Assignment does not bypass page/form restriction rules. The Owner must opt in before ordinary managed users can assign work to that account.
+Anyone allowed to edit the originating page can edit its tasks. Assigning a task lets the assignee work on that task (subject to restrictions) without exposing unrelated content on its origin page, though assignment never bypasses page or form restrictions. The Owner must enable **Assign tasks to me** under **Account Settings** before managed users can assign tasks to them.

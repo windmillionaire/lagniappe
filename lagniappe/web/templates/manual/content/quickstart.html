@@ -1,4 +1,4 @@
-{% from "manual/macros.html" import heading, card, callout, link, nav_buttons %}
+{% from "manual/macros.html" import chapter_header, heading, card, callout, link, nav_buttons %}
 
 {% macro guide_item(icon, title, description, kind="page") %}
   <div data-kind="{{ kind }}"
@@ -31,12 +31,13 @@
   </details>
 {% endmacro %}
 <div class="space-y-6">
+  {{ chapter_header("Quickstart", icon="launch", kind="page") }}
   {% call card() %}
     <p class="mb-3 text-lg leading-relaxed text-base-medium">
-      Lagniappe starts at Home, where you can open a recent list, create
-      something new, or jump into the workspace directory. Once you open a
-      record, colored icons switch between the information, documents, tasks,
-      and files that belong to it.
+      Lagniappe starts at Home, where you can open your starred or recent lists,
+      create something new, or open the top-left Navigation menu to move anywhere
+      in the workspace. Once you open a record, colored icons switch between the
+      information, documents, tasks, and files that belong to it.
     </p>
     {% call callout("tip", False) %}
       Controls only appear when they apply. If an icon described here is
@@ -123,15 +124,15 @@
     "page"
     ) %}
     <p class="mb-4 text-base-medium">
-      Select the main label for <strong>Starred, Directory, Plans &amp; Reports, Pages,
-      Notes, Tasks, Projects,</strong> or <strong>Categories</strong> to expand
-      its list on Home; select it again to collapse it. An adjacent
+      Select the main label for <strong>Pages, Notes, Tasks, Projects, Categories,
+      Starred,</strong> or <strong>Plans &amp; Reports</strong> to expand its
+      list on Home; select it again to collapse it. An adjacent
       <strong>plus</strong> opens that section's creation form instead. Select a
       result inside a list to leave Home and open the record.
     </p>
     <div class="grid gap-3 sm:grid-cols-2">
-      {{ guide_item("user", "My Page", "Goes directly to your user page and its related information.", "user") }}
-      {{ guide_item("directory", "Directory", "Expands links to Active Tasks, Forms, Users, Analytics, and Admin when you have access.") }}
+      {{ guide_item("menu", "Navigation menu", "Opens links to Home, My Page, Messages, Active Tasks, Forms, Users, Analytics, Admin, Manual, Account Settings, and Sign out.") }}
+      {{ guide_item("user", "My Page", "Goes directly to your personal page and its related information.", "user") }}
       {{ guide_item("page", "Pages", "Expands recent pages; plus starts a page by choosing its category.") }}
       {{ guide_item("notes", "Notes", "Expands workspace notes; plus opens a quick text or photo note.", "note") }}
       {{ guide_item("tasks", "Tasks", "Expands your active tasks; plus creates a personal task on My Page.", "task") }}
@@ -186,13 +187,13 @@
     </p>
     <div class="grid gap-3 sm:grid-cols-2">
       {{ guide_item("selected", "Completion checkbox", "Marks the task complete immediately; clear it to reopen a completed task.", "task") }}
-      {{ guide_item("settings.page", "Task settings", "Edits the name, description, schedule, assignment, project, form, and attachments. Save with Update Task.", "task") }}
-      {{ guide_item("form", "Task form", "Opens the structured checklist or record attached to the task. Save with Update; it does not autosave.", "form") }}
+      {{ guide_item("add", "Add task details", "The inline + chip tray adds or edits Description, Schedule, Form, Project, Assignee, and File right inside the task.", "task") }}
+      {{ guide_item("form", "Task form", "Opens the structured checklist or record attached to the task. Save with the Save pill or Update button; it does not autosave.", "form") }}
       {{ guide_item("history", "History", "Shows earlier completions and their saved form values.", "task") }}
-      {{ guide_item("builder.unsaved", "Unsaved task", "Appears after changing settings or form values. Select the cloud alert or the form's Update button to save.", "task") }}
+      {{ guide_item("builder.unsaved", "Unsaved task", "Appears after changing task form values. Use Save or Update to persist your changes.", "task") }}
       {{ guide_item("snooze", "Postpone", "On Home, moves a task's due date without deleting its schedule.", "task") }}
       {{ guide_item("expand", "Completed tasks", "Expands or collapses the completed-task list on a page.", "task") }}
-      {{ guide_item("menu", "Task actions", "Provides Move to Page, Combine with Task, and Delete when permitted.", "task") }}
+      {{ guide_item("menu", "Task actions", "Provides Rename, Change Form, Move to Page, Combine with Task, and Delete when permitted.", "task") }}
     </div>
   {% endcall %}
   {% call disclosure(
@@ -207,11 +208,11 @@
       and Users use the same basic table layout, so these controls repeat.
     </p>
     <div class="grid gap-3 sm:grid-cols-2">
-      {{ guide_item("filter.active", "Column sort/filter", "Opens choices for sorting or filtering that column.") }}
-      {{ guide_item("column", "Visible columns", "Shows or hides table columns. On mobile it opens the combined table-controls panel.") }}
-      {{ guide_item("tableEdit", "Edit table", "Enables inline editing for supported cells.", "category") }}
-      {{ guide_item("indexTools", "Tools", "Opens actions such as New Page, settings, filters, saved filters, or creation forms.", "category") }}
-      {{ guide_item("filter.list", "Saved filters", "Opens reusable filters; the play button beside one runs it.") }}
+      {{ guide_item("filter.active", "Column sorting", "Click column headers to sort rows by field values, names, or dates.") }}
+      {{ guide_item("column", "Visible columns", "Shows or hides table columns (Choose visible columns on desktop, Table controls on mobile).") }}
+      {{ guide_item("tableEdit", "Edit table", "Enables inline editing for supported cells in Categories (Edit table inline) and Active Tasks (Edit table).", "category") }}
+      {{ guide_item("menu", "Category actions", "Menu beside the category title to Rename, edit description, set default form, edit table inline, Star, or Delete (with + for New Page).", "category") }}
+      {{ guide_item("filter.list", "Live filter bar", "Add + Filter chips that update matches automatically as you edit them, then Save filter or Clear.") }}
       {{ guide_item("trash.inactive", "Row delete", "Deletes that row after confirmation when you have permission.", "delete") }}
     </div>
   {% endcall %}
@@ -282,9 +283,9 @@
     ) %}
     <div class="grid gap-3 sm:grid-cols-2">
       {{ guide_item("search", "Search", "Type in the top bar for quick results; open All Results to filter matches by record kind.") }}
-      {{ guide_item("users", "Users", "User rows open user pages. Authorized administrators can use Tools for new users, groups, and permissions.", "user") }}
+      {{ guide_item("users", "Users", "User rows open user pages. Authorized administrators can use header icons for New User, User Groups, and Show public/regular users.", "user") }}
       {{ guide_item("public", "Public/regular users", "On the User Index, switches between public and regular accounts when public users are enabled.", "user") }}
-      {{ guide_item("siteSettings", "Admin", "Opens Administrator site settings, exports, imports, and deployment information; secret-bearing Configuration remains Owner-only.") }}
+      {{ guide_item("siteSettings", "Admin", "Opens Administrator Site Settings, Import Data, and Backups & Archives; secret-bearing Configuration remains Owner-only.") }}
     </div>
   {% endcall %}
   {% call callout("success") %}
